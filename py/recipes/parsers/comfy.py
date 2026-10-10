@@ -7,8 +7,28 @@ from typing import Dict, Any
 from ..base import RecipeMetadataParser
 from ..constants import GEN_PARAM_KEYS
 from ...services.metadata_service import get_default_metadata_provider
+from ...utils.generation_metadata import split_lora_tags
 
 logger = logging.getLogger(__name__)
+
+# LoRA loaders that name a single LoRA in ``lora_name``. ``LoraLoaderModelOnly``
+# has no clip strength and is the usual shape in LoRA-only workflows (Anima,
+# Flux, ...); ignoring it silently emptied a recipe's LoRA list.
+_LORA_NAME_NODES = frozenset({
+    "LoraLoader",
+    "LoraLoaderModelOnly",
+})
+
+# LoRA loaders that carry several entries in a ``loras`` widget.
+_LORA_WIDGET_NODES = frozenset({
+    "LoraLoaderLM",
+    "Lora Loader (LoraManager)",
+})
+
+# A LoRA stack written as text: "<lora:name:0.8>".
+_LORA_TEXT_NODES = frozenset({
+    "LoRA Text Loader (LoraManager)",
+})
 
 class ComfyMetadataParser(RecipeMetadataParser):
     """Parser for Civitai ComfyUI metadata JSON format"""
@@ -80,13 +100,27 @@ class ComfyMetadataParser(RecipeMetadataParser):
                 if not isinstance(inputs, dict):
                     continue
 
-                if node.get('class_type') == 'LoraLoader':
+                class_type = node.get('class_type')
+
+                if class_type in _LORA_NAME_NODES:
                     lora_name = inputs.get('lora_name', '')
                     if isinstance(lora_name, str) and lora_name:
                         lora_candidates.append((lora_name, inputs.get('strength_model', 1.0)))
                     continue
 
-                if node.get('class_type') != 'LoraLoaderLM':
+                if class_type in _LORA_TEXT_NODES:
+                    syntax = inputs.get('lora_syntax', '')
+                    if isinstance(syntax, str) and syntax:
+                        try:
+                            _clean, entries = split_lora_tags(syntax)
+                        except (ValueError, TypeError) as exc:
+                            logger.debug("Unparsable LoRA syntax in recipe: %s", exc)
+                            entries = []
+                        for entry_name, model_weight, _clip_weight in entries:
+                            lora_candidates.append((entry_name, model_weight))
+                    continue
+
+                if class_type not in _LORA_WIDGET_NODES:
                     continue
 
                 loras_data = inputs.get('loras', [])
