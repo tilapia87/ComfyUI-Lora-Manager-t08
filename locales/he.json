@@ -245,14 +245,14 @@
             "embeddings": "Embeddings",
             "other": "אחרים",
             "statistics": "סטטיסטיקה",
-            "gallery": "[TODO: Translate] Gallery"
+            "gallery": "גלריה"
         },
         "search": {
             "placeholder": "חיפוש",
             "options": "אפשרויות חיפוש",
             "searchIn": "חפש ב:",
             "notAvailable": "חיפוש לא זמין בדף הסטטיסטיקה",
-            "notAvailableGallery": "[TODO: Translate] Search is available in the gallery toolbar",
+            "notAvailableGallery": "החיפוש זמין בסרגל הכלים של הגלריה",
             "filters": {
                 "filename": "שם קובץ",
                 "modelname": "שם מודל",
@@ -2836,17 +2836,17 @@
             "scanRootUnreachable": "{scope} אינו זמין כעת. לא בוצעו שינויים."
         },
         "gallery": {
-            "fetchFailed": "[TODO: Translate] Failed to load gallery images: {message}",
-            "ratingFailed": "[TODO: Translate] Failed to save the rating: {message}",
-            "statsFailed": "[TODO: Translate] Failed to load gallery statistics: {message}",
-            "configFailed": "[TODO: Translate] Failed to load the gallery configuration: {message}",
-            "scanStarted": "[TODO: Translate] Scanning the output folder...",
-            "scanAlreadyRunning": "[TODO: Translate] A scan is already running.",
-            "scanFailed": "[TODO: Translate] Failed to start the scan: {message}",
-            "scanError": "[TODO: Translate] Scan failed: {message}",
-            "scanComplete": "[TODO: Translate] Scan complete: {added} added, {updated} updated, {removed} removed",
-            "settingsSaved": "[TODO: Translate] Gallery settings saved",
-            "settingsSaveFailed": "[TODO: Translate] Failed to save gallery settings: {message}"
+            "fetchFailed": "טעינת תמונות הגלריה נכשלה: {message}",
+            "ratingFailed": "שמירת ההערכה נכשלה: {message}",
+            "statsFailed": "טעינת סטטיסטיקת הגלריה נכשלה: {message}",
+            "configFailed": "טעינת תצורת הגלריה נכשלה: {message}",
+            "scanStarted": "סורק את תיקיית הפלט...",
+            "scanAlreadyRunning": "סריקה כבר פועלת.",
+            "scanFailed": "הפעלת הסריקה נכשלה: {message}",
+            "scanError": "הסריקה נכשלה: {message}",
+            "scanComplete": "הסריקה הושלמה: {added} נוספו, {updated} עודכנו, {removed} הוסרו",
+            "settingsSaved": "הגדרות הגלריה נשמרו",
+            "settingsSaveFailed": "שמירת הגדרות הגלריה נכשלה: {message}"
         },
         "agent": {
             "llmNotConfigured": "ספק AI לא הוגדר. הפעל אותו בהגדרות → ספק AI.",
@@ -2962,138 +2962,138 @@
         }
     },
     "gallery": {
-        "title": "[TODO: Translate] Gallery",
+        "title": "גלריה",
         "views": {
-            "images": "[TODO: Translate] Images",
-            "statistics": "[TODO: Translate] Statistics"
+            "images": "תמונות",
+            "statistics": "סטטיסטיקה"
         },
         "actions": {
-            "scan": "[TODO: Translate] Scan output folder",
-            "scanNow": "[TODO: Translate] Scan now",
-            "settings": "[TODO: Translate] Gallery settings",
-            "setOutputFolder": "[TODO: Translate] Set output folder",
-            "browse": "[TODO: Translate] Browse",
-            "save": "[TODO: Translate] Save",
-            "clearFilter": "[TODO: Translate] Clear filter",
-            "previous": "[TODO: Translate] Previous page",
-            "next": "[TODO: Translate] Next page"
+            "scan": "סרוק את תיקיית הפלט",
+            "scanNow": "סרוק כעת",
+            "settings": "הגדרות הגלריה",
+            "setOutputFolder": "הגדר תיקיית פלט",
+            "browse": "עיון",
+            "save": "שמירה",
+            "clearFilter": "נקה סינון",
+            "previous": "העמוד הקודם",
+            "next": "העמוד הבא"
         },
         "sort": {
-            "label": "[TODO: Translate] Sort",
-            "newest": "[TODO: Translate] Newest first",
-            "oldest": "[TODO: Translate] Oldest first",
-            "ratingDesc": "[TODO: Translate] Highest rated first",
-            "ratingAsc": "[TODO: Translate] Lowest rated first",
-            "name": "[TODO: Translate] File name"
+            "label": "מיון לפי",
+            "newest": "החדשות ביותר תחילה",
+            "oldest": "הישנות ביותר תחילה",
+            "ratingDesc": "ההערכה הגבוהה ביותר תחילה",
+            "ratingAsc": "ההערכה הנמוכה ביותר תחילה",
+            "name": "שם קובץ"
         },
         "rating": {
-            "label": "[TODO: Translate] Rating",
-            "all": "[TODO: Translate] All images",
-            "liked": "[TODO: Translate] Liked",
-            "disliked": "[TODO: Translate] Disliked",
-            "unrated": "[TODO: Translate] Unrated"
+            "label": "הערכה",
+            "all": "כל התמונות",
+            "liked": "אהבתי",
+            "disliked": "לא אהבתי",
+            "unrated": "ללא הערכה"
         },
         "search": {
-            "label": "[TODO: Translate] Search",
-            "placeholder": "[TODO: Translate] File name or prompt"
+            "label": "חיפוש",
+            "placeholder": "שם קובץ או פרומפט"
         },
         "status": {
-            "loading": "[TODO: Translate] Loading images..."
+            "loading": "טוען תמונות..."
         },
         "filter": {
-            "artist": "[TODO: Translate] Artist: {name}",
-            "lora": "[TODO: Translate] LoRA: {name}"
+            "artist": "אמן: {name}",
+            "lora": "LoRA: {name}"
         },
         "card": {
-            "unknownSize": "[TODO: Translate] Unknown size",
-            "likeHint": "[TODO: Translate] Like (ArrowUp or U)",
-            "dislikeHint": "[TODO: Translate] Dislike (ArrowDown or D)",
-            "artistHint": "[TODO: Translate] @{name} - from your artist list",
-            "unknownArtistHint": "[TODO: Translate] @{name} - not found in your artist list",
-            "loraHint": "[TODO: Translate] Show images that use {name}",
-            "loraMissingHint": "[TODO: Translate] {name} - this LoRA is not in your local library",
-            "noMetadata": "[TODO: Translate] No metadata",
-            "noMetadataHint": "[TODO: Translate] This image has no readable generation metadata, so its artists and LoRAs are unknown."
+            "unknownSize": "גודל לא ידוע",
+            "likeHint": "אהבתי (↑ או U)",
+            "dislikeHint": "לא אהבתי (↓ או D)",
+            "artistHint": "@{name} - מרשימת האמנים שלך",
+            "unknownArtistHint": "@{name} - לא נמצא ברשימת האמנים שלך",
+            "loraHint": "הצג תמונות שמשתמשות ב-{name}",
+            "loraMissingHint": "{name} - ה-LoRA הזה אינו בספרייה המקומית שלך",
+            "noMetadata": "אין מטא-נתונים",
+            "noMetadataHint": "לתמונה זו אין מטא-נתוני יצירה קריאים, ולכן האמנים וה-LoRA שלה אינם ידועים."
         },
         "progress": {
             "stage": {
-                "idle": "[TODO: Translate] Idle",
-                "walking": "[TODO: Translate] Walking folders",
-                "parsing": "[TODO: Translate] Parsing metadata",
-                "finalizing": "[TODO: Translate] Finalizing",
-                "completed": "[TODO: Translate] Scan complete",
-                "error": "[TODO: Translate] Scan failed"
+                "idle": "לא פעיל",
+                "walking": "סורק תיקיות",
+                "parsing": "מנתח מטא-נתונים",
+                "finalizing": "מסיים",
+                "completed": "הסריקה הושלמה",
+                "error": "הסריקה נכשלה"
             },
-            "counts": "[TODO: Translate] {indexed} of {total} indexed",
-            "details": "[TODO: Translate] {added} added, {updated} updated, {removed} removed, {failed} failed"
+            "counts": "{indexed} מתוך {total} באינדקס",
+            "details": "{added} נוספו, {updated} עודכנו, {removed} הוסרו, {failed} נכשלו"
         },
         "empty": {
-            "noImagesTitle": "[TODO: Translate] No images yet",
-            "noImagesMessage": "[TODO: Translate] Nothing has been indexed from the output folder yet. Run a scan to pick up your generated images.",
-            "noMatchesTitle": "[TODO: Translate] No images match",
-            "noMatchesMessage": "[TODO: Translate] Try clearing the artist or LoRA filter, the rating filter, or the search box.",
-            "unsetTitle": "[TODO: Translate] No output folder found",
-            "unsetMessage": "[TODO: Translate] Set the ComfyUI output folder in the gallery settings, then scan it to build the gallery."
+            "noImagesTitle": "אין עדיין תמונות",
+            "noImagesMessage": "עדיין לא נאסף דבר לאינדקס מתיקיית הפלט. הפעל סריקה כדי לאסוף את התמונות שיצרת.",
+            "noMatchesTitle": "אין תמונות תואמות",
+            "noMatchesMessage": "נסה לנקות את הסינון לפי אמן או LoRA, את סינון ההערכה, או את תיבת החיפוש.",
+            "unsetTitle": "לא נמצאה תיקיית פלט",
+            "unsetMessage": "הגדר את תיקיית הפלט של ComfyUI בהגדרות הגלריה, ואז סרוק אותה כדי לבנות את הגלריה."
         },
         "error": {
-            "title": "[TODO: Translate] Could not load the gallery",
-            "unknown": "[TODO: Translate] Unknown error",
-            "retry": "[TODO: Translate] Retry"
+            "title": "לא ניתן לטעון את הגלריה",
+            "unknown": "שגיאה לא ידועה",
+            "retry": "נסה שוב"
         },
         "pagination": {
-            "total": "[TODO: Translate] {total} images",
-            "page": "[TODO: Translate] Page {page} of {total}"
+            "total": "{total} תמונות",
+            "page": "עמוד {page} מתוך {total}"
         },
         "settings": {
-            "outputPath": "[TODO: Translate] ComfyUI output folder",
-            "outputPathPlaceholder": "[TODO: Translate] Leave empty to use ComfyUI's own output folder",
-            "outputPathHint": "[TODO: Translate] Images are indexed from this folder.",
-            "artistListPath": "[TODO: Translate] Artist list file",
-            "artistListPathPlaceholder": "[TODO: Translate] A danbooru-style artist list, one artist per line",
-            "artistListPathHint": "[TODO: Translate] Used to confirm and canonicalise the @artist names found in prompts.",
-            "recursive": "[TODO: Translate] Include subfolders",
-            "recursiveHint": "[TODO: Translate] Also scan subfolders of the output folder.",
-            "effectivePath": "[TODO: Translate] Effective folder: {path} ({source})",
-            "effectivePathUnset": "[TODO: Translate] No output folder could be detected.",
+            "outputPath": "תיקיית הפלט של ComfyUI",
+            "outputPathPlaceholder": "השאר ריק כדי להשתמש בתיקיית הפלט של ComfyUI עצמו",
+            "outputPathHint": "התמונות נאספות לאינדקס מתיקייה זו.",
+            "artistListPath": "קובץ רשימת אמנים",
+            "artistListPathPlaceholder": "רשימת אמנים בסגנון danbooru, אמן אחד בכל שורה",
+            "artistListPathHint": "משמש לאימות ולנרמול של שמות אמנים עם @ שנמצאו בפרומפטים.",
+            "recursive": "כלול תיקיות משנה",
+            "recursiveHint": "סרוק גם תיקיות משנה של תיקיית הפלט.",
+            "effectivePath": "תיקייה פעילה: {path} ({source})",
+            "effectivePathUnset": "לא זוהתה תיקיית פלט.",
             "source": {
-                "comfyui": "[TODO: Translate] detected automatically",
-                "setting": "[TODO: Translate] from your setting",
-                "unset": "[TODO: Translate] not set"
+                "comfyui": "זוהתה אוטומטית",
+                "setting": "מההגדרה שלך",
+                "unset": "לא מוגדרת"
             }
         },
         "stats": {
             "by": {
-                "label": "[TODO: Translate] Group by",
-                "artist": "[TODO: Translate] Artist",
-                "lora": "[TODO: Translate] LoRA"
+                "label": "קבץ לפי",
+                "artist": "אמן",
+                "lora": "LoRA"
             },
             "sort": {
-                "label": "[TODO: Translate] Sort",
-                "net": "[TODO: Translate] Net score",
-                "likes": "[TODO: Translate] Likes",
-                "dislikes": "[TODO: Translate] Dislikes",
-                "total": "[TODO: Translate] Total",
-                "ratio": "[TODO: Translate] Like ratio"
+                "label": "מיון לפי",
+                "net": "ניקוד נטו",
+                "likes": "לייקים",
+                "dislikes": "דיסלייקים",
+                "total": "סה\"כ",
+                "ratio": "יחס לייקים"
             },
             "summary": {
-                "images": "[TODO: Translate] Images",
-                "rated": "[TODO: Translate] Rated",
-                "liked": "[TODO: Translate] Liked",
-                "disliked": "[TODO: Translate] Disliked"
+                "images": "תמונות",
+                "rated": "הוערכו",
+                "liked": "אהבתי",
+                "disliked": "לא אהבתי"
             },
             "columns": {
-                "rank": "[TODO: Translate] #",
-                "name": "[TODO: Translate] Name",
-                "likes": "[TODO: Translate] Likes",
-                "dislikes": "[TODO: Translate] Dislikes",
-                "unrated": "[TODO: Translate] Unrated",
-                "total": "[TODO: Translate] Total",
-                "net": "[TODO: Translate] Net",
-                "ratio": "[TODO: Translate] Ratio"
+                "rank": "#",
+                "name": "שם",
+                "likes": "לייקים",
+                "dislikes": "דיסלייקים",
+                "unrated": "ללא הערכה",
+                "total": "סה\"כ",
+                "net": "נטו",
+                "ratio": "יחס"
             },
-            "noRatio": "[TODO: Translate] n/a",
-            "rowHint": "[TODO: Translate] Show the images for this entry",
-            "empty": "[TODO: Translate] Nothing to rank yet. Rate some images, then come back."
+            "noRatio": "לא זמין",
+            "rowHint": "הצג את התמונות של רשומה זו",
+            "empty": "אין עדיין מה לדרג. הערך כמה תמונות ואז חזור."
         }
     }
 }

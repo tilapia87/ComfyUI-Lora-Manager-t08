@@ -245,14 +245,14 @@
             "embeddings": "Embedding",
             "other": "기타",
             "statistics": "통계",
-            "gallery": "[TODO: Translate] Gallery"
+            "gallery": "갤러리"
         },
         "search": {
             "placeholder": "검색",
             "options": "검색 옵션",
             "searchIn": "검색 범위:",
             "notAvailable": "통계 페이지에서는 검색을 사용할 수 없습니다",
-            "notAvailableGallery": "[TODO: Translate] Search is available in the gallery toolbar",
+            "notAvailableGallery": "검색은 갤러리 도구 모음에서 사용할 수 있습니다",
             "filters": {
                 "filename": "파일명",
                 "modelname": "모델명",
@@ -2836,17 +2836,17 @@
             "scanRootUnreachable": "{scope}에 현재 접근할 수 없습니다. 변경된 내용은 없습니다."
         },
         "gallery": {
-            "fetchFailed": "[TODO: Translate] Failed to load gallery images: {message}",
-            "ratingFailed": "[TODO: Translate] Failed to save the rating: {message}",
-            "statsFailed": "[TODO: Translate] Failed to load gallery statistics: {message}",
-            "configFailed": "[TODO: Translate] Failed to load the gallery configuration: {message}",
-            "scanStarted": "[TODO: Translate] Scanning the output folder...",
-            "scanAlreadyRunning": "[TODO: Translate] A scan is already running.",
-            "scanFailed": "[TODO: Translate] Failed to start the scan: {message}",
-            "scanError": "[TODO: Translate] Scan failed: {message}",
-            "scanComplete": "[TODO: Translate] Scan complete: {added} added, {updated} updated, {removed} removed",
-            "settingsSaved": "[TODO: Translate] Gallery settings saved",
-            "settingsSaveFailed": "[TODO: Translate] Failed to save gallery settings: {message}"
+            "fetchFailed": "갤러리 이미지를 불러오지 못했습니다: {message}",
+            "ratingFailed": "평점을 저장하지 못했습니다: {message}",
+            "statsFailed": "갤러리 통계를 불러오지 못했습니다: {message}",
+            "configFailed": "갤러리 설정을 불러오지 못했습니다: {message}",
+            "scanStarted": "출력 폴더를 스캔하는 중...",
+            "scanAlreadyRunning": "이미 스캔이 실행 중입니다.",
+            "scanFailed": "스캔을 시작하지 못했습니다: {message}",
+            "scanError": "스캔 실패: {message}",
+            "scanComplete": "스캔 완료: 새 이미지 {added}개, 업데이트 {updated}개, 제거 {removed}개",
+            "settingsSaved": "갤러리 설정을 저장했습니다",
+            "settingsSaveFailed": "갤러리 설정을 저장하지 못했습니다: {message}"
         },
         "agent": {
             "llmNotConfigured": "AI 제공자가 설정되지 않았습니다. 설정 → AI 제공자에서 활성화하세요.",
@@ -2962,138 +2962,138 @@
         }
     },
     "gallery": {
-        "title": "[TODO: Translate] Gallery",
+        "title": "갤러리",
         "views": {
-            "images": "[TODO: Translate] Images",
-            "statistics": "[TODO: Translate] Statistics"
+            "images": "이미지",
+            "statistics": "통계"
         },
         "actions": {
-            "scan": "[TODO: Translate] Scan output folder",
-            "scanNow": "[TODO: Translate] Scan now",
-            "settings": "[TODO: Translate] Gallery settings",
-            "setOutputFolder": "[TODO: Translate] Set output folder",
-            "browse": "[TODO: Translate] Browse",
-            "save": "[TODO: Translate] Save",
-            "clearFilter": "[TODO: Translate] Clear filter",
-            "previous": "[TODO: Translate] Previous page",
-            "next": "[TODO: Translate] Next page"
+            "scan": "출력 폴더 스캔",
+            "scanNow": "지금 스캔",
+            "settings": "갤러리 설정",
+            "setOutputFolder": "출력 폴더 설정",
+            "browse": "찾아보기",
+            "save": "저장",
+            "clearFilter": "필터 지우기",
+            "previous": "이전 페이지",
+            "next": "다음 페이지"
         },
         "sort": {
-            "label": "[TODO: Translate] Sort",
-            "newest": "[TODO: Translate] Newest first",
-            "oldest": "[TODO: Translate] Oldest first",
-            "ratingDesc": "[TODO: Translate] Highest rated first",
-            "ratingAsc": "[TODO: Translate] Lowest rated first",
-            "name": "[TODO: Translate] File name"
+            "label": "정렬",
+            "newest": "최신순",
+            "oldest": "오래된순",
+            "ratingDesc": "평점 높은순",
+            "ratingAsc": "평점 낮은순",
+            "name": "파일 이름"
         },
         "rating": {
-            "label": "[TODO: Translate] Rating",
-            "all": "[TODO: Translate] All images",
-            "liked": "[TODO: Translate] Liked",
-            "disliked": "[TODO: Translate] Disliked",
-            "unrated": "[TODO: Translate] Unrated"
+            "label": "평점",
+            "all": "모든 이미지",
+            "liked": "좋아요",
+            "disliked": "싫어요",
+            "unrated": "미평가"
         },
         "search": {
-            "label": "[TODO: Translate] Search",
-            "placeholder": "[TODO: Translate] File name or prompt"
+            "label": "검색",
+            "placeholder": "파일 이름 또는 프롬프트"
         },
         "status": {
-            "loading": "[TODO: Translate] Loading images..."
+            "loading": "이미지 불러오는 중..."
         },
         "filter": {
-            "artist": "[TODO: Translate] Artist: {name}",
-            "lora": "[TODO: Translate] LoRA: {name}"
+            "artist": "작가: {name}",
+            "lora": "LoRA: {name}"
         },
         "card": {
-            "unknownSize": "[TODO: Translate] Unknown size",
-            "likeHint": "[TODO: Translate] Like (ArrowUp or U)",
-            "dislikeHint": "[TODO: Translate] Dislike (ArrowDown or D)",
-            "artistHint": "[TODO: Translate] @{name} - from your artist list",
-            "unknownArtistHint": "[TODO: Translate] @{name} - not found in your artist list",
-            "loraHint": "[TODO: Translate] Show images that use {name}",
-            "loraMissingHint": "[TODO: Translate] {name} - this LoRA is not in your local library",
-            "noMetadata": "[TODO: Translate] No metadata",
-            "noMetadataHint": "[TODO: Translate] This image has no readable generation metadata, so its artists and LoRAs are unknown."
+            "unknownSize": "크기 알 수 없음",
+            "likeHint": "좋아요 (↑ 또는 U)",
+            "dislikeHint": "싫어요 (↓ 또는 D)",
+            "artistHint": "@{name} - 작가 목록에 있음",
+            "unknownArtistHint": "@{name} - 작가 목록에서 찾을 수 없음",
+            "loraHint": "{name}을(를) 사용하는 이미지 표시",
+            "loraMissingHint": "{name} - 이 LoRA는 로컬 라이브러리에 없습니다",
+            "noMetadata": "메타데이터 없음",
+            "noMetadataHint": "이 이미지에는 읽을 수 있는 생성 메타데이터가 없어 사용된 작가와 LoRA를 알 수 없습니다."
         },
         "progress": {
             "stage": {
-                "idle": "[TODO: Translate] Idle",
-                "walking": "[TODO: Translate] Walking folders",
-                "parsing": "[TODO: Translate] Parsing metadata",
-                "finalizing": "[TODO: Translate] Finalizing",
-                "completed": "[TODO: Translate] Scan complete",
-                "error": "[TODO: Translate] Scan failed"
+                "idle": "대기 중",
+                "walking": "폴더 검색 중",
+                "parsing": "메타데이터 분석 중",
+                "finalizing": "마무리 중",
+                "completed": "스캔 완료",
+                "error": "스캔 실패"
             },
-            "counts": "[TODO: Translate] {indexed} of {total} indexed",
-            "details": "[TODO: Translate] {added} added, {updated} updated, {removed} removed, {failed} failed"
+            "counts": "{total}개 중 {indexed}개 인덱싱됨",
+            "details": "새 이미지 {added}개, 업데이트 {updated}개, 제거 {removed}개, 실패 {failed}개"
         },
         "empty": {
-            "noImagesTitle": "[TODO: Translate] No images yet",
-            "noImagesMessage": "[TODO: Translate] Nothing has been indexed from the output folder yet. Run a scan to pick up your generated images.",
-            "noMatchesTitle": "[TODO: Translate] No images match",
-            "noMatchesMessage": "[TODO: Translate] Try clearing the artist or LoRA filter, the rating filter, or the search box.",
-            "unsetTitle": "[TODO: Translate] No output folder found",
-            "unsetMessage": "[TODO: Translate] Set the ComfyUI output folder in the gallery settings, then scan it to build the gallery."
+            "noImagesTitle": "아직 이미지가 없습니다",
+            "noImagesMessage": "아직 출력 폴더에서 인덱싱된 항목이 없습니다. 스캔을 실행해 생성된 이미지를 가져오세요.",
+            "noMatchesTitle": "일치하는 이미지가 없습니다",
+            "noMatchesMessage": "작가 또는 LoRA 필터, 평점 필터, 검색어를 지워 보세요.",
+            "unsetTitle": "출력 폴더를 찾을 수 없습니다",
+            "unsetMessage": "갤러리 설정에서 ComfyUI 출력 폴더를 지정한 다음 스캔해 갤러리를 만드세요."
         },
         "error": {
-            "title": "[TODO: Translate] Could not load the gallery",
-            "unknown": "[TODO: Translate] Unknown error",
-            "retry": "[TODO: Translate] Retry"
+            "title": "갤러리를 불러오지 못했습니다",
+            "unknown": "알 수 없는 오류",
+            "retry": "다시 시도"
         },
         "pagination": {
-            "total": "[TODO: Translate] {total} images",
-            "page": "[TODO: Translate] Page {page} of {total}"
+            "total": "이미지 {total}개",
+            "page": "{total}페이지 중 {page}페이지"
         },
         "settings": {
-            "outputPath": "[TODO: Translate] ComfyUI output folder",
-            "outputPathPlaceholder": "[TODO: Translate] Leave empty to use ComfyUI's own output folder",
-            "outputPathHint": "[TODO: Translate] Images are indexed from this folder.",
-            "artistListPath": "[TODO: Translate] Artist list file",
-            "artistListPathPlaceholder": "[TODO: Translate] A danbooru-style artist list, one artist per line",
-            "artistListPathHint": "[TODO: Translate] Used to confirm and canonicalise the @artist names found in prompts.",
-            "recursive": "[TODO: Translate] Include subfolders",
-            "recursiveHint": "[TODO: Translate] Also scan subfolders of the output folder.",
-            "effectivePath": "[TODO: Translate] Effective folder: {path} ({source})",
-            "effectivePathUnset": "[TODO: Translate] No output folder could be detected.",
+            "outputPath": "ComfyUI 출력 폴더",
+            "outputPathPlaceholder": "비워 두면 ComfyUI 자체 출력 폴더를 사용합니다",
+            "outputPathHint": "이미지는 이 폴더에서 인덱싱됩니다.",
+            "artistListPath": "작가 목록 파일",
+            "artistListPathPlaceholder": "danbooru 스타일 작가 목록, 한 줄에 작가 하나",
+            "artistListPathHint": "프롬프트에서 발견된 @작가 이름을 확인하고 정규화하는 데 사용됩니다.",
+            "recursive": "하위 폴더 포함",
+            "recursiveHint": "출력 폴더의 하위 폴더도 스캔합니다.",
+            "effectivePath": "실제 폴더: {path} ({source})",
+            "effectivePathUnset": "출력 폴더를 감지할 수 없습니다.",
             "source": {
-                "comfyui": "[TODO: Translate] detected automatically",
-                "setting": "[TODO: Translate] from your setting",
-                "unset": "[TODO: Translate] not set"
+                "comfyui": "자동 감지됨",
+                "setting": "설정에서 가져옴",
+                "unset": "설정되지 않음"
             }
         },
         "stats": {
             "by": {
-                "label": "[TODO: Translate] Group by",
-                "artist": "[TODO: Translate] Artist",
-                "lora": "[TODO: Translate] LoRA"
+                "label": "그룹 기준",
+                "artist": "작가",
+                "lora": "LoRA"
             },
             "sort": {
-                "label": "[TODO: Translate] Sort",
-                "net": "[TODO: Translate] Net score",
-                "likes": "[TODO: Translate] Likes",
-                "dislikes": "[TODO: Translate] Dislikes",
-                "total": "[TODO: Translate] Total",
-                "ratio": "[TODO: Translate] Like ratio"
+                "label": "정렬",
+                "net": "순점수",
+                "likes": "좋아요",
+                "dislikes": "싫어요",
+                "total": "전체",
+                "ratio": "좋아요 비율"
             },
             "summary": {
-                "images": "[TODO: Translate] Images",
-                "rated": "[TODO: Translate] Rated",
-                "liked": "[TODO: Translate] Liked",
-                "disliked": "[TODO: Translate] Disliked"
+                "images": "이미지",
+                "rated": "평가됨",
+                "liked": "좋아요",
+                "disliked": "싫어요"
             },
             "columns": {
-                "rank": "[TODO: Translate] #",
-                "name": "[TODO: Translate] Name",
-                "likes": "[TODO: Translate] Likes",
-                "dislikes": "[TODO: Translate] Dislikes",
-                "unrated": "[TODO: Translate] Unrated",
-                "total": "[TODO: Translate] Total",
-                "net": "[TODO: Translate] Net",
-                "ratio": "[TODO: Translate] Ratio"
+                "rank": "#",
+                "name": "이름",
+                "likes": "좋아요",
+                "dislikes": "싫어요",
+                "unrated": "미평가",
+                "total": "전체",
+                "net": "순점수",
+                "ratio": "비율"
             },
-            "noRatio": "[TODO: Translate] n/a",
-            "rowHint": "[TODO: Translate] Show the images for this entry",
-            "empty": "[TODO: Translate] Nothing to rank yet. Rate some images, then come back."
+            "noRatio": "없음",
+            "rowHint": "이 항목의 이미지 보기",
+            "empty": "아직 순위를 매길 데이터가 없습니다. 이미지 몇 장에 평점을 남기고 다시 오세요."
         }
     }
 }

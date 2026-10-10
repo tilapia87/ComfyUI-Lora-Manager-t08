@@ -245,14 +245,14 @@
             "embeddings": "Embedding",
             "other": "その他",
             "statistics": "統計",
-            "gallery": "[TODO: Translate] Gallery"
+            "gallery": "ギャラリー"
         },
         "search": {
             "placeholder": "検索",
             "options": "検索オプション",
             "searchIn": "検索対象：",
             "notAvailable": "統計ページでは検索は利用できません",
-            "notAvailableGallery": "[TODO: Translate] Search is available in the gallery toolbar",
+            "notAvailableGallery": "検索はギャラリーツールバーで利用できます",
             "filters": {
                 "filename": "ファイル名",
                 "modelname": "モデル名",
@@ -2836,17 +2836,17 @@
             "scanRootUnreachable": "{scope} に現在アクセスできません。変更は行われていません。"
         },
         "gallery": {
-            "fetchFailed": "[TODO: Translate] Failed to load gallery images: {message}",
-            "ratingFailed": "[TODO: Translate] Failed to save the rating: {message}",
-            "statsFailed": "[TODO: Translate] Failed to load gallery statistics: {message}",
-            "configFailed": "[TODO: Translate] Failed to load the gallery configuration: {message}",
-            "scanStarted": "[TODO: Translate] Scanning the output folder...",
-            "scanAlreadyRunning": "[TODO: Translate] A scan is already running.",
-            "scanFailed": "[TODO: Translate] Failed to start the scan: {message}",
-            "scanError": "[TODO: Translate] Scan failed: {message}",
-            "scanComplete": "[TODO: Translate] Scan complete: {added} added, {updated} updated, {removed} removed",
-            "settingsSaved": "[TODO: Translate] Gallery settings saved",
-            "settingsSaveFailed": "[TODO: Translate] Failed to save gallery settings: {message}"
+            "fetchFailed": "ギャラリー画像の読み込みに失敗しました：{message}",
+            "ratingFailed": "評価の保存に失敗しました：{message}",
+            "statsFailed": "ギャラリー統計の読み込みに失敗しました：{message}",
+            "configFailed": "ギャラリー設定の読み込みに失敗しました：{message}",
+            "scanStarted": "出力フォルダをスキャンしています...",
+            "scanAlreadyRunning": "スキャンはすでに実行中です。",
+            "scanFailed": "スキャンの開始に失敗しました：{message}",
+            "scanError": "スキャンに失敗しました：{message}",
+            "scanComplete": "スキャン完了：新規 {added} 件、更新 {updated} 件、削除 {removed} 件",
+            "settingsSaved": "ギャラリー設定を保存しました",
+            "settingsSaveFailed": "ギャラリー設定の保存に失敗しました：{message}"
         },
         "agent": {
             "llmNotConfigured": "AIプロバイダーが設定されていません。設定 → AIプロバイダーで有効にしてください。",
@@ -2962,138 +2962,138 @@
         }
     },
     "gallery": {
-        "title": "[TODO: Translate] Gallery",
+        "title": "ギャラリー",
         "views": {
-            "images": "[TODO: Translate] Images",
-            "statistics": "[TODO: Translate] Statistics"
+            "images": "画像",
+            "statistics": "統計"
         },
         "actions": {
-            "scan": "[TODO: Translate] Scan output folder",
-            "scanNow": "[TODO: Translate] Scan now",
-            "settings": "[TODO: Translate] Gallery settings",
-            "setOutputFolder": "[TODO: Translate] Set output folder",
-            "browse": "[TODO: Translate] Browse",
-            "save": "[TODO: Translate] Save",
-            "clearFilter": "[TODO: Translate] Clear filter",
-            "previous": "[TODO: Translate] Previous page",
-            "next": "[TODO: Translate] Next page"
+            "scan": "出力フォルダをスキャン",
+            "scanNow": "今すぐスキャン",
+            "settings": "ギャラリー設定",
+            "setOutputFolder": "出力フォルダを設定",
+            "browse": "参照",
+            "save": "保存",
+            "clearFilter": "フィルターをクリア",
+            "previous": "前のページ",
+            "next": "次のページ"
         },
         "sort": {
-            "label": "[TODO: Translate] Sort",
-            "newest": "[TODO: Translate] Newest first",
-            "oldest": "[TODO: Translate] Oldest first",
-            "ratingDesc": "[TODO: Translate] Highest rated first",
-            "ratingAsc": "[TODO: Translate] Lowest rated first",
-            "name": "[TODO: Translate] File name"
+            "label": "並び順",
+            "newest": "新しい順",
+            "oldest": "古い順",
+            "ratingDesc": "評価の高い順",
+            "ratingAsc": "評価の低い順",
+            "name": "ファイル名"
         },
         "rating": {
-            "label": "[TODO: Translate] Rating",
-            "all": "[TODO: Translate] All images",
-            "liked": "[TODO: Translate] Liked",
-            "disliked": "[TODO: Translate] Disliked",
-            "unrated": "[TODO: Translate] Unrated"
+            "label": "評価",
+            "all": "すべての画像",
+            "liked": "いいね",
+            "disliked": "よくないね",
+            "unrated": "未評価"
         },
         "search": {
-            "label": "[TODO: Translate] Search",
-            "placeholder": "[TODO: Translate] File name or prompt"
+            "label": "検索",
+            "placeholder": "ファイル名またはプロンプト"
         },
         "status": {
-            "loading": "[TODO: Translate] Loading images..."
+            "loading": "画像を読み込み中..."
         },
         "filter": {
-            "artist": "[TODO: Translate] Artist: {name}",
-            "lora": "[TODO: Translate] LoRA: {name}"
+            "artist": "絵師：{name}",
+            "lora": "LoRA：{name}"
         },
         "card": {
-            "unknownSize": "[TODO: Translate] Unknown size",
-            "likeHint": "[TODO: Translate] Like (ArrowUp or U)",
-            "dislikeHint": "[TODO: Translate] Dislike (ArrowDown or D)",
-            "artistHint": "[TODO: Translate] @{name} - from your artist list",
-            "unknownArtistHint": "[TODO: Translate] @{name} - not found in your artist list",
-            "loraHint": "[TODO: Translate] Show images that use {name}",
-            "loraMissingHint": "[TODO: Translate] {name} - this LoRA is not in your local library",
-            "noMetadata": "[TODO: Translate] No metadata",
-            "noMetadataHint": "[TODO: Translate] This image has no readable generation metadata, so its artists and LoRAs are unknown."
+            "unknownSize": "サイズ不明",
+            "likeHint": "いいね（↑ または U）",
+            "dislikeHint": "よくないね（↓ または D）",
+            "artistHint": "@{name} - 絵師リストから",
+            "unknownArtistHint": "@{name} - 絵師リストに見つかりません",
+            "loraHint": "{name} を使用した画像を表示",
+            "loraMissingHint": "{name} - この LoRA はローカルライブラリにありません",
+            "noMetadata": "メタデータなし",
+            "noMetadataHint": "この画像には読み取り可能な生成メタデータがないため、使用された絵師と LoRA は不明です。"
         },
         "progress": {
             "stage": {
-                "idle": "[TODO: Translate] Idle",
-                "walking": "[TODO: Translate] Walking folders",
-                "parsing": "[TODO: Translate] Parsing metadata",
-                "finalizing": "[TODO: Translate] Finalizing",
-                "completed": "[TODO: Translate] Scan complete",
-                "error": "[TODO: Translate] Scan failed"
+                "idle": "待機中",
+                "walking": "フォルダを走査中",
+                "parsing": "メタデータを解析中",
+                "finalizing": "仕上げ中",
+                "completed": "スキャン完了",
+                "error": "スキャン失敗"
             },
-            "counts": "[TODO: Translate] {indexed} of {total} indexed",
-            "details": "[TODO: Translate] {added} added, {updated} updated, {removed} removed, {failed} failed"
+            "counts": "{indexed} / {total} 件をインデックス済み",
+            "details": "新規 {added} 件、更新 {updated} 件、削除 {removed} 件、失敗 {failed} 件"
         },
         "empty": {
-            "noImagesTitle": "[TODO: Translate] No images yet",
-            "noImagesMessage": "[TODO: Translate] Nothing has been indexed from the output folder yet. Run a scan to pick up your generated images.",
-            "noMatchesTitle": "[TODO: Translate] No images match",
-            "noMatchesMessage": "[TODO: Translate] Try clearing the artist or LoRA filter, the rating filter, or the search box.",
-            "unsetTitle": "[TODO: Translate] No output folder found",
-            "unsetMessage": "[TODO: Translate] Set the ComfyUI output folder in the gallery settings, then scan it to build the gallery."
+            "noImagesTitle": "まだ画像がありません",
+            "noImagesMessage": "出力フォルダからまだ何もインデックスされていません。スキャンを実行して生成した画像を取り込んでください。",
+            "noMatchesTitle": "条件に一致する画像がありません",
+            "noMatchesMessage": "絵師または LoRA のフィルター、評価フィルター、検索ボックスをクリアしてみてください。",
+            "unsetTitle": "出力フォルダが見つかりません",
+            "unsetMessage": "ギャラリー設定で ComfyUI の出力フォルダを指定し、スキャンしてギャラリーを作成してください。"
         },
         "error": {
-            "title": "[TODO: Translate] Could not load the gallery",
-            "unknown": "[TODO: Translate] Unknown error",
-            "retry": "[TODO: Translate] Retry"
+            "title": "ギャラリーを読み込めませんでした",
+            "unknown": "不明なエラー",
+            "retry": "再試行"
         },
         "pagination": {
-            "total": "[TODO: Translate] {total} images",
-            "page": "[TODO: Translate] Page {page} of {total}"
+            "total": "{total} 件の画像",
+            "page": "{page} / {total} ページ"
         },
         "settings": {
-            "outputPath": "[TODO: Translate] ComfyUI output folder",
-            "outputPathPlaceholder": "[TODO: Translate] Leave empty to use ComfyUI's own output folder",
-            "outputPathHint": "[TODO: Translate] Images are indexed from this folder.",
-            "artistListPath": "[TODO: Translate] Artist list file",
-            "artistListPathPlaceholder": "[TODO: Translate] A danbooru-style artist list, one artist per line",
-            "artistListPathHint": "[TODO: Translate] Used to confirm and canonicalise the @artist names found in prompts.",
-            "recursive": "[TODO: Translate] Include subfolders",
-            "recursiveHint": "[TODO: Translate] Also scan subfolders of the output folder.",
-            "effectivePath": "[TODO: Translate] Effective folder: {path} ({source})",
-            "effectivePathUnset": "[TODO: Translate] No output folder could be detected.",
+            "outputPath": "ComfyUI 出力フォルダ",
+            "outputPathPlaceholder": "空欄にすると ComfyUI 自身の出力フォルダを使用します",
+            "outputPathHint": "画像はこのフォルダからインデックスされます。",
+            "artistListPath": "絵師リストファイル",
+            "artistListPathPlaceholder": "danbooru 形式の絵師リスト、1 行に 1 名",
+            "artistListPathHint": "プロンプト内で見つかった @ 付きの絵師名を確認して正規化するために使用します。",
+            "recursive": "サブフォルダを含める",
+            "recursiveHint": "出力フォルダのサブフォルダもスキャンします。",
+            "effectivePath": "有効なフォルダ：{path}（{source}）",
+            "effectivePathUnset": "出力フォルダを検出できませんでした。",
             "source": {
-                "comfyui": "[TODO: Translate] detected automatically",
-                "setting": "[TODO: Translate] from your setting",
-                "unset": "[TODO: Translate] not set"
+                "comfyui": "自動検出",
+                "setting": "設定から",
+                "unset": "未設定"
             }
         },
         "stats": {
             "by": {
-                "label": "[TODO: Translate] Group by",
-                "artist": "[TODO: Translate] Artist",
-                "lora": "[TODO: Translate] LoRA"
+                "label": "グループ化",
+                "artist": "絵師",
+                "lora": "LoRA"
             },
             "sort": {
-                "label": "[TODO: Translate] Sort",
-                "net": "[TODO: Translate] Net score",
-                "likes": "[TODO: Translate] Likes",
-                "dislikes": "[TODO: Translate] Dislikes",
-                "total": "[TODO: Translate] Total",
-                "ratio": "[TODO: Translate] Like ratio"
+                "label": "並び順",
+                "net": "ネットスコア",
+                "likes": "いいね",
+                "dislikes": "よくないね",
+                "total": "合計",
+                "ratio": "いいね率"
             },
             "summary": {
-                "images": "[TODO: Translate] Images",
-                "rated": "[TODO: Translate] Rated",
-                "liked": "[TODO: Translate] Liked",
-                "disliked": "[TODO: Translate] Disliked"
+                "images": "画像",
+                "rated": "評価済み",
+                "liked": "いいね",
+                "disliked": "よくないね"
             },
             "columns": {
-                "rank": "[TODO: Translate] #",
-                "name": "[TODO: Translate] Name",
-                "likes": "[TODO: Translate] Likes",
-                "dislikes": "[TODO: Translate] Dislikes",
-                "unrated": "[TODO: Translate] Unrated",
-                "total": "[TODO: Translate] Total",
-                "net": "[TODO: Translate] Net",
-                "ratio": "[TODO: Translate] Ratio"
+                "rank": "#",
+                "name": "名前",
+                "likes": "いいね",
+                "dislikes": "よくないね",
+                "unrated": "未評価",
+                "total": "合計",
+                "net": "ネットスコア",
+                "ratio": "比率"
             },
-            "noRatio": "[TODO: Translate] n/a",
-            "rowHint": "[TODO: Translate] Show the images for this entry",
-            "empty": "[TODO: Translate] Nothing to rank yet. Rate some images, then come back."
+            "noRatio": "なし",
+            "rowHint": "この項目の画像を表示",
+            "empty": "まだ集計できるデータがありません。いくつか画像を評価してから戻ってきてください。"
         }
     }
 }
