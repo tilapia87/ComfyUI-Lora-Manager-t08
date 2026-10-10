@@ -15,7 +15,7 @@ import time
 import urllib.parse
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from ...utils.artist_tags import load_artist_index
+from ...utils.artist_tags import load_gallery_artist_index
 from ..settings_manager import get_settings_manager
 from ..websocket_manager import ws_manager
 from .gallery_cache import GalleryCache, VALID_RATINGS
@@ -144,7 +144,9 @@ class GalleryService:
             return
 
         recursive = bool(settings.get("gallery_recursive", True))
-        artist_index = load_artist_index(str(settings.get("gallery_artist_list_path") or ""))
+        artist_index = load_gallery_artist_index(
+            str(settings.get("gallery_artist_list_path") or "")
+        )
         known_loras = await self._collect_known_loras()
 
         poller = asyncio.create_task(self._broadcast_loop(), name="gallery_index_progress")
@@ -337,7 +339,9 @@ class GalleryService:
         settings = get_settings_manager()
         root, source = resolve_output_dir(settings)
         artist_list_path = str(settings.get("gallery_artist_list_path") or "")
-        index = load_artist_index(artist_list_path) if artist_list_path else None
+        # Report the index actually used for normalization: the shipped CSV and
+        # the user's list are merged, so the count is the union, not either file.
+        index = load_gallery_artist_index(artist_list_path)
         last_run = self.cache.get_meta("last_run")
         return {
             "output_path": root,
@@ -346,7 +350,7 @@ class GalleryService:
             "recursive": bool(settings.get("gallery_recursive", True)),
             "artist_list_path": artist_list_path,
             "artist_list_loaded": bool(index),
-            "artist_count": len(index) if index is not None else 0,
+            "artist_count": len(index),
             "indexed_images": self.cache.count_images(),
             "last_run": float(last_run) if last_run else None,
         }

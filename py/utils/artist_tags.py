@@ -13,16 +13,33 @@ An optional artist list (danbooru-style exports such as ``known_artists.txt``)
 is used to confirm and canonicalize a name: the export lists ``yaneko uta``,
 while a prompt may spell it with different casing. Unknown names are still
 recorded, flagged as such, so statistics never silently drop an artist.
+
+Two sources are merged, because neither contains the other:
+
+* the danbooru/e621 CSV shipped in ``refs/`` (84k artists, underscore-form);
+* an optional user list (one artist tag per line, typically space-form).
+
+:func:`_fold` bridges the underscore/space split, so ``hammer_(sunset_beach)``
+from the CSV matches ``@hammer (sunset beach)`` in an Anima prompt.
 """
 
 from __future__ import annotations
 
+import csv
 import logging
 import os
 import re
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+# danbooru category 1 and e621 category 8 both mean "artist". Keeping only
+# these matters: the CSV also holds general tags like "1girl", and admitting
+# those would make the "known artist" flag meaningless.
+_DANBOORU_ARTIST_CATEGORIES = frozenset({"1", "8"})
+
+# The tag export shipped with the plugin (see py/services/tag_fts_index.py).
+_BUNDLED_ARTIST_CSV = "danbooru_e621_merged.csv"
 
 # Comma-separated prompt segments are the unit an artist tag lives in. Weights
 # and the model's own parenthesised weighting syntax may wrap the tag, so a
@@ -32,6 +49,10 @@ _WRAPPER_CLOSE_CHARS = ")]}"
 
 # A trailing ``:1.2`` left behind by the model's weighting syntax.
 _WEIGHT_SUFFIX_PATTERN = re.compile(r":\s*[+-]?\d*\.?\d+\s*$")
+
+# Wrapper pairs that may enclose a whole artist tag rather than belong to the
+# name. The escaped pair is danbooru's literal-parenthesis notation.
+_WRAPPER_PAIRS = (("(", ")"), ("[", "]"), ("{", "}"), ("\\(", "\\)"))
 
 # A sentence boundary inside a mixed tag/natural-language prompt, as shown in the
 # model card: "@big chungus. An anime girl with ...". Only a period followed by a
@@ -71,6 +92,24 @@ def _split_top_level(text: str, separator: str = ",") -> List[str]:
     return segments
 
 
+def _strip_balanced_wrapper(segment: str) -> str:
+    """Remove one wrapper that encloses the whole segment.
+
+    A whole artist tag may be wrapped to weight or group it -- ``(@name:1.2)``,
+    ``{@name}``, or danbooru's escaped ``\\(@name\\)``. Only a pair enclosing the
+    entire segment counts, so a bracket that belongs to the name itself
+    (``@hammer (sunset beach)``) is left alone.
+    """
+    for opener, closer in _WRAPPER_PAIRS:
+        if (
+            segment.startswith(opener)
+            and segment.endswith(closer)
+            and len(segment) > len(opener) + len(closer) + 1
+        ):
+            return segment[len(opener) : -len(closer)].strip()
+    return segment
+
+
 def _clean_artist_name(raw: str) -> str:
     """Reduce the text after ``@`` to the artist name alone."""
     name = raw.strip()
@@ -78,17 +117,20 @@ def _clean_artist_name(raw: str) -> str:
         # A bare "@" is not an artist.
         return ""
 
-    # Drop the bracket a weighted tag left behind *before* the weight itself:
-    # "(@nnn yryr:1.2)" only exposes ":1.2" once the ")" is gone.
-    name = name.rstrip("".join(_WRAPPER_CLOSE_CHARS) + r"\ ").strip()
+    # Drop the weighting suffix the model's "(tag:1.2)" syntax leaves behind.
+    # The enclosing bracket is removed by the caller, so a bracket that belongs
+    # to the name itself -- "@hammer (sunset beach)" -- survives.
     name = _WEIGHT_SUFFIX_PATTERN.sub("", name).strip()
+
+    # Danbooru escapes literal parentheses: "@hammer \\(sunset beach\\)".
+    name = name.replace("\\(", "(").replace("\\)", ")").strip()
 
     # Stop at a sentence boundary so mixed natural-language prompts do not
     # swallow the prose that follows the artist tag.
     name = _SENTENCE_BREAK_PATTERN.split(name, maxsplit=1)[0]
 
-    # A newline always terminates a tag, and a danbooru escape may lead the name.
-    name = name.splitlines()[0].strip().lstrip("\\").strip()
+    # A newline always terminates a tag.
+    name = name.splitlines()[0].strip()
     return name
 
 
@@ -120,9 +162,10 @@ class ArtistIndex:
 
 EMPTY_ARTIST_INDEX = ArtistIndex()
 
-# ``(path, mtime, size)`` -> index. The number of distinct artist lists a user
-# configures is tiny, so a small dict is enough and stale keys fall out of use.
-_INDEX_CACHE: Dict[Tuple[str, float, int], ArtistIndex] = {}
+# ``(path, mtime, size, parser)`` -> index. The number of distinct artist lists
+# a user configures is tiny, so a small dict is enough and stale keys fall out of
+# use. The parser is part of the key because the same path is never both.
+_INDEX_CACHE: Dict[Tuple[str, float, int, str], ArtistIndex] = {}
 
 
 def _parse_artist_list(lines: Iterable[str]) -> Dict[str, str]:
@@ -144,13 +187,42 @@ def _parse_artist_list(lines: Iterable[str]) -> Dict[str, str]:
     return mapping
 
 
-def load_artist_index(path: str, *, use_cache: bool = True) -> ArtistIndex:
-    """Load an artist list, caching it until the file changes.
+def _parse_danbooru_artist_csv(handle: Iterable[str]) -> Dict[str, str]:
+    """Map folded artist names to their canonical spelling from a tag CSV.
 
-    A missing or unreadable file yields an empty index rather than an error:
-    the list only confirms and canonicalizes names, and extraction must keep
-    working when it is unavailable.
+    The export is ``name,category,post_count,"aliases"`` with the category in
+    the second column. Only artist categories are kept; the file also lists
+    general tags such as ``1girl``, and admitting those would make the "known
+    artist" flag meaningless. Names are underscore-form here while Anima prompts
+    use spaces, which :func:`_fold` bridges.
     """
+    mapping: Dict[str, str] = {}
+    for row in csv.reader(handle):
+        if len(row) < 2:
+            continue
+        name = row[0].strip()
+        if not name or row[1].strip() not in _DANBOORU_ARTIST_CATEGORIES:
+            continue
+        mapping.setdefault(_fold(name), name)
+    return mapping
+
+
+def bundled_artist_list_path() -> str:
+    """Return the artist CSV shipped with the plugin, or ``""`` when absent."""
+    # py/utils/artist_tags.py -> <plugin root>/refs/<csv>
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    path = os.path.join(root, "refs", _BUNDLED_ARTIST_CSV)
+    return path if os.path.isfile(path) else ""
+
+
+def _load_index(
+    path: str,
+    parser: Callable[[Iterable[str]], Dict[str, str]],
+    kind: str,
+    *,
+    use_cache: bool,
+) -> ArtistIndex:
+    """Read *path* through *parser*, caching by ``(path, mtime, size, kind)``."""
     if not path:
         return EMPTY_ARTIST_INDEX
 
@@ -160,15 +232,15 @@ def load_artist_index(path: str, *, use_cache: bool = True) -> ArtistIndex:
         logger.warning("Artist list not found or unreadable: %s", path)
         return EMPTY_ARTIST_INDEX
 
-    key = (os.path.abspath(path), stat.st_mtime, stat.st_size)
+    key = (os.path.abspath(path), stat.st_mtime, stat.st_size, kind)
     if use_cache:
         cached = _INDEX_CACHE.get(key)
         if cached is not None:
             return cached
 
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as handle:
-            mapping = _parse_artist_list(handle)
+        with open(path, "r", encoding="utf-8", errors="replace", newline="") as handle:
+            mapping = parser(handle)
     except OSError as exc:
         logger.warning("Could not read artist list %s: %s", path, exc)
         return EMPTY_ARTIST_INDEX
@@ -181,6 +253,59 @@ def load_artist_index(path: str, *, use_cache: bool = True) -> ArtistIndex:
         _INDEX_CACHE[key] = index
     logger.info("Loaded %d artists from %s", len(index), path)
     return index
+
+
+def load_artist_index(path: str, *, use_cache: bool = True) -> ArtistIndex:
+    """Load a one-artist-per-line list, caching it until the file changes.
+
+    A missing or unreadable file yields an empty index rather than an error:
+    the list only confirms and canonicalizes names, and extraction must keep
+    working when it is unavailable.
+    """
+    return _load_index(path, _parse_artist_list, "text", use_cache=use_cache)
+
+
+def load_danbooru_artist_index(path: str = "", *, use_cache: bool = True) -> ArtistIndex:
+    """Load the shipped danbooru/e621 tag CSV, keeping its artist rows only."""
+    return _load_index(
+        path or bundled_artist_list_path(),
+        _parse_danbooru_artist_csv,
+        "danbooru_csv",
+        use_cache=use_cache,
+    )
+
+
+def load_gallery_artist_index(
+    user_path: str = "",
+    *,
+    use_bundled: bool = True,
+    use_cache: bool = True,
+) -> ArtistIndex:
+    """Build the index the gallery normalizes against.
+
+    The shipped CSV and a user list are complementary -- the CSV carries artists
+    the user's export lacks and vice versa -- so they are merged, with the user
+    list winning on the display name because it is the one the user curates.
+    """
+    merged: Dict[str, str] = {}
+    sources: List[str] = []
+
+    if use_bundled:
+        bundled = load_danbooru_artist_index(use_cache=use_cache)
+        if bundled:
+            merged.update(bundled.as_dict())
+            sources.append(bundled.source)
+
+    if user_path:
+        user = load_artist_index(user_path, use_cache=use_cache)
+        if user:
+            merged.update(user.as_dict())
+            sources.append(user.source)
+
+    if not merged:
+        return EMPTY_ARTIST_INDEX
+    return ArtistIndex(merged, source=" + ".join(sources))
+
 
 
 def clear_artist_index_cache() -> None:
@@ -200,7 +325,7 @@ def extract_artist_names(prompt: str) -> List[str]:
     names: List[str] = []
     seen: set[str] = set()
     for segment in _split_top_level(prompt):
-        candidate = segment.strip().lstrip("".join(_WRAPPER_OPEN_CHARS)).strip()
+        candidate = _strip_balanced_wrapper(segment.strip())
         if not candidate.startswith("@"):
             continue
         name = _clean_artist_name(candidate[1:])
