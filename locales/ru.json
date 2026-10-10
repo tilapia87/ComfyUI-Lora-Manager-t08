@@ -244,13 +244,15 @@
             "checkpoints": "Checkpoints",
             "embeddings": "Embeddings",
             "other": "Другое",
-            "statistics": "Статистика"
+            "statistics": "Статистика",
+            "gallery": "[TODO: Translate] Gallery"
         },
         "search": {
             "placeholder": "Поиск",
             "options": "Опции поиска",
             "searchIn": "Искать в:",
             "notAvailable": "Поиск недоступен на странице статистики",
+            "notAvailableGallery": "[TODO: Translate] Search is available in the gallery toolbar",
             "filters": {
                 "filename": "Имя файла",
                 "modelname": "Название модели",
@@ -2833,6 +2835,19 @@
             "refreshKeptUnreachable": "Сохранено моделей: {count} — {paths} недоступны",
             "scanRootUnreachable": "{scope} сейчас недоступен. Изменений не внесено."
         },
+        "gallery": {
+            "fetchFailed": "[TODO: Translate] Failed to load gallery images: {message}",
+            "ratingFailed": "[TODO: Translate] Failed to save the rating: {message}",
+            "statsFailed": "[TODO: Translate] Failed to load gallery statistics: {message}",
+            "configFailed": "[TODO: Translate] Failed to load the gallery configuration: {message}",
+            "scanStarted": "[TODO: Translate] Scanning the output folder...",
+            "scanAlreadyRunning": "[TODO: Translate] A scan is already running.",
+            "scanFailed": "[TODO: Translate] Failed to start the scan: {message}",
+            "scanError": "[TODO: Translate] Scan failed: {message}",
+            "scanComplete": "[TODO: Translate] Scan complete: {added} added, {updated} updated, {removed} removed",
+            "settingsSaved": "[TODO: Translate] Gallery settings saved",
+            "settingsSaveFailed": "[TODO: Translate] Failed to save gallery settings: {message}"
+        },
         "agent": {
             "llmNotConfigured": "Поставщик ИИ не настроен. Включите его в Настройки → Поставщик ИИ.",
             "enrichStarted": "Обогащение метаданных с помощью ИИ...",
@@ -2944,6 +2959,141 @@
             "previous": "Предыдущее уведомление",
             "next": "Следующее уведомление",
             "position": "Уведомление {current} из {total}"
+        }
+    },
+    "gallery": {
+        "title": "[TODO: Translate] Gallery",
+        "views": {
+            "images": "[TODO: Translate] Images",
+            "statistics": "[TODO: Translate] Statistics"
+        },
+        "actions": {
+            "scan": "[TODO: Translate] Scan output folder",
+            "scanNow": "[TODO: Translate] Scan now",
+            "settings": "[TODO: Translate] Gallery settings",
+            "setOutputFolder": "[TODO: Translate] Set output folder",
+            "browse": "[TODO: Translate] Browse",
+            "save": "[TODO: Translate] Save",
+            "clearFilter": "[TODO: Translate] Clear filter",
+            "previous": "[TODO: Translate] Previous page",
+            "next": "[TODO: Translate] Next page"
+        },
+        "sort": {
+            "label": "[TODO: Translate] Sort",
+            "newest": "[TODO: Translate] Newest first",
+            "oldest": "[TODO: Translate] Oldest first",
+            "ratingDesc": "[TODO: Translate] Highest rated first",
+            "ratingAsc": "[TODO: Translate] Lowest rated first",
+            "name": "[TODO: Translate] File name"
+        },
+        "rating": {
+            "label": "[TODO: Translate] Rating",
+            "all": "[TODO: Translate] All images",
+            "liked": "[TODO: Translate] Liked",
+            "disliked": "[TODO: Translate] Disliked",
+            "unrated": "[TODO: Translate] Unrated"
+        },
+        "search": {
+            "label": "[TODO: Translate] Search",
+            "placeholder": "[TODO: Translate] File name or prompt"
+        },
+        "status": {
+            "loading": "[TODO: Translate] Loading images..."
+        },
+        "filter": {
+            "artist": "[TODO: Translate] Artist: {name}",
+            "lora": "[TODO: Translate] LoRA: {name}"
+        },
+        "card": {
+            "unknownSize": "[TODO: Translate] Unknown size",
+            "likeHint": "[TODO: Translate] Like (ArrowUp or U)",
+            "dislikeHint": "[TODO: Translate] Dislike (ArrowDown or D)",
+            "artistHint": "[TODO: Translate] @{name} - from your artist list",
+            "unknownArtistHint": "[TODO: Translate] @{name} - not found in your artist list",
+            "loraHint": "[TODO: Translate] Show images that use {name}",
+            "loraMissingHint": "[TODO: Translate] {name} - this LoRA is not in your local library",
+            "noMetadata": "[TODO: Translate] No metadata",
+            "noMetadataHint": "[TODO: Translate] This image has no readable generation metadata, so its artists and LoRAs are unknown."
+        },
+        "progress": {
+            "stage": {
+                "idle": "[TODO: Translate] Idle",
+                "walking": "[TODO: Translate] Walking folders",
+                "parsing": "[TODO: Translate] Parsing metadata",
+                "finalizing": "[TODO: Translate] Finalizing",
+                "completed": "[TODO: Translate] Scan complete",
+                "error": "[TODO: Translate] Scan failed"
+            },
+            "counts": "[TODO: Translate] {indexed} of {total} indexed",
+            "details": "[TODO: Translate] {added} added, {updated} updated, {removed} removed, {failed} failed"
+        },
+        "empty": {
+            "noImagesTitle": "[TODO: Translate] No images yet",
+            "noImagesMessage": "[TODO: Translate] Nothing has been indexed from the output folder yet. Run a scan to pick up your generated images.",
+            "noMatchesTitle": "[TODO: Translate] No images match",
+            "noMatchesMessage": "[TODO: Translate] Try clearing the artist or LoRA filter, the rating filter, or the search box.",
+            "unsetTitle": "[TODO: Translate] No output folder found",
+            "unsetMessage": "[TODO: Translate] Set the ComfyUI output folder in the gallery settings, then scan it to build the gallery."
+        },
+        "error": {
+            "title": "[TODO: Translate] Could not load the gallery",
+            "unknown": "[TODO: Translate] Unknown error",
+            "retry": "[TODO: Translate] Retry"
+        },
+        "pagination": {
+            "total": "[TODO: Translate] {total} images",
+            "page": "[TODO: Translate] Page {page} of {total}"
+        },
+        "settings": {
+            "outputPath": "[TODO: Translate] ComfyUI output folder",
+            "outputPathPlaceholder": "[TODO: Translate] Leave empty to use ComfyUI's own output folder",
+            "outputPathHint": "[TODO: Translate] Images are indexed from this folder.",
+            "artistListPath": "[TODO: Translate] Artist list file",
+            "artistListPathPlaceholder": "[TODO: Translate] A danbooru-style artist list, one artist per line",
+            "artistListPathHint": "[TODO: Translate] Used to confirm and canonicalise the @artist names found in prompts.",
+            "recursive": "[TODO: Translate] Include subfolders",
+            "recursiveHint": "[TODO: Translate] Also scan subfolders of the output folder.",
+            "effectivePath": "[TODO: Translate] Effective folder: {path} ({source})",
+            "effectivePathUnset": "[TODO: Translate] No output folder could be detected.",
+            "source": {
+                "comfyui": "[TODO: Translate] detected automatically",
+                "setting": "[TODO: Translate] from your setting",
+                "unset": "[TODO: Translate] not set"
+            }
+        },
+        "stats": {
+            "by": {
+                "label": "[TODO: Translate] Group by",
+                "artist": "[TODO: Translate] Artist",
+                "lora": "[TODO: Translate] LoRA"
+            },
+            "sort": {
+                "label": "[TODO: Translate] Sort",
+                "net": "[TODO: Translate] Net score",
+                "likes": "[TODO: Translate] Likes",
+                "dislikes": "[TODO: Translate] Dislikes",
+                "total": "[TODO: Translate] Total",
+                "ratio": "[TODO: Translate] Like ratio"
+            },
+            "summary": {
+                "images": "[TODO: Translate] Images",
+                "rated": "[TODO: Translate] Rated",
+                "liked": "[TODO: Translate] Liked",
+                "disliked": "[TODO: Translate] Disliked"
+            },
+            "columns": {
+                "rank": "[TODO: Translate] #",
+                "name": "[TODO: Translate] Name",
+                "likes": "[TODO: Translate] Likes",
+                "dislikes": "[TODO: Translate] Dislikes",
+                "unrated": "[TODO: Translate] Unrated",
+                "total": "[TODO: Translate] Total",
+                "net": "[TODO: Translate] Net",
+                "ratio": "[TODO: Translate] Ratio"
+            },
+            "noRatio": "[TODO: Translate] n/a",
+            "rowHint": "[TODO: Translate] Show the images for this entry",
+            "empty": "[TODO: Translate] Nothing to rank yet. Rate some images, then come back."
         }
     }
 }

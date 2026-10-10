@@ -19,6 +19,8 @@
       {% set current_page = 'other' %}
       {% elif current_path.startswith('/statistics') %}
       {% set current_page = 'statistics' %}
+      {% elif current_path.startswith('/gallery') %}
+      {% set current_page = 'gallery' %}
       {% else %}
       {% set current_page = 'loras' %}
       {% endif %}
@@ -46,12 +48,22 @@
           id="statisticsNavItem">
           <i class="fas fa-chart-bar"></i> <span>{{ t('header.navigation.statistics') }}</span>
         </a>
+        <a href="{{ rel_prefix }}gallery" class="nav-item{% if current_path.startswith('/gallery') %} active{% endif %}"
+          id="galleryNavItem">
+          <i class="fas fa-images"></i> <span>{{ t('header.navigation.gallery') }}</span>
+        </a>
       </nav>
     </div>
 
     <!-- Center section: Search -->
-    {% set search_disabled = current_page == 'statistics' %}
-    {% set search_placeholder_key = 'header.search.notAvailable' if search_disabled else 'header.search.placeholder' %}
+    {% set search_disabled = current_page == 'statistics' or current_page == 'gallery' %}
+    {% if current_page == 'gallery' %}
+    {% set search_placeholder_key = 'header.search.notAvailableGallery' %}
+    {% elif search_disabled %}
+    {% set search_placeholder_key = 'header.search.notAvailable' %}
+    {% else %}
+    {% set search_placeholder_key = 'header.search.placeholder' %}
+    {% endif %}
     {% set header_search_class = 'header-search disabled' if search_disabled else 'header-search' %}
     <div class="{{ header_search_class }}" id="headerSearch">
       <div class="search-container">

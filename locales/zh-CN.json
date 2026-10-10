@@ -244,13 +244,15 @@
             "checkpoints": "Checkpoint",
             "embeddings": "Embedding",
             "other": "其他",
-            "statistics": "统计"
+            "statistics": "统计",
+            "gallery": "画廊"
         },
         "search": {
             "placeholder": "搜索",
             "options": "搜索选项",
             "searchIn": "搜索范围：",
             "notAvailable": "统计页面不可用搜索",
+            "notAvailableGallery": "搜索在画廊工具栏中可用",
             "filters": {
                 "filename": "文件名",
                 "modelname": "模型名称",
@@ -2833,6 +2835,19 @@
             "refreshKeptUnreachable": "已保留 {count} 个模型：{paths} 当前不可访问",
             "scanRootUnreachable": "{scope} 当前不可访问，未做任何改动。"
         },
+        "gallery": {
+            "fetchFailed": "加载画廊图片失败：{message}",
+            "ratingFailed": "保存评分失败：{message}",
+            "statsFailed": "加载画廊统计失败：{message}",
+            "configFailed": "加载画廊配置失败：{message}",
+            "scanStarted": "正在扫描输出目录...",
+            "scanAlreadyRunning": "已有扫描在进行中。",
+            "scanFailed": "启动扫描失败：{message}",
+            "scanError": "扫描失败：{message}",
+            "scanComplete": "扫描完成：新增 {added}，更新 {updated}，移除 {removed}",
+            "settingsSaved": "画廊设置已保存",
+            "settingsSaveFailed": "保存画廊设置失败：{message}"
+        },
         "agent": {
             "llmNotConfigured": "AI 提供商未配置。请在 设置 → AI 提供商 中进行配置。",
             "enrichStarted": "正在使用 AI 增强元数据...",
@@ -2944,6 +2959,141 @@
             "previous": "上一条通知",
             "next": "下一条通知",
             "position": "第 {current} 条通知，共 {total} 条"
+        }
+    },
+    "gallery": {
+        "title": "画廊",
+        "views": {
+            "images": "图片",
+            "statistics": "统计"
+        },
+        "actions": {
+            "scan": "扫描输出目录",
+            "scanNow": "立即扫描",
+            "settings": "画廊设置",
+            "setOutputFolder": "设置输出目录",
+            "browse": "浏览",
+            "save": "保存",
+            "clearFilter": "清除筛选",
+            "previous": "上一页",
+            "next": "下一页"
+        },
+        "sort": {
+            "label": "排序",
+            "newest": "最新优先",
+            "oldest": "最早优先",
+            "ratingDesc": "评分从高到低",
+            "ratingAsc": "评分从低到高",
+            "name": "文件名"
+        },
+        "rating": {
+            "label": "评分",
+            "all": "全部图片",
+            "liked": "已点赞",
+            "disliked": "已点踩",
+            "unrated": "未评分"
+        },
+        "search": {
+            "label": "搜索",
+            "placeholder": "文件名或提示词"
+        },
+        "status": {
+            "loading": "正在加载图片..."
+        },
+        "filter": {
+            "artist": "画师：{name}",
+            "lora": "LoRA：{name}"
+        },
+        "card": {
+            "unknownSize": "尺寸未知",
+            "likeHint": "点赞（↑ 或 U）",
+            "dislikeHint": "点踩（↓ 或 D）",
+            "artistHint": "@{name} - 来自你的画师表",
+            "unknownArtistHint": "@{name} - 在你的画师表中未找到",
+            "loraHint": "显示使用 {name} 的图片",
+            "loraMissingHint": "{name} - 这个 LoRA 不在你的本地库中",
+            "noMetadata": "无元数据",
+            "noMetadataHint": "这张图片没有可读取的生成元数据，因此无法得知它使用的画师和 LoRA。"
+        },
+        "progress": {
+            "stage": {
+                "idle": "空闲",
+                "walking": "正在遍历文件夹",
+                "parsing": "正在解析元数据",
+                "finalizing": "正在收尾",
+                "completed": "扫描完成",
+                "error": "扫描失败"
+            },
+            "counts": "已索引 {indexed} / {total}",
+            "details": "新增 {added}，更新 {updated}，移除 {removed}，失败 {failed}"
+        },
+        "empty": {
+            "noImagesTitle": "还没有图片",
+            "noImagesMessage": "尚未从输出目录索引到任何内容。运行一次扫描来收录你生成的图片。",
+            "noMatchesTitle": "没有符合条件的图片",
+            "noMatchesMessage": "试着清除画师或 LoRA 筛选、评分筛选，或清空搜索框。",
+            "unsetTitle": "未找到输出目录",
+            "unsetMessage": "请在画廊设置中指定 ComfyUI 输出目录，然后扫描它以建立画廊。"
+        },
+        "error": {
+            "title": "无法加载画廊",
+            "unknown": "未知错误",
+            "retry": "重试"
+        },
+        "pagination": {
+            "total": "共 {total} 张图片",
+            "page": "第 {page} / {total} 页"
+        },
+        "settings": {
+            "outputPath": "ComfyUI 输出目录",
+            "outputPathPlaceholder": "留空则使用 ComfyUI 自己的输出目录",
+            "outputPathHint": "图片从这个目录中被索引。",
+            "artistListPath": "画师表文件",
+            "artistListPathPlaceholder": "danbooru 风格的画师表，每行一个画师",
+            "artistListPathHint": "用于确认并归一化提示词中 @ 开头的画师名。",
+            "recursive": "包含子文件夹",
+            "recursiveHint": "同时扫描输出目录的子文件夹。",
+            "effectivePath": "当前生效目录：{path}（{source}）",
+            "effectivePathUnset": "未能检测到输出目录。",
+            "source": {
+                "comfyui": "自动检测",
+                "setting": "来自你的设置",
+                "unset": "未设置"
+            }
+        },
+        "stats": {
+            "by": {
+                "label": "分组方式",
+                "artist": "画师",
+                "lora": "LoRA"
+            },
+            "sort": {
+                "label": "排序",
+                "net": "净分",
+                "likes": "点赞数",
+                "dislikes": "点踩数",
+                "total": "总数",
+                "ratio": "点赞率"
+            },
+            "summary": {
+                "images": "图片",
+                "rated": "已评分",
+                "liked": "已点赞",
+                "disliked": "已点踩"
+            },
+            "columns": {
+                "rank": "#",
+                "name": "名称",
+                "likes": "点赞",
+                "dislikes": "点踩",
+                "unrated": "未评分",
+                "total": "总数",
+                "net": "净分",
+                "ratio": "点赞率"
+            },
+            "noRatio": "无",
+            "rowHint": "显示这一项的图片",
+            "empty": "还没有可统计的数据。先给一些图片评分，再回来看。"
         }
     }
 }

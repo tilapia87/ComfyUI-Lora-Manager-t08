@@ -244,13 +244,15 @@
             "checkpoints": "Checkpoint",
             "embeddings": "Embedding",
             "other": "其他",
-            "statistics": "統計"
+            "statistics": "統計",
+            "gallery": "圖庫"
         },
         "search": {
             "placeholder": "搜尋",
             "options": "搜尋選項",
             "searchIn": "搜尋範圍：",
             "notAvailable": "統計頁面無法搜尋",
+            "notAvailableGallery": "搜尋可在圖庫工具列中使用",
             "filters": {
                 "filename": "檔案名稱",
                 "modelname": "模型名稱",
@@ -2833,6 +2835,19 @@
             "refreshKeptUnreachable": "已保留 {count} 個模型：{paths} 目前無法存取",
             "scanRootUnreachable": "{scope} 目前無法存取，未做任何變更。"
         },
+        "gallery": {
+            "fetchFailed": "載入圖庫圖片失敗：{message}",
+            "ratingFailed": "儲存評分失敗：{message}",
+            "statsFailed": "載入圖庫統計失敗：{message}",
+            "configFailed": "載入圖庫設定失敗：{message}",
+            "scanStarted": "正在掃描輸出資料夾...",
+            "scanAlreadyRunning": "已有掃描正在進行中。",
+            "scanFailed": "啟動掃描失敗：{message}",
+            "scanError": "掃描失敗：{message}",
+            "scanComplete": "掃描完成：新增 {added}，更新 {updated}，移除 {removed}",
+            "settingsSaved": "圖庫設定已儲存",
+            "settingsSaveFailed": "儲存圖庫設定失敗：{message}"
+        },
         "agent": {
             "llmNotConfigured": "AI 提供者尚未設定。請在 設定 → AI 提供者 中進行設定。",
             "enrichStarted": "正在使用 AI 增強中繼資料...",
@@ -2944,6 +2959,141 @@
             "previous": "上一則通知",
             "next": "下一則通知",
             "position": "第 {current} 則通知，共 {total} 則"
+        }
+    },
+    "gallery": {
+        "title": "圖庫",
+        "views": {
+            "images": "圖片",
+            "statistics": "統計"
+        },
+        "actions": {
+            "scan": "掃描輸出資料夾",
+            "scanNow": "立即掃描",
+            "settings": "圖庫設定",
+            "setOutputFolder": "設定輸出資料夾",
+            "browse": "瀏覽",
+            "save": "儲存",
+            "clearFilter": "清除篩選",
+            "previous": "上一頁",
+            "next": "下一頁"
+        },
+        "sort": {
+            "label": "排序",
+            "newest": "最新優先",
+            "oldest": "最舊優先",
+            "ratingDesc": "評分由高到低",
+            "ratingAsc": "評分由低到高",
+            "name": "檔案名稱"
+        },
+        "rating": {
+            "label": "評分",
+            "all": "全部圖片",
+            "liked": "已按讚",
+            "disliked": "已倒讚",
+            "unrated": "未評分"
+        },
+        "search": {
+            "label": "搜尋",
+            "placeholder": "檔案名稱或提示詞"
+        },
+        "status": {
+            "loading": "正在載入圖片..."
+        },
+        "filter": {
+            "artist": "繪師：{name}",
+            "lora": "LoRA：{name}"
+        },
+        "card": {
+            "unknownSize": "尺寸未知",
+            "likeHint": "按讚（↑ 或 U）",
+            "dislikeHint": "倒讚（↓ 或 D）",
+            "artistHint": "@{name} - 來自您的繪師表",
+            "unknownArtistHint": "@{name} - 在您的繪師表中找不到",
+            "loraHint": "顯示使用 {name} 的圖片",
+            "loraMissingHint": "{name} - 這個 LoRA 不在您的本機媒體庫中",
+            "noMetadata": "無中繼資料",
+            "noMetadataHint": "這張圖片沒有可讀取的生成中繼資料，因此無法得知它使用的繪師和 LoRA。"
+        },
+        "progress": {
+            "stage": {
+                "idle": "閒置",
+                "walking": "正在走訪資料夾",
+                "parsing": "正在解析中繼資料",
+                "finalizing": "正在收尾",
+                "completed": "掃描完成",
+                "error": "掃描失敗"
+            },
+            "counts": "已索引 {indexed} / {total}",
+            "details": "新增 {added}，更新 {updated}，移除 {removed}，失敗 {failed}"
+        },
+        "empty": {
+            "noImagesTitle": "還沒有圖片",
+            "noImagesMessage": "尚未從輸出資料夾索引到任何內容。執行一次掃描來收錄您生成的圖片。",
+            "noMatchesTitle": "沒有符合條件的圖片",
+            "noMatchesMessage": "試著清除繪師或 LoRA 篩選、評分篩選，或清空搜尋框。",
+            "unsetTitle": "找不到輸出資料夾",
+            "unsetMessage": "請在圖庫設定中指定 ComfyUI 輸出資料夾，然後掃描它以建立圖庫。"
+        },
+        "error": {
+            "title": "無法載入圖庫",
+            "unknown": "未知錯誤",
+            "retry": "重試"
+        },
+        "pagination": {
+            "total": "共 {total} 張圖片",
+            "page": "第 {page} / {total} 頁"
+        },
+        "settings": {
+            "outputPath": "ComfyUI 輸出資料夾",
+            "outputPathPlaceholder": "留空則使用 ComfyUI 自己的輸出資料夾",
+            "outputPathHint": "圖片從這個資料夾中被索引。",
+            "artistListPath": "繪師表檔案",
+            "artistListPathPlaceholder": "danbooru 風格的繪師表，每行一個繪師",
+            "artistListPathHint": "用於確認並正規化提示詞中 @ 開頭的繪師名。",
+            "recursive": "包含子資料夾",
+            "recursiveHint": "同時掃描輸出資料夾的子資料夾。",
+            "effectivePath": "目前生效資料夾：{path}（{source}）",
+            "effectivePathUnset": "未能偵測到輸出資料夾。",
+            "source": {
+                "comfyui": "自動偵測",
+                "setting": "來自您的設定",
+                "unset": "未設定"
+            }
+        },
+        "stats": {
+            "by": {
+                "label": "分組方式",
+                "artist": "繪師",
+                "lora": "LoRA"
+            },
+            "sort": {
+                "label": "排序",
+                "net": "淨分",
+                "likes": "按讚數",
+                "dislikes": "倒讚數",
+                "total": "總數",
+                "ratio": "按讚率"
+            },
+            "summary": {
+                "images": "圖片",
+                "rated": "已評分",
+                "liked": "已按讚",
+                "disliked": "已倒讚"
+            },
+            "columns": {
+                "rank": "#",
+                "name": "名稱",
+                "likes": "按讚",
+                "dislikes": "倒讚",
+                "unrated": "未評分",
+                "total": "總數",
+                "net": "淨分",
+                "ratio": "按讚率"
+            },
+            "noRatio": "無",
+            "rowHint": "顯示這一項的圖片",
+            "empty": "還沒有可統計的資料。先給一些圖片評分，再回來看。"
         }
     }
 }

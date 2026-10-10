@@ -193,6 +193,29 @@ class ServiceRegistry:
             return service
 
     @classmethod
+    async def get_gallery_service(cls):
+        """Get or create the gallery service.
+
+        The gallery owns no startup work, so it is built on the first request
+        rather than during plugin initialization.
+        """
+        service_name = "gallery_service"
+
+        if service_name in cls._services:
+            return cls._services[service_name]
+
+        async with cls._get_lock(service_name):
+            if service_name in cls._services:
+                return cls._services[service_name]
+
+            from .gallery.gallery_service import GalleryService
+
+            service = await GalleryService.get_instance()
+            cls._services[service_name] = service
+            logger.debug(f"Created and registered {service_name}")
+            return service
+
+    @classmethod
     async def get_download_queue_service(cls):
         """Get or create the download queue service."""
         service_name = "download_queue_service"

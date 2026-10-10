@@ -18,8 +18,9 @@ export class HeaderManager {
       this.searchManager = null;
       this.filterManager = null;
       
-      // Initialize appropriate managers based on current page
-      if (this.currentPage !== 'statistics') {
+      // Initialize appropriate managers based on current page. Pages without a
+      // header search UI (statistics, gallery) build their own controls instead.
+      if (this.currentPage !== 'statistics' && this.currentPage !== 'gallery') {
         this.initializeManagers();
       }
       
@@ -34,6 +35,8 @@ export class HeaderManager {
       if (path.includes('/embeddings')) return 'embeddings';
       if (path.includes('/other')) return 'other';
       if (path.includes('/statistics')) return 'statistics';
+      // The gallery is a standalone page; match it before the '/loras' catch-all.
+      if (path.includes('/gallery')) return 'gallery';
       if (path.includes('/loras')) return 'loras';
       return 'unknown';
     }
@@ -352,12 +355,19 @@ export class HeaderManager {
       const searchInput = headerSearch?.querySelector('#searchInput');
       const searchButtons = headerSearch?.querySelectorAll('button');
 
-      if (this.currentPage === 'statistics' && headerSearch) {
+      if ((this.currentPage === 'statistics' || this.currentPage === 'gallery') && headerSearch) {
         headerSearch.classList.add('disabled');
         if (searchInput) {
           searchInput.disabled = true;
           // Use i18nHelpers to update placeholder
-          updateElementAttribute(searchInput, 'placeholder', 'header.search.notAvailable', {}, 'Search not available on statistics page');
+          const isGallery = this.currentPage === 'gallery';
+          const placeholderKey = isGallery
+            ? 'header.search.notAvailableGallery'
+            : 'header.search.notAvailable';
+          const placeholderFallback = isGallery
+            ? 'Search is available in the gallery toolbar'
+            : 'Search not available on statistics page';
+          updateElementAttribute(searchInput, 'placeholder', placeholderKey, {}, placeholderFallback);
         }
         searchButtons?.forEach(btn => btn.disabled = true);
       } else if (headerSearch) {

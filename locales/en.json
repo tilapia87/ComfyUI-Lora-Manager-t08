@@ -244,13 +244,15 @@
       "checkpoints": "Checkpoints",
       "embeddings": "Embeddings",
       "other": "Other",
-      "statistics": "Stats"
+      "statistics": "Stats",
+      "gallery": "Gallery"
     },
     "search": {
       "placeholder": "Search",
       "options": "Search Options",
       "searchIn": "Search In:",
       "notAvailable": "Search not available on statistics page",
+      "notAvailableGallery": "Search is available in the gallery toolbar",
       "filters": {
         "filename": "Filename",
         "modelname": "Model Name",
@@ -2833,6 +2835,19 @@
       "refreshKeptUnreachable": "{count} models kept: {paths} not reachable",
       "scanRootUnreachable": "{scope} is not reachable right now. Nothing was changed."
     },
+    "gallery": {
+      "fetchFailed": "Failed to load gallery images: {message}",
+      "ratingFailed": "Failed to save the rating: {message}",
+      "statsFailed": "Failed to load gallery statistics: {message}",
+      "configFailed": "Failed to load the gallery configuration: {message}",
+      "scanStarted": "Scanning the output folder...",
+      "scanAlreadyRunning": "A scan is already running.",
+      "scanFailed": "Failed to start the scan: {message}",
+      "scanError": "Scan failed: {message}",
+      "scanComplete": "Scan complete: {added} added, {updated} updated, {removed} removed",
+      "settingsSaved": "Gallery settings saved",
+      "settingsSaveFailed": "Failed to save gallery settings: {message}"
+    },
     "agent": {
       "llmNotConfigured": "AI provider not configured. Enable it in Settings → AI Provider.",
       "enrichStarted": "Enriching metadata with AI...",
@@ -2944,6 +2959,141 @@
       "previous": "Previous message",
       "next": "Next message",
       "position": "Message {current} of {total}"
+    }
+  },
+  "gallery": {
+    "title": "Gallery",
+    "views": {
+      "images": "Images",
+      "statistics": "Statistics"
+    },
+    "actions": {
+      "scan": "Scan output folder",
+      "scanNow": "Scan now",
+      "settings": "Gallery settings",
+      "setOutputFolder": "Set output folder",
+      "browse": "Browse",
+      "save": "Save",
+      "clearFilter": "Clear filter",
+      "previous": "Previous page",
+      "next": "Next page"
+    },
+    "sort": {
+      "label": "Sort",
+      "newest": "Newest first",
+      "oldest": "Oldest first",
+      "ratingDesc": "Highest rated first",
+      "ratingAsc": "Lowest rated first",
+      "name": "File name"
+    },
+    "rating": {
+      "label": "Rating",
+      "all": "All images",
+      "liked": "Liked",
+      "disliked": "Disliked",
+      "unrated": "Unrated"
+    },
+    "search": {
+      "label": "Search",
+      "placeholder": "File name or prompt"
+    },
+    "status": {
+      "loading": "Loading images..."
+    },
+    "filter": {
+      "artist": "Artist: {name}",
+      "lora": "LoRA: {name}"
+    },
+    "card": {
+      "unknownSize": "Unknown size",
+      "likeHint": "Like (ArrowUp or U)",
+      "dislikeHint": "Dislike (ArrowDown or D)",
+      "artistHint": "@{name} - from your artist list",
+      "unknownArtistHint": "@{name} - not found in your artist list",
+      "loraHint": "Show images that use {name}",
+      "loraMissingHint": "{name} - this LoRA is not in your local library",
+      "noMetadata": "No metadata",
+      "noMetadataHint": "This image has no readable generation metadata, so its artists and LoRAs are unknown."
+    },
+    "progress": {
+      "stage": {
+        "idle": "Idle",
+        "walking": "Walking folders",
+        "parsing": "Parsing metadata",
+        "finalizing": "Finalizing",
+        "completed": "Scan complete",
+        "error": "Scan failed"
+      },
+      "counts": "{indexed} of {total} indexed",
+      "details": "{added} added, {updated} updated, {removed} removed, {failed} failed"
+    },
+    "empty": {
+      "noImagesTitle": "No images yet",
+      "noImagesMessage": "Nothing has been indexed from the output folder yet. Run a scan to pick up your generated images.",
+      "noMatchesTitle": "No images match",
+      "noMatchesMessage": "Try clearing the artist or LoRA filter, the rating filter, or the search box.",
+      "unsetTitle": "No output folder found",
+      "unsetMessage": "Set the ComfyUI output folder in the gallery settings, then scan it to build the gallery."
+    },
+    "error": {
+      "title": "Could not load the gallery",
+      "unknown": "Unknown error",
+      "retry": "Retry"
+    },
+    "pagination": {
+      "total": "{total} images",
+      "page": "Page {page} of {total}"
+    },
+    "settings": {
+      "outputPath": "ComfyUI output folder",
+      "outputPathPlaceholder": "Leave empty to use ComfyUI's own output folder",
+      "outputPathHint": "Images are indexed from this folder.",
+      "artistListPath": "Artist list file",
+      "artistListPathPlaceholder": "A danbooru-style artist list, one artist per line",
+      "artistListPathHint": "Used to confirm and canonicalise the @artist names found in prompts.",
+      "recursive": "Include subfolders",
+      "recursiveHint": "Also scan subfolders of the output folder.",
+      "effectivePath": "Effective folder: {path} ({source})",
+      "effectivePathUnset": "No output folder could be detected.",
+      "source": {
+        "comfyui": "detected automatically",
+        "setting": "from your setting",
+        "unset": "not set"
+      }
+    },
+    "stats": {
+      "by": {
+        "label": "Group by",
+        "artist": "Artist",
+        "lora": "LoRA"
+      },
+      "sort": {
+        "label": "Sort",
+        "net": "Net score",
+        "likes": "Likes",
+        "dislikes": "Dislikes",
+        "total": "Total",
+        "ratio": "Like ratio"
+      },
+      "summary": {
+        "images": "Images",
+        "rated": "Rated",
+        "liked": "Liked",
+        "disliked": "Disliked"
+      },
+      "columns": {
+        "rank": "#",
+        "name": "Name",
+        "likes": "Likes",
+        "dislikes": "Dislikes",
+        "unrated": "Unrated",
+        "total": "Total",
+        "net": "Net",
+        "ratio": "Ratio"
+      },
+      "noRatio": "n/a",
+      "rowHint": "Show the images for this entry",
+      "empty": "Nothing to rank yet. Rate some images, then come back."
     }
   }
 }

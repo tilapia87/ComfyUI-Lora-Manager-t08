@@ -59,3 +59,15 @@ export function renderRecipesPage() {
     },
   });
 }
+
+/**
+ * Renders the Gallery page template with expected dataset attributes.
+ * @returns {Element}
+ */
+export function renderGalleryPage() {
+  return renderTemplate('gallery.html', {
+    dataset: {
+      page: 'gallery',
+    },
+  });
+}

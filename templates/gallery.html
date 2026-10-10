@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('gallery.title') }} - {{ t('header.appTitle') }}{% endblock %}
+{% block page_id %}gallery{% endblock %}
+
+{% block init_check_url %}/api/lm/gallery/config{% endblock %}
+
+{% block content %}
+    {% if not is_initializing %}
+    <div class="gallery-page" id="galleryPage">
+        <!-- Toolbar: title, view switch, scan + settings -->
+        <div class="gallery-toolbar">
+            <div class="gallery-toolbar-row">
+                <h1 class="gallery-heading">
+                    <i class="fas fa-images"></i> {{ t('gallery.title') }}
+                </h1>
+
+                <div class="gallery-segmented gallery-view-switch" id="galleryViewSwitch" role="tablist">
+                    <button type="button" class="gallery-segmented-btn active" data-view="images" id="galleryImagesTab"
+                        role="tab" aria-selected="true">
+                        <i class="fas fa-th"></i> {{ t('gallery.views.images') }}
+                    </button>
+                    <button type="button" class="gallery-segmented-btn" data-view="stats" id="galleryStatsTab"
+                        role="tab" aria-selected="false">
+                        <i class="fas fa-chart-bar"></i> {{ t('gallery.views.statistics') }}
+                    </button>
+                </div>
+
+                <div class="gallery-toolbar-actions">
+                    <button type="button" class="gallery-btn gallery-btn-primary" id="galleryScanBtn">
+                        <i class="fas fa-sync"></i> <span>{{ t('gallery.actions.scan') }}</span>
+                    </button>
+                    <button type="button" class="gallery-btn" id="gallerySettingsToggle" aria-expanded="false">
+                        <i class="fas fa-cog"></i> <span>{{ t('gallery.actions.settings') }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scan progress -->
+            <div class="gallery-progress hidden" id="galleryProgress">
+                <div class="gallery-progress-bar">
+                    <div class="gallery-progress-fill" id="galleryProgressFill"></div>
+                </div>
+                <div class="gallery-progress-text" id="galleryProgressText"></div>
+            </div>
+
+            <!-- Collapsible settings -->
+            <div class="gallery-settings hidden" id="gallerySettingsPanel">
+                <div class="gallery-field">
+                    <label class="gallery-field-label" for="galleryOutputPathInput">
+                        <i class="fas fa-folder-open"></i> {{ t('gallery.settings.outputPath') }}
+                    </label>
+                    <div class="gallery-path-row">
+                        <input type="text" id="galleryOutputPathInput"
+                            placeholder="{{ t('gallery.settings.outputPathPlaceholder') }}" autocomplete="off">
+                        <button type="button" class="gallery-btn" id="galleryOutputPathBrowse"
+                            title="{{ t('gallery.actions.browse') }}">
+                            <i class="fas fa-folder-tree"></i> {{ t('gallery.actions.browse') }}
+                        </button>
+                    </div>
+                    <span class="gallery-field-hint">{{ t('gallery.settings.outputPathHint') }}</span>
+                </div>
+
+                <div class="gallery-field">
+                    <label class="gallery-field-label" for="galleryArtistListInput">
+                        <i class="fas fa-list"></i> {{ t('gallery.settings.artistListPath') }}
+                    </label>
+                    <div class="gallery-path-row">
+                        <input type="text" id="galleryArtistListInput"
+                            placeholder="{{ t('gallery.settings.artistListPathPlaceholder') }}" autocomplete="off">
+                        <button type="button" class="gallery-btn" id="galleryArtistListBrowse"
+                            title="{{ t('gallery.actions.browse') }}">
+                            <i class="fas fa-folder-tree"></i> {{ t('gallery.actions.browse') }}
+                        </button>
+                    </div>
+                    <span class="gallery-field-hint">{{ t('gallery.settings.artistListPathHint') }}</span>
+                </div>
+
+                <div class="gallery-field gallery-field-inline">
+                    <label class="gallery-toggle" for="galleryRecursiveToggle">
+                        <input type="checkbox" id="galleryRecursiveToggle">
+                        <span>{{ t('gallery.settings.recursive') }}</span>
+                    </label>
+                    <span class="gallery-field-hint">{{ t('gallery.settings.recursiveHint') }}</span>
+                </div>
+
+                <div class="gallery-settings-actions">
+                    <button type="button" class="gallery-btn gallery-btn-primary" id="gallerySettingsSave">
+                        <i class="fas fa-save"></i> {{ t('gallery.actions.save') }}
+                    </button>
+                    <span class="gallery-field-hint gallery-effective-path" id="galleryEffectivePath"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= Images view ================= -->
+        <div class="gallery-view" id="galleryImagesPanel">
+            <div class="gallery-controls">
+                <div class="gallery-control">
+                    <label class="gallery-control-label" for="gallerySortSelect">
+                        {{ t('gallery.sort.label') }}
+                    </label>
+                    <select id="gallerySortSelect">
+                        <option value="newest">{{ t('gallery.sort.newest') }}</option>
+                        <option value="oldest">{{ t('gallery.sort.oldest') }}</option>
+                        <option value="rating_desc">{{ t('gallery.sort.ratingDesc') }}</option>
+                        <option value="rating_asc">{{ t('gallery.sort.ratingAsc') }}</option>
+                        <option value="name">{{ t('gallery.sort.name') }}</option>
+                    </select>
+                </div>
+
+                <div class="gallery-control">
+                    <label class="gallery-control-label" for="galleryRatingSelect">
+                        {{ t('gallery.rating.label') }}
+                    </label>
+                    <select id="galleryRatingSelect">
+                        <option value="all">{{ t('gallery.rating.all') }}</option>
+                        <option value="liked">{{ t('gallery.rating.liked') }}</option>
+                        <option value="disliked">{{ t('gallery.rating.disliked') }}</option>
+                        <option value="unrated">{{ t('gallery.rating.unrated') }}</option>
+                    </select>
+                </div>
+
+                <div class="gallery-control gallery-control-search">
+                    <label class="gallery-control-label" for="gallerySearchInput">
+                        {{ t('gallery.search.label') }}
+                    </label>
+                    <div class="gallery-search-box">
+                        <input type="text" id="gallerySearchInput"
+                            placeholder="{{ t('gallery.search.placeholder') }}" autocomplete="off">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+
+                <div class="gallery-control gallery-control-count">
+                    <span class="gallery-total" id="galleryTotalCount"></span>
+                </div>
+            </div>
+
+            <!-- Active artist / LoRA filter banner -->
+            <div class="gallery-filter-banner hidden" id="galleryFilterBanner">
+                <span class="gallery-filter-banner-text" id="galleryFilterBannerText"></span>
+                <button type="button" class="gallery-btn gallery-btn-small" id="galleryFilterClearBtn">
+                    <i class="fas fa-times"></i> {{ t('gallery.actions.clearFilter') }}
+                </button>
+            </div>
+
+            <div class="gallery-status hidden" id="galleryStatus">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span id="galleryStatusText"></span>
+            </div>
+
+            <div class="gallery-grid" id="galleryGrid"></div>
+
+            <!-- Error / empty states -->
+            <div class="gallery-empty hidden" id="galleryErrorState">
+                <i class="fas fa-triangle-exclamation gallery-empty-icon"></i>
+                <h2>{{ t('gallery.error.title') }}</h2>
+                <p id="galleryErrorMessage"></p>
+                <button type="button" class="gallery-btn gallery-btn-primary" id="galleryErrorRetryBtn">
+                    <i class="fas fa-rotate-right"></i> {{ t('gallery.error.retry') }}
+                </button>
+            </div>
+
+            <div class="gallery-empty hidden" id="galleryEmptyState">
+                <i class="fas fa-images gallery-empty-icon"></i>
+                <h2 id="galleryEmptyTitle"></h2>
+                <p id="galleryEmptyMessage"></p>
+                <div class="gallery-empty-actions">
+                    <button type="button" class="gallery-btn gallery-btn-primary" id="galleryEmptyScanBtn">
+                        <i class="fas fa-sync"></i> {{ t('gallery.actions.scanNow') }}
+                    </button>
+                    <button type="button" class="gallery-btn" id="galleryEmptySettingsBtn">
+                        <i class="fas fa-cog"></i> {{ t('gallery.actions.setOutputFolder') }}
+                    </button>
+                </div>
+            </div>
+
+            <div class="gallery-pagination hidden" id="galleryPagination">
+                <button type="button" class="gallery-btn gallery-btn-small" id="galleryPrevPage"
+                    title="{{ t('gallery.actions.previous') }}">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="gallery-pagination-info" id="galleryPageInfo"></span>
+                <button type="button" class="gallery-btn gallery-btn-small" id="galleryNextPage"
+                    title="{{ t('gallery.actions.next') }}">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= Statistics view ================= -->
+        <div class="gallery-view hidden" id="galleryStatsPanel">
+            <div class="gallery-controls">
+                <div class="gallery-control">
+                    <span class="gallery-control-label">{{ t('gallery.stats.by.label') }}</span>
+                    <div class="gallery-segmented" id="galleryStatsBySwitch">
+                        <button type="button" class="gallery-segmented-btn active" data-by="artist">
+                            {{ t('gallery.stats.by.artist') }}
+                        </button>
+                        <button type="button" class="gallery-segmented-btn" data-by="lora">
+                            {{ t('gallery.stats.by.lora') }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="gallery-control">
+                    <label class="gallery-control-label" for="galleryStatsSortSelect">
+                        {{ t('gallery.stats.sort.label') }}
+                    </label>
+                    <select id="galleryStatsSortSelect">
+                        <option value="net">{{ t('gallery.stats.sort.net') }}</option>
+                        <option value="likes">{{ t('gallery.stats.sort.likes') }}</option>
+                        <option value="dislikes">{{ t('gallery.stats.sort.dislikes') }}</option>
+                        <option value="total">{{ t('gallery.stats.sort.total') }}</option>
+                        <option value="ratio">{{ t('gallery.stats.sort.ratio') }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="gallery-stats-summary" id="galleryStatsSummary"></div>
+
+            <div class="gallery-table-wrap" id="galleryStatsTableWrap">
+                <table class="gallery-table">
+                    <thead>
+                        <tr>
+                            <th class="gallery-col-rank">{{ t('gallery.stats.columns.rank') }}</th>
+                            <th class="gallery-col-name">{{ t('gallery.stats.columns.name') }}</th>
+                            <th class="gallery-col-num">{{ t('gallery.stats.columns.likes') }}</th>
+                            <th class="gallery-col-num">{{ t('gallery.stats.columns.dislikes') }}</th>
+                            <th class="gallery-col-num">{{ t('gallery.stats.columns.unrated') }}</th>
+                            <th class="gallery-col-num">{{ t('gallery.stats.columns.total') }}</th>
+                            <th class="gallery-col-num">{{ t('gallery.stats.columns.net') }}</th>
+                            <th class="gallery-col-num">{{ t('gallery.stats.columns.ratio') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="galleryStatsBody"></tbody>
+                </table>
+            </div>
+
+            <div class="gallery-status hidden" id="galleryStatsStatus">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>{{ t('common.status.loading') }}</span>
+            </div>
+
+            <div class="gallery-empty hidden" id="galleryStatsEmpty">
+                <i class="fas fa-chart-bar gallery-empty-icon"></i>
+                <p>{{ t('gallery.stats.empty') }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}
+
+{% block main_script %}
+{% if not is_initializing %}
+<script type="module" src="{{ rel_prefix }}loras_static/js/gallery.js?v={{ version }}"></script>
+{% endif %}
+{% endblock %}

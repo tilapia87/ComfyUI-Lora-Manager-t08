@@ -77,6 +77,13 @@ const DEFAULT_SETTINGS_BASE = Object.freeze({
     llm_api_key: '',
     llm_api_base: '',
     llm_model: '',
+    // Gallery. These must live here as well as in the backend DEFAULT_SETTINGS:
+    // SettingsManager only POSTs keys it knows about, so a key missing from this
+    // map would look saved in the UI but never reach the server.
+    gallery_output_path: '',
+    gallery_artist_list_path: '',
+    gallery_recursive: true,
+    gallery_sort: 'newest',
 });
 
 export function createDefaultSettings() {

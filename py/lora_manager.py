@@ -28,6 +28,7 @@ from .routes.misc_routes import MiscRoutes
 from .routes.pending_delete_routes import PendingDeleteRoutes
 from .routes.preview_routes import PreviewRoutes
 from .routes.example_images_routes import ExampleImagesRoutes
+from .routes.gallery_routes import GalleryRoutes
 from .services.service_registry import ServiceRegistry
 from .services.settings_manager import get_settings_manager
 from .services.pending_delete_service import get_pending_delete_service
@@ -175,6 +176,7 @@ class LoraManager:
         PendingDeleteRoutes.setup_routes(app)
         ExampleImagesRoutes.setup_routes(app, ws_manager=ws_manager)
         PreviewRoutes.setup_routes(app)
+        GalleryRoutes().setup_routes(app)
 
         # Setup WebSocket routes that are shared across all model types
         app.router.add_get("/ws/fetch-progress", ws_manager.handle_connection)

@@ -153,6 +153,17 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "llm_api_key": "",
     "llm_api_base": "",  # empty = provider default
     "llm_model": "",  # e.g. "gpt-4o-mini"
+    # Gallery: indexes images from ComfyUI's output directory, records the
+    # artists (@-prefixed, the Anima model family's artist syntax) and LoRAs each
+    # image used, and keeps the user's like/dislike per image.
+    # Empty means "use ComfyUI's own output directory"; an explicit path is what
+    # makes the gallery usable when ComfyUI runs elsewhere (e.g. standalone).
+    "gallery_output_path": "",
+    # Optional artist list (one artist tag per line) used to confirm and
+    # canonicalize the names found after "@".
+    "gallery_artist_list_path": "",
+    "gallery_recursive": True,
+    "gallery_sort": "newest",
 }
 
 

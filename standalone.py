@@ -366,6 +366,7 @@ class StandaloneLoraManager(LoraManager):
         from py.routes.pending_delete_routes import PendingDeleteRoutes
         from py.routes.example_images_routes import ExampleImagesRoutes
         from py.routes.preview_routes import PreviewRoutes
+        from py.routes.gallery_routes import GalleryRoutes
         from py.routes.stats_routes import StatsRoutes
         from py.services.websocket_manager import ws_manager
 
@@ -384,6 +385,7 @@ class StandaloneLoraManager(LoraManager):
         PendingDeleteRoutes.setup_routes(app)
         ExampleImagesRoutes.setup_routes(app, ws_manager=ws_manager)
         PreviewRoutes.setup_routes(app)
+        GalleryRoutes().setup_routes(app)
 
         # Setup WebSocket routes that are shared across all model types
         app.router.add_get("/ws/fetch-progress", ws_manager.handle_connection)

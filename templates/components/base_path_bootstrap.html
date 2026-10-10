@@ -15,7 +15,7 @@
     // Manager page routes as the backend sees them (proxies strip the
     // prefix, so the page path always ends with one of these suffixes).
     // Longest first so "/loras/recipes" wins over "/loras".
-    var KNOWN_PAGES = ['/loras/recipes', '/loras', '/checkpoints', '/embeddings', '/other', '/statistics'];
+    var KNOWN_PAGES = ['/loras/recipes', '/loras', '/checkpoints', '/embeddings', '/other', '/statistics', '/gallery'];
 
     var path = window.location.pathname.replace(/\/+$/, '') || '/';
     var prefix = '';
