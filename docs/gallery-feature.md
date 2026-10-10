@@ -88,7 +88,7 @@ gallery_meta(key PK, value)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/lm/gallery/images` | 分页列表。参数 `page`、`page_size`、`sort`(`newest/oldest/rating_desc/rating_asc/name`)、`rating`(`all/liked/disliked/unrated`)、`artist`、`lora`、`q` |
+| GET | `/api/lm/gallery/images` | 分页列表。参数 `page`、`page_size`、`sort`(`newest/oldest/rating_desc/rating_asc/name`)、`rating`(`all/liked/disliked/unrated`)、`metadata`(`all/with/without`)、`artist`、`lora`、`q` |
 | POST/GET | `/api/lm/gallery/rating` | `{"image_path","rating"}`，rating 取 `1/-1/0` |
 | GET | `/api/lm/gallery/stats` | `by`(`artist/lora`)、`sort`(`net/likes/dislikes/total/ratio`)、`limit`、`min_total` |
 | POST/GET | `/api/lm/gallery/index` | 启动后台扫描，`force=1` 强制重新解析 |
@@ -122,11 +122,11 @@ pytest tests/utils/test_artist_tags.py tests/services/test_gallery_service.py te
 npx vitest run tests/frontend
 ```
 
-覆盖范围：画师解析的全部边界写法、Anima 负向词不产生幻影画师、
+覆盖范围：画师解析的全部边界写法（含 Anima 的转义括号）、负向词不产生幻影画师、
 ComfyUI 图与 A1111 文本两种来源、`LoraLoaderModelOnly` 的 LoRA 抓取、
 无元数据图片的降级、递归开关与删除后的剪枝、**重扫保留评分**、
-统计聚合与排序、列表各过滤器、分页、包含性校验与扩展名白名单、
-路由注册完整性、评分接口的参数校验。
+统计聚合与排序、列表各过滤器（评分 / **元数据有无** / 画师 / LoRA / 关键词）及其组合、
+分页总计、包含性校验与扩展名白名单、路由注册完整性、评分接口的参数校验。
 
 ## 6. 已知限制 / 后续可做
 

@@ -107,6 +107,52 @@ async def test_list_images_clamps_page_size(service):
     assert _payload(response)["data"]["page_size"] == 200
 
 
+@pytest.fixture
+def mixed_metadata_service(tmp_path, monkeypatch):
+    """Two images, one with readable metadata and one without."""
+    cache = GalleryCache(str(tmp_path / "gallery.sqlite"))
+
+    def _record(name, has_metadata):
+        return {
+            "image_path": str(tmp_path / "output" / name),
+            "file_name": name,
+            "mtime": 1.0,
+            "size": 10,
+            "width": 8,
+            "height": 8,
+            "prompt": "1girl, @nnn yryr" if has_metadata else None,
+            "negative_prompt": None,
+            "parser": "comfy" if has_metadata else None,
+            "gen_params": {},
+            "has_metadata": has_metadata,
+            "artists": [],
+            "loras": [],
+        }
+
+    cache.upsert_images([_record("with.png", True), _record("without.png", False)])
+    instance = GalleryService(cache=cache)
+    monkeypatch.setattr(GalleryService, "_instance", instance)
+    return instance
+
+
+async def test_metadata_query_parameter_filters_the_listing(mixed_metadata_service):
+    handler = GalleryHandlerSet()
+
+    async def names(**query):
+        body = _payload(await handler.list_images(FakeRequest(query=query)))
+        return sorted(item["file_name"] for item in body["data"]["items"])
+
+    assert await names() == ["with.png", "without.png"]
+    assert await names(metadata="all") == ["with.png", "without.png"]
+    assert await names(metadata="with") == ["with.png"]
+    assert await names(metadata="without") == ["without.png"]
+    # An unknown value degrades to "all" instead of erroring, so a stale
+    # frontend cannot break against a newer backend.
+    assert await names(metadata="bogus") == ["with.png", "without.png"]
+    # Case does not matter.
+    assert await names(metadata="WITH") == ["with.png"]
+
+
 async def test_rating_accepts_a_post_body(service, tmp_path):
     image_path = str(tmp_path / "output" / "a.png")
     response = await GalleryHandlerSet().set_rating(

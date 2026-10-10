@@ -2993,6 +2993,12 @@
             "disliked": "싫어요",
             "unrated": "미평가"
         },
+        "metadata": {
+            "label": "메타데이터",
+            "all": "모두",
+            "with": "메타데이터 있음",
+            "without": "메타데이터 없음"
+        },
         "search": {
             "label": "검색",
             "placeholder": "파일 이름 또는 프롬프트"
@@ -3031,7 +3037,7 @@
             "noImagesTitle": "아직 이미지가 없습니다",
             "noImagesMessage": "아직 출력 폴더에서 인덱싱된 항목이 없습니다. 스캔을 실행해 생성된 이미지를 가져오세요.",
             "noMatchesTitle": "일치하는 이미지가 없습니다",
-            "noMatchesMessage": "작가 또는 LoRA 필터, 평점 필터, 검색어를 지워 보세요.",
+            "noMatchesMessage": "작가 또는 LoRA 필터, 평점 필터, 메타데이터 필터, 검색어를 지워 보세요.",
             "unsetTitle": "출력 폴더를 찾을 수 없습니다",
             "unsetMessage": "갤러리 설정에서 ComfyUI 출력 폴더를 지정한 다음 스캔해 갤러리를 만드세요."
         },

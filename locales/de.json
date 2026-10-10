@@ -2993,6 +2993,12 @@
             "disliked": "Gefällt mir nicht",
             "unrated": "Nicht bewertet"
         },
+        "metadata": {
+            "label": "Metadaten",
+            "all": "Alle",
+            "with": "Mit Metadaten",
+            "without": "Ohne Metadaten"
+        },
         "search": {
             "label": "Suchen",
             "placeholder": "Dateiname oder Prompt"
@@ -3031,7 +3037,7 @@
             "noImagesTitle": "Noch keine Bilder",
             "noImagesMessage": "Aus dem Ausgabeordner wurde noch nichts indexiert. Führen Sie einen Scan aus, um Ihre generierten Bilder zu erfassen.",
             "noMatchesTitle": "Keine Bilder entsprechen den Kriterien",
-            "noMatchesMessage": "Versuchen Sie, den Künstler- oder LoRA-Filter, den Bewertungsfilter oder das Suchfeld zu leeren.",
+            "noMatchesMessage": "Versuchen Sie, den Künstler- oder LoRA-Filter, den Bewertungsfilter, den Metadatenfilter oder das Suchfeld zu leeren.",
             "unsetTitle": "Kein Ausgabeordner gefunden",
             "unsetMessage": "Legen Sie den ComfyUI-Ausgabeordner in den Galerie-Einstellungen fest und scannen Sie ihn, um die Galerie aufzubauen."
         },

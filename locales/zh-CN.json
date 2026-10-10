@@ -2993,6 +2993,12 @@
             "disliked": "已点踩",
             "unrated": "未评分"
         },
+        "metadata": {
+            "label": "元数据",
+            "all": "全部",
+            "with": "有元数据",
+            "without": "无元数据"
+        },
         "search": {
             "label": "搜索",
             "placeholder": "文件名或提示词"
@@ -3031,7 +3037,7 @@
             "noImagesTitle": "还没有图片",
             "noImagesMessage": "尚未从输出目录索引到任何内容。运行一次扫描来收录你生成的图片。",
             "noMatchesTitle": "没有符合条件的图片",
-            "noMatchesMessage": "试着清除画师或 LoRA 筛选、评分筛选，或清空搜索框。",
+            "noMatchesMessage": "试着清除画师或 LoRA 筛选、评分筛选、元数据筛选，或清空搜索框。",
             "unsetTitle": "未找到输出目录",
             "unsetMessage": "请在画廊设置中指定 ComfyUI 输出目录，然后扫描它以建立画廊。"
         },

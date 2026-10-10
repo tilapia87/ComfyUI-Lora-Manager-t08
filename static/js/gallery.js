@@ -106,6 +106,7 @@ export class GalleryPage {
         this.totalItems = 0;
         this.sort = 'newest';
         this.ratingFilter = 'all';
+        this.metadataFilter = 'all';
         this.search = '';
         this.artist = '';
         this.lora = '';
@@ -163,6 +164,7 @@ export class GalleryPage {
             statsPanel: byId('galleryStatsPanel'),
             sortSelect: byId('gallerySortSelect'),
             ratingSelect: byId('galleryRatingSelect'),
+            metadataSelect: byId('galleryMetadataSelect'),
             searchInput: byId('gallerySearchInput'),
             totalCount: byId('galleryTotalCount'),
             filterBanner: byId('galleryFilterBanner'),
@@ -222,6 +224,12 @@ export class GalleryPage {
 
         el.ratingSelect?.addEventListener('change', () => {
             this.ratingFilter = el.ratingSelect.value;
+            this.page = 1;
+            this.loadImages();
+        });
+
+        el.metadataSelect?.addEventListener('change', () => {
+            this.metadataFilter = el.metadataSelect.value;
             this.page = 1;
             this.loadImages();
         });
@@ -295,6 +303,7 @@ export class GalleryPage {
                 pageSize: GALLERY_PAGE_SIZE,
                 sort: this.sort,
                 rating: this.ratingFilter,
+                metadata: this.metadataFilter,
                 artist: this.artist,
                 lora: this.lora,
                 q: this.search,
@@ -635,7 +644,9 @@ export class GalleryPage {
         const el = this.el;
         this._hide(el.errorState);
 
-        const filtersActive = Boolean(this.artist || this.lora || this.search) || this.ratingFilter !== 'all';
+        const filtersActive = Boolean(this.artist || this.lora || this.search) ||
+            this.ratingFilter !== 'all' ||
+            this.metadataFilter !== 'all';
         const outputUnset = !this.config || this.config.output_path_source === 'unset' || !this.config.output_path;
 
         if (filtersActive) {

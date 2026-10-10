@@ -57,6 +57,11 @@ class GalleryHandlerSet:
             query = request.query
             page = _parse_int(query.get("page"), 1, minimum=1)
             page_size = _parse_int(query.get("page_size"), 40, minimum=1, maximum=200)
+            # An unknown value falls back to "all" rather than erroring, so an
+            # older frontend keeps working against a newer backend.
+            metadata = (query.get("metadata") or "all").lower()
+            if metadata not in ("all", "with", "without"):
+                metadata = "all"
             service = await self._service()
             data = await service.list_images(
                 page=page,
@@ -66,6 +71,7 @@ class GalleryHandlerSet:
                 artist=query.get("artist") or None,
                 lora=query.get("lora") or None,
                 query=(query.get("q") or "").strip() or None,
+                metadata=metadata,
             )
             return web.json_response({"success": True, "data": data})
         except Exception as exc:

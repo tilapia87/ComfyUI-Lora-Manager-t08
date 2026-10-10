@@ -290,6 +290,7 @@ class GalleryService:
         artist: Optional[str] = None,
         lora: Optional[str] = None,
         query: Optional[str] = None,
+        metadata: str = "all",
     ) -> Dict[str, Any]:
         items, total = self.cache.list_images(
             page=page,
@@ -299,6 +300,7 @@ class GalleryService:
             artist=artist,
             lora=lora,
             query=query,
+            metadata=metadata,
         )
         for item in items:
             item["image_url"] = self.image_url(item["image_path"])

@@ -70,6 +70,17 @@ async def test_images_endpoint_is_empty_before_any_scan(client, tmp_path):
     assert body["data"]["items"] == []
 
 
+@pytest.mark.parametrize("value", ["all", "with", "without", "bogus", ""])
+async def test_images_endpoint_accepts_every_metadata_value(client, tmp_path, value):
+    """The metadata filter must never turn a bad or absent value into a 4xx/5xx."""
+    get_settings_manager().set("gallery_output_path", str(tmp_path))
+    response = await client.get("/api/lm/gallery/images", params={"metadata": value})
+    assert response.status == 200
+    body = await response.json()
+    assert body["success"] is True
+    assert body["data"]["total"] == 0
+
+
 async def test_index_status_endpoint_reports_idle_state(client, tmp_path):
     get_settings_manager().set("gallery_output_path", str(tmp_path))
     body = await (await client.get("/api/lm/gallery/index/status")).json()

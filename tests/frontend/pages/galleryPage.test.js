@@ -374,6 +374,62 @@ describe('GalleryPage', () => {
     expect(imageCalls(fetchStub.calls)[2].url).toContain('rating=liked');
   });
 
+  it('renders the metadata filter select next to the rating select', async () => {
+    await boot();
+
+    const metadata = document.getElementById('galleryMetadataSelect');
+    expect(metadata).not.toBeNull();
+    expect(metadata.value).toBe('all');
+    // The three states the backend understands: all | with | without.
+    expect([...metadata.options].map((option) => option.value)).toEqual(['all', 'with', 'without']);
+
+    const selects = [...document.querySelectorAll('#galleryImagesPanel .gallery-control select')].map(
+      (node) => node.id
+    );
+    expect(selects).toEqual(['gallerySortSelect', 'galleryRatingSelect', 'galleryMetadataSelect']);
+  });
+
+  it('requests the selected metadata filter and resets to the first page', async () => {
+    const page = await boot();
+
+    // The unfiltered request still names the parameter, like the rating filter.
+    expect(imageCalls(fetchStub.calls)[0].url).toContain('metadata=all');
+
+    // Pretend the user paged forward: switching a filter must come back to page 1.
+    page.page = 2;
+
+    const metadata = document.getElementById('galleryMetadataSelect');
+    metadata.value = 'with';
+    metadata.dispatchEvent(new Event('change'));
+
+    await vi.waitFor(() => expect(imageCalls(fetchStub.calls).length).toBe(2), { timeout: 2000 });
+    const query = new URL(imageCalls(fetchStub.calls)[1].url, 'http://localhost').searchParams;
+    expect(query.get('metadata')).toBe('with');
+    expect(query.get('page')).toBe('1');
+    expect(page.metadataFilter).toBe('with');
+  });
+
+  it('treats the metadata filter as an active filter in the empty state', async () => {
+    fetchStub.setRoute('/api/lm/gallery/images', {
+      success: true,
+      data: { items: [], total: 0, page: 1, page_size: 40, total_pages: 0 },
+    });
+
+    await boot();
+
+    // Nothing indexed and no filter set: the plain "no images yet" state.
+    expect(document.getElementById('galleryEmptyTitle').textContent).toBe('gallery.empty.noImagesTitle');
+
+    const metadata = document.getElementById('galleryMetadataSelect');
+    metadata.value = 'without';
+    metadata.dispatchEvent(new Event('change'));
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('galleryEmptyTitle').textContent).toBe('gallery.empty.noMatchesTitle')
+    );
+    expect(imageCalls(fetchStub.calls)[1].url).toContain('metadata=without');
+  });
+
   it('renders the statistics table from the stats response', async () => {
     await boot();
 

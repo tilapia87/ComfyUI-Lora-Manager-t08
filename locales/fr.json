@@ -2993,6 +2993,12 @@
             "disliked": "Je n'aime pas",
             "unrated": "Non évaluées"
         },
+        "metadata": {
+            "label": "Métadonnées",
+            "all": "Toutes",
+            "with": "Avec métadonnées",
+            "without": "Sans métadonnées"
+        },
         "search": {
             "label": "Rechercher",
             "placeholder": "Nom de fichier ou prompt"
@@ -3031,7 +3037,7 @@
             "noImagesTitle": "Aucune image pour le moment",
             "noImagesMessage": "Rien n'a encore été indexé depuis le dossier de sortie. Lancez une analyse pour récupérer vos images générées.",
             "noMatchesTitle": "Aucune image ne correspond",
-            "noMatchesMessage": "Essayez d'effacer le filtre d'artiste ou de LoRA, le filtre d'évaluation, ou le champ de recherche.",
+            "noMatchesMessage": "Essayez d'effacer le filtre d'artiste ou de LoRA, le filtre d'évaluation, le filtre de métadonnées, ou le champ de recherche.",
             "unsetTitle": "Aucun dossier de sortie trouvé",
             "unsetMessage": "Définissez le dossier de sortie de ComfyUI dans les paramètres de la galerie, puis analysez-le pour construire la galerie."
         },

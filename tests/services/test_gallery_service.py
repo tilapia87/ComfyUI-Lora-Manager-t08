@@ -339,6 +339,55 @@ async def test_pagination_math(service):
     assert page["page"] == 2
 
 
+async def test_metadata_filter_separates_images_with_and_without_metadata(service):
+    # "plain.png" carries no readable generation metadata, so it can never
+    # contribute an artist or a LoRA and the user wants to hide it.
+    await _scan(service)
+
+    everything = await service.list_images()
+    assert everything["total"] == 3
+
+    with_meta = await service.list_images(metadata="with")
+    assert sorted(i["file_name"] for i in with_meta["items"]) == [
+        "a1111_00002_.png",
+        "comfy_00001_.png",
+    ]
+    assert all(i["has_metadata"] for i in with_meta["items"])
+
+    without_meta = await service.list_images(metadata="without")
+    assert [i["file_name"] for i in without_meta["items"]] == ["plain.png"]
+    assert without_meta["items"][0]["has_metadata"] is False
+
+    # "all" and an unset value behave identically.
+    assert (await service.list_images(metadata="all"))["total"] == 3
+
+
+async def test_metadata_filter_ignores_an_unknown_value(service):
+    await _scan(service)
+    assert (await service.list_images(metadata="nonsense"))["total"] == 3
+
+
+async def test_metadata_filter_combines_with_other_filters(service):
+    await _scan(service)
+    items = _by_name((await service.list_images())["items"])
+    await service.set_rating(items["plain.png"]["image_path"], 1)
+
+    # The no-metadata image is the only liked one, so the two filters intersect
+    # to nothing rather than either one winning.
+    assert (await service.list_images(rating="liked", metadata="with"))["total"] == 0
+    assert (await service.list_images(rating="liked", metadata="without"))["total"] == 1
+    assert (await service.list_images(artist="nnn yryr", metadata="without"))["total"] == 0
+    assert (await service.list_images(query="masterpiece", metadata="without"))["total"] == 0
+
+
+async def test_metadata_filter_respects_pagination_totals(service):
+    await _scan(service)
+    page = await service.list_images(metadata="with", page=1, page_size=1)
+    assert page["total"] == 2
+    assert page["total_pages"] == 2
+    assert len(page["items"]) == 1
+
+
 async def test_listed_items_carry_a_servable_url(service):
     await _scan(service)
     item = (await service.list_images())["items"][0]

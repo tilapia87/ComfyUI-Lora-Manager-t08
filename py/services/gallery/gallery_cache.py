@@ -89,6 +89,15 @@ _RATING_FILTERS: Dict[str, str] = {
     "unrated": "i.rating = 0",
 }
 
+# Whether an image carries readable generation metadata. An image without any
+# cannot contribute artists or a LoRA, so hiding those is how a user keeps the
+# noise that upscalers and other tools drop into the output folder out of view.
+_METADATA_FILTERS: Dict[str, str] = {
+    "all": "",
+    "with": "i.has_metadata = 1",
+    "without": "i.has_metadata = 0",
+}
+
 
 def default_db_path() -> str:
     """Return the gallery database path, creating its directory."""
@@ -327,6 +336,7 @@ class GalleryCache:
         artist: Optional[str],
         lora: Optional[str],
         query: Optional[str],
+        metadata: str = "all",
     ) -> Tuple[List[str], List[Any]]:
         clauses: List[str] = []
         params: List[Any] = []
@@ -334,6 +344,9 @@ class GalleryCache:
         rating_clause = _RATING_FILTERS.get(rating, "")
         if rating_clause:
             clauses.append(rating_clause)
+        metadata_clause = _METADATA_FILTERS.get(metadata, "")
+        if metadata_clause:
+            clauses.append(metadata_clause)
         if artist:
             clauses.append(
                 "EXISTS (SELECT 1 FROM gallery_image_artists a "
@@ -368,9 +381,10 @@ class GalleryCache:
         artist: Optional[str] = None,
         lora: Optional[str] = None,
         query: Optional[str] = None,
+        metadata: str = "all",
     ) -> Tuple[List[Dict[str, Any]], int]:
         self._ensure_schema()
-        clauses, params = self._build_filters(rating, artist, lora, query)
+        clauses, params = self._build_filters(rating, artist, lora, query, metadata)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         order = _SORT_SQL.get(sort, _SORT_SQL["newest"])
         offset = max(0, (max(1, page) - 1) * page_size)

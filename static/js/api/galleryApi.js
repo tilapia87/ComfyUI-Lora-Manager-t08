@@ -71,6 +71,7 @@ async function requestJson(url, options = {}) {
  * @param {number} [params.pageSize=40] - Items per page (max 200).
  * @param {string} [params.sort='newest'] - newest|oldest|rating_desc|rating_asc|name.
  * @param {string} [params.rating='all'] - all|liked|disliked|unrated.
+ * @param {string} [params.metadata='all'] - all|with|without.
  * @param {string} [params.artist=''] - Exact artist name filter.
  * @param {string} [params.lora=''] - Exact LoRA name filter.
  * @param {string} [params.q=''] - Free-text substring filter.
@@ -82,6 +83,7 @@ export async function fetchGalleryImages(params = {}) {
         pageSize = 40,
         sort = 'newest',
         rating = 'all',
+        metadata = 'all',
         artist = '',
         lora = '',
         q = '',
@@ -92,6 +94,7 @@ export async function fetchGalleryImages(params = {}) {
         page_size: String(Math.min(Math.max(1, pageSize), GALLERY_MAX_PAGE_SIZE)),
         sort,
         rating,
+        metadata,
     });
 
     if (artist) query.append('artist', artist);

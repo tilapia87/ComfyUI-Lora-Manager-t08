@@ -121,6 +121,17 @@
                     </select>
                 </div>
 
+                <div class="gallery-control">
+                    <label class="gallery-control-label" for="galleryMetadataSelect">
+                        {{ t('gallery.metadata.label') }}
+                    </label>
+                    <select id="galleryMetadataSelect">
+                        <option value="all">{{ t('gallery.metadata.all') }}</option>
+                        <option value="with">{{ t('gallery.metadata.with') }}</option>
+                        <option value="without">{{ t('gallery.metadata.without') }}</option>
+                    </select>
+                </div>
+
                 <div class="gallery-control gallery-control-search">
                     <label class="gallery-control-label" for="gallerySearchInput">
                         {{ t('gallery.search.label') }}

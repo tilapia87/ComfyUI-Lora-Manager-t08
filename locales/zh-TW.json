@@ -2993,6 +2993,12 @@
             "disliked": "已倒讚",
             "unrated": "未評分"
         },
+        "metadata": {
+            "label": "中繼資料",
+            "all": "全部",
+            "with": "有中繼資料",
+            "without": "無中繼資料"
+        },
         "search": {
             "label": "搜尋",
             "placeholder": "檔案名稱或提示詞"
@@ -3031,7 +3037,7 @@
             "noImagesTitle": "還沒有圖片",
             "noImagesMessage": "尚未從輸出資料夾索引到任何內容。執行一次掃描來收錄您生成的圖片。",
             "noMatchesTitle": "沒有符合條件的圖片",
-            "noMatchesMessage": "試著清除繪師或 LoRA 篩選、評分篩選，或清空搜尋框。",
+            "noMatchesMessage": "試著清除繪師或 LoRA 篩選、評分篩選、中繼資料篩選，或清空搜尋框。",
             "unsetTitle": "找不到輸出資料夾",
             "unsetMessage": "請在圖庫設定中指定 ComfyUI 輸出資料夾，然後掃描它以建立圖庫。"
         },
