@@ -247,3 +247,91 @@ def test_gallery_index_falls_back_when_the_user_list_is_missing(tmp_path):
     # A bad path must not take the shipped list down with it.
     index = load_gallery_artist_index(str(tmp_path / "nope.txt"))
     assert len(index) > 80_000
+
+
+# --- escaped parentheses: Anima escapes every bracket in a prompt -----------
+
+
+def test_escaped_parentheses_become_literal_ones():
+    # Anima prompts write "@hammer \(sunset beach\)" so the model reads a literal
+    # bracket instead of attention weighting.
+    assert extract_artist_names(r"1girl, @hammer \(sunset beach\), smile") == [
+        "hammer (sunset beach)"
+    ]
+
+
+def test_escaped_name_matches_the_underscore_export(tmp_path):
+    path = _write_csv(tmp_path, "hammer_(sunset_beach),1,1500,\n")
+    index = load_danbooru_artist_index(path)
+    artists = extract_artists(r"1girl, @hammer \(sunset beach\), smile", index)
+    assert artists == [
+        {
+            "name": "hammer (sunset beach)",
+            "canonical": "hammer_(sunset_beach)",
+            "known": True,
+        }
+    ]
+
+
+def test_colon_inside_escaped_parentheses_is_not_eaten_as_a_weight():
+    # The weight stripper must not treat "(...: star rail)" as ":weight".
+    assert extract_artist_names(r"1girl, @firefly \(honkai: star rail\), smile") == [
+        "firefly (honkai: star rail)"
+    ]
+
+
+def test_escaped_weighted_wrapper_is_stripped():
+    # "\(@name:1.2\)" is a weighted group around the whole tag.
+    assert extract_artist_names(r"1girl, \(@nnn yryr:1.2\), smile") == ["nnn yryr"]
+
+
+def test_multiple_escaped_artists_in_one_prompt():
+    prompt = r"masterpiece, 1girl, @alpha \(series a\), solo, @beta \(series b\), smile"
+    assert extract_artist_names(prompt) == ["alpha (series a)", "beta (series b)"]
+
+
+def test_realistic_anima_prompt_with_escapes(tmp_path):
+    # Mirrors the model card's own example shape: tag order with escaped
+    # brackets on the character, the series and the artist.
+    path = _write_csv(tmp_path, "hoshimachi_suisei_(1st_costume),1,10,\n")
+    index = load_danbooru_artist_index(path)
+    prompt = (
+        "masterpiece, best quality, safe, 1girl, hoshimachi suisei, "
+        r"hoshimachi suisei \(1st costume\), @hoshimachi suisei \(1st costume\), cosplay, smile"
+    )
+    assert extract_artists(prompt, index)[0]["canonical"] == "hoshimachi_suisei_(1st_costume)"
+
+
+def test_folding_bridges_escapes_without_an_explicit_unescape(tmp_path):
+    # Defence in depth: even a name that still carries escapes has to match the
+    # export, because that is the only form Anima ever writes.
+    path = _write_csv(tmp_path, "k_k_slider,1,10,\n")
+    index = load_danbooru_artist_index(path)
+    assert index.is_known(r"k k slider \(ver 2\)") is False  # sanity: folds, no match
+    assert index.is_known("k_k_slider") is True
+    # The escaped form of a name that IS in the export must match too.
+    index2 = load_danbooru_artist_index(_write_csv(tmp_path, "hammer_(sunset_beach),1,10,\n"))
+    assert index2.canonical(r"hammer \(sunset beach\)") == "hammer_(sunset_beach)"
+
+
+def test_canonical_names_never_keep_danbooru_escapes(tmp_path):
+    # A real export writes every disambiguator escaped -- "addy \(@vegeebs\)".
+    # A chip must show the plain name, not the backslashes.
+    path = _write_list(
+        tmp_path, "+1 \\(yakusoku0722\\)\naddy \\(@vegeebs\\)\n"
+    )
+    index = load_artist_index(path)
+    assert index.canonical("+1 (yakusoku0722)") == "+1 (yakusoku0722)"
+    assert index.canonical("addy (@vegeebs)") == "addy (@vegeebs)"
+    assert all("\\" not in value for value in index.as_dict().values())
+
+
+def test_extraction_and_export_meet_at_the_plain_name():
+    # The two spellings that actually occur -- Anima's escaped prompt and the
+    # export's escaped list entry -- must land on the same artist. The index key
+    # is already folded, so the plain name is what it holds.
+    index = ArtistIndex({"addy (@vegeebs)": "addy (@vegeebs)"}, source="memory")
+    artists = extract_artists(r"1girl, @addy \(@vegeebs\), smile", index)
+    assert artists == [
+        {"name": "addy (@vegeebs)", "canonical": "addy (@vegeebs)", "known": True}
+    ]

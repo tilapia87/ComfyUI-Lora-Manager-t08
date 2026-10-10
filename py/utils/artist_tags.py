@@ -60,13 +60,28 @@ _WRAPPER_PAIRS = (("(", ")"), ("[", "]"), ("{", "}"), ("\\(", "\\)"))
 _SENTENCE_BREAK_PATTERN = re.compile(r"\.\s+(?=[A-Z])")
 
 
+def _unescape_parentheses(name: str) -> str:
+    """Turn danbooru's escaped parentheses back into literal ones.
+
+    Anima prompts escape every parenthesis -- ``@hammer \\(sunset beach\\)`` --
+    so the model reads a literal bracket instead of attention weighting. The
+    artist export stores the same name with plain underscores
+    (``hammer_(sunset_beach)``), so the escapes have to come off before the two
+    can be compared.
+    """
+    return name.replace("\\(", "(").replace("\\)", ")")
+
+
 def _fold(name: str) -> str:
     """Normalize a name for comparison.
 
     Anima asks for lowercase with spaces instead of underscores, while danbooru
-    exports keep underscores, so folding has to bridge the two spellings.
+    exports keep underscores, so folding has to bridge the two spellings. The
+    escapes come off here as well, so a name matches even if some caller forgot
+    to unescape it on the way in.
     """
-    return re.sub(r"\s+", " ", name.replace("_", " ")).strip().lower()
+    normalized = _unescape_parentheses(name).replace("_", " ")
+    return re.sub(r"\s+", " ", normalized).strip().lower()
 
 
 def _split_top_level(text: str, separator: str = ",") -> List[str]:
@@ -122,8 +137,9 @@ def _clean_artist_name(raw: str) -> str:
     # to the name itself -- "@hammer (sunset beach)" -- survives.
     name = _WEIGHT_SUFFIX_PATTERN.sub("", name).strip()
 
-    # Danbooru escapes literal parentheses: "@hammer \\(sunset beach\\)".
-    name = name.replace("\\(", "(").replace("\\)", ")").strip()
+    # Danbooru escapes literal parentheses and Anima prompts escape every one
+    # of them: "@hammer \(sunset beach\)".
+    name = _unescape_parentheses(name).strip()
 
     # Stop at a sentence boundary so mixed natural-language prompts do not
     # swallow the prose that follows the artist tag.
@@ -183,7 +199,11 @@ def _parse_artist_list(lines: Iterable[str]) -> Dict[str, str]:
         if not re.search(r"[^\W\d_]", entry, re.UNICODE):
             # No letter at all: ".", "0", "0.05", "00047".
             continue
-        mapping.setdefault(_fold(entry), entry)
+        # Exports write the disambiguator with danbooru escapes --
+        # "addy \(@vegeebs\)". Store the plain form: it is what a user wants to
+        # read in a chip, and folding still matches either spelling.
+        canonical = _unescape_parentheses(entry)
+        mapping.setdefault(_fold(canonical), canonical)
     return mapping
 
 
@@ -203,7 +223,7 @@ def _parse_danbooru_artist_csv(handle: Iterable[str]) -> Dict[str, str]:
         name = row[0].strip()
         if not name or row[1].strip() not in _DANBOORU_ARTIST_CATEGORIES:
             continue
-        mapping.setdefault(_fold(name), name)
+        mapping.setdefault(_fold(name), _unescape_parentheses(name))
     return mapping
 
 
