@@ -40,6 +40,7 @@ class GalleryHandlerSet:
     def to_route_mapping(self) -> Mapping[str, Callable[[web.Request], Awaitable[web.StreamResponse]]]:
         return {
             "list_gallery_images": self.list_images,
+            "list_gallery_images_for_lora": self.list_images_for_lora,
             "set_gallery_rating": self.set_rating,
             "get_gallery_stats": self.get_stats,
             "start_gallery_index": self.start_index,
@@ -76,6 +77,27 @@ class GalleryHandlerSet:
             return web.json_response({"success": True, "data": data})
         except Exception as exc:
             logger.error("Gallery list failed: %s", exc, exc_info=True)
+            return _error(str(exc))
+
+    async def list_images_for_lora(self, request: web.Request) -> web.Response:
+        """Images that used one LoRA, for the LoRA modal's gallery tab."""
+        try:
+            query = request.query
+            lora_hash = (query.get("hash") or "").strip() or None
+            lora_name = (query.get("name") or "").strip() or None
+            if not lora_hash and not lora_name:
+                # Asking for nothing would otherwise look like "every image".
+                return _error("hash or name is required", 400)
+            service = await self._service()
+            data = await service.list_images_for_lora(
+                lora_hash=lora_hash,
+                lora_name=lora_name,
+                page=_parse_int(query.get("page"), 1, minimum=1),
+                page_size=_parse_int(query.get("page_size"), 24, minimum=1, maximum=200),
+            )
+            return web.json_response({"success": True, "data": data})
+        except Exception as exc:
+            logger.error("Gallery for-lora failed: %s", exc, exc_info=True)
             return _error(str(exc))
 
     async def set_rating(self, request: web.Request) -> web.Response:

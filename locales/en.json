@@ -2502,7 +2502,9 @@
       "filenameTemplateSuccess": "Filename template applied successfully for {count} {type}",
       "filenameTemplatePartialSuccess": "Filename template applied with {success} renamed, {failures} failed out of {total} models",
       "filenameTemplateFailed": "Applying filename template failed: {error}",
-      "noModelsSelected": "No models selected"
+      "noModelsSelected": "No models selected",
+      "deepLinkNotFound": "That LoRA is not in the library, so the normal list is shown.",
+      "deepLinkFailed": "Could not open the linked LoRA: {message}"
     },
     "recipes": {
       "fetchFailed": "Failed to fetch recipes: {message}",
@@ -2846,7 +2848,8 @@
       "scanError": "Scan failed: {message}",
       "scanComplete": "Scan complete: {added} added, {updated} updated, {removed} removed",
       "settingsSaved": "Gallery settings saved",
-      "settingsSaveFailed": "Failed to save gallery settings: {message}"
+      "settingsSaveFailed": "Failed to save gallery settings: {message}",
+      "loraLinkFailed": "Could not open {name} on the LoRA page"
     },
     "agent": {
       "llmNotConfigured": "AI provider not configured. Enable it in Settings → AI Provider.",
@@ -2976,7 +2979,8 @@
       "save": "Save",
       "clearFilter": "Clear filter",
       "previous": "Previous page",
-      "next": "Next page"
+      "next": "Next page",
+      "openInLoraPage": "Open in the LoRA page"
     },
     "sort": {
       "label": "Sort",
@@ -3100,6 +3104,12 @@
       "noRatio": "n/a",
       "rowHint": "Show the images for this entry",
       "empty": "Nothing to rank yet. Rate some images, then come back."
+    },
+    "loraTab": {
+      "title": "Gallery",
+      "summary": "{total} images · {liked} liked · {disliked} disliked · {unrated} unrated · net {net}",
+      "empty": "No gallery images use this LoRA yet.",
+      "loadFailed": "Failed to load the gallery images. Please try again later."
     }
   }
 }

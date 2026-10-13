@@ -2502,7 +2502,9 @@
             "filenameTemplateSuccess": "Plantilla de nombres de archivo aplicada exitosamente para {count} {type}",
             "filenameTemplatePartialSuccess": "Plantilla de nombres de archivo aplicada con {success} renombrados, {failures} fallidos de un total de {total} modelos",
             "filenameTemplateFailed": "Aplicación de la plantilla de nombres de archivo fallida: {error}",
-            "noModelsSelected": "No hay modelos seleccionados"
+            "noModelsSelected": "No hay modelos seleccionados",
+            "deepLinkNotFound": "Ese LoRA no está en la biblioteca, se muestra la lista normal.",
+            "deepLinkFailed": "No se pudo abrir el LoRA enlazado: {message}"
         },
         "recipes": {
             "fetchFailed": "Error al obtener recetas: {message}",
@@ -2846,7 +2848,8 @@
             "scanError": "Error en el escaneo: {message}",
             "scanComplete": "Escaneo completado: {added} nuevo(s), {updated} actualizado(s), {removed} eliminado(s)",
             "settingsSaved": "Ajustes de la galería guardados",
-            "settingsSaveFailed": "No se pudieron guardar los ajustes de la galería: {message}"
+            "settingsSaveFailed": "No se pudieron guardar los ajustes de la galería: {message}",
+            "loraLinkFailed": "No se pudo abrir {name} en la página de LoRA"
         },
         "agent": {
             "llmNotConfigured": "Proveedor de IA no configurado. Actívelo en Configuración → Proveedor de IA.",
@@ -2976,7 +2979,8 @@
             "save": "Guardar",
             "clearFilter": "Borrar filtro",
             "previous": "Página anterior",
-            "next": "Página siguiente"
+            "next": "Página siguiente",
+            "openInLoraPage": "Abrir en la página de LoRA"
         },
         "sort": {
             "label": "Ordenar por",
@@ -3100,6 +3104,12 @@
             "noRatio": "N/D",
             "rowHint": "Mostrar las imágenes de esta entrada",
             "empty": "Todavía no hay nada que clasificar. Valora algunas imágenes y vuelve después."
+        },
+        "loraTab": {
+            "title": "Galería",
+            "summary": "Imágenes: {total} · Me gusta: {liked} · No me gusta: {disliked} · Sin valorar: {unrated} · Neto: {net}",
+            "empty": "Todavía no hay imágenes de la galería que usen este LoRA.",
+            "loadFailed": "No se pudieron cargar las imágenes de la galería. Inténtalo de nuevo más tarde."
         }
     }
 }

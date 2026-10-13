@@ -2502,7 +2502,9 @@
             "filenameTemplateSuccess": "{count}개의 {type}에 파일명 템플릿이 성공적으로 적용되었습니다",
             "filenameTemplatePartialSuccess": "파일명 템플릿 적용 완료: 전체 {total}개 중 {success}개 이름 변경, {failures}개 실패",
             "filenameTemplateFailed": "파일명 템플릿 적용 실패: {error}",
-            "noModelsSelected": "선택된 모델이 없습니다"
+            "noModelsSelected": "선택된 모델이 없습니다",
+            "deepLinkNotFound": "해당 LoRA가 라이브러리에 없어 일반 목록을 표시합니다.",
+            "deepLinkFailed": "연결된 LoRA를 열 수 없습니다: {message}"
         },
         "recipes": {
             "fetchFailed": "레시피 가져오기 실패: {message}",
@@ -2846,7 +2848,8 @@
             "scanError": "스캔 실패: {message}",
             "scanComplete": "스캔 완료: 새 이미지 {added}개, 업데이트 {updated}개, 제거 {removed}개",
             "settingsSaved": "갤러리 설정을 저장했습니다",
-            "settingsSaveFailed": "갤러리 설정을 저장하지 못했습니다: {message}"
+            "settingsSaveFailed": "갤러리 설정을 저장하지 못했습니다: {message}",
+            "loraLinkFailed": "LoRA 페이지에서 {name}을(를) 열 수 없습니다"
         },
         "agent": {
             "llmNotConfigured": "AI 제공자가 설정되지 않았습니다. 설정 → AI 제공자에서 활성화하세요.",
@@ -2976,7 +2979,8 @@
             "save": "저장",
             "clearFilter": "필터 지우기",
             "previous": "이전 페이지",
-            "next": "다음 페이지"
+            "next": "다음 페이지",
+            "openInLoraPage": "LoRA 페이지에서 열기"
         },
         "sort": {
             "label": "정렬",
@@ -3100,6 +3104,12 @@
             "noRatio": "없음",
             "rowHint": "이 항목의 이미지 보기",
             "empty": "아직 순위를 매길 데이터가 없습니다. 이미지 몇 장에 평점을 남기고 다시 오세요."
+        },
+        "loraTab": {
+            "title": "갤러리",
+            "summary": "이미지: {total} · 좋아요: {liked} · 싫어요: {disliked} · 미평가: {unrated} · 순점수: {net}",
+            "empty": "이 LoRA를 사용한 갤러리 이미지가 아직 없습니다.",
+            "loadFailed": "갤러리 이미지를 불러오지 못했습니다. 나중에 다시 시도해 주세요."
         }
     }
 }

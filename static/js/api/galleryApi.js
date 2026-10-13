@@ -7,6 +7,7 @@ import { showToast } from '../utils/uiHelpers.js';
 
 const GALLERY_ENDPOINTS = {
     images: '/api/lm/gallery/images',
+    forLora: '/api/lm/gallery/for-lora',
     rating: '/api/lm/gallery/rating',
     stats: '/api/lm/gallery/stats',
     index: '/api/lm/gallery/index',
@@ -117,6 +118,77 @@ export async function fetchGalleryImages(params = {}) {
         showToast('toast.gallery.fetchFailed', { message: error.message }, 'error');
         throw error;
     }
+}
+
+/**
+ * Fetch the images that used one LoRA, together with their rating summary.
+ *
+ * `hash` is the preferred lookup key: a LoRA *name* can stand for more than one
+ * local file, which the backend treats as unresolvable. `name` is the fallback
+ * for a LoRA that is not in the local library at all — the backend answers with
+ * an empty page rather than an error in both cases.
+ * @param {Object} [params] - Query parameters.
+ * @param {string} [params.hash=''] - Full sha256 of the LoRA.
+ * @param {string} [params.name=''] - LoRA file name, used when no hash is known.
+ * @param {number} [params.page=1] - 1-based page number.
+ * @param {number} [params.pageSize=24] - Items per page (max 200).
+ * @returns {Promise<{items: Array, total: number, totalPages: number, page: number, pageSize: number, summary: Object, lora: Object}>}
+ */
+export async function fetchGalleryImagesForLora(params = {}) {
+    const { hash = '', name = '', page = 1, pageSize = 24 } = params;
+    const safePage = Math.max(1, Number(page) || 1);
+    const safePageSize = Math.min(Math.max(1, Number(pageSize) || 24), GALLERY_MAX_PAGE_SIZE);
+
+    const query = new URLSearchParams({
+        page: String(safePage),
+        page_size: String(safePageSize),
+    });
+    if (hash) {
+        query.append('hash', hash);
+    } else if (name) {
+        query.append('name', name);
+    } else {
+        // Nothing to look up: an unknown LoRA is an empty result, not an error.
+        return emptyForLoraResult(safePage, safePageSize, { hash, name });
+    }
+
+    // No toast here: the LoRA modal's gallery tab renders its own failure state,
+    // the same way the recipes tab does.
+    const data = await requestJson(`${GALLERY_ENDPOINTS.forLora}?${query.toString()}`);
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const totalPages = Number(data?.total_pages) || 0;
+    return {
+        items,
+        total: Number(data?.total) || 0,
+        totalPages,
+        page: Number(data?.page) || safePage,
+        pageSize: Number(data?.page_size) || safePageSize,
+        summary: data?.summary || emptyForLoraSummary(),
+        lora: data?.lora || { name, hash: hash || null },
+    };
+}
+
+/**
+ * The zero-value payload an unknown LoRA resolves to.
+ * @param {number} page - Requested page.
+ * @param {number} pageSize - Requested page size.
+ * @param {{hash: string, name: string}} key - What was asked for.
+ * @returns {Object}
+ */
+function emptyForLoraResult(page, pageSize, key) {
+    return {
+        items: [],
+        total: 0,
+        totalPages: 0,
+        page,
+        pageSize,
+        summary: emptyForLoraSummary(),
+        lora: { name: key.name || '', hash: key.hash || null },
+    };
+}
+
+function emptyForLoraSummary() {
+    return { total: 0, liked: 0, disliked: 0, unrated: 0, net: 0 };
 }
 
 /**

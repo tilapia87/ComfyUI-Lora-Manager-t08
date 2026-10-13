@@ -2502,7 +2502,9 @@
             "filenameTemplateSuccess": "Modèle de nom de fichier appliqué avec succès pour {count} {type}",
             "filenameTemplatePartialSuccess": "Modèle de nom de fichier appliqué avec {success} renommés, {failures} échecs sur {total} modèles",
             "filenameTemplateFailed": "Échec de l'application du modèle de nom de fichier : {error}",
-            "noModelsSelected": "Aucun modèle sélectionné"
+            "noModelsSelected": "Aucun modèle sélectionné",
+            "deepLinkNotFound": "Ce LoRA n'est pas dans la bibliothèque, la liste normale est affichée.",
+            "deepLinkFailed": "Impossible d'ouvrir le LoRA lié : {message}"
         },
         "recipes": {
             "fetchFailed": "Échec de la récupération des recipes : {message}",
@@ -2846,7 +2848,8 @@
             "scanError": "Échec de l'analyse : {message}",
             "scanComplete": "Analyse terminée : {added} ajout(s), {updated} mise(s) à jour, {removed} supprimé(s)",
             "settingsSaved": "Paramètres de la galerie enregistrés",
-            "settingsSaveFailed": "Échec de l'enregistrement des paramètres de la galerie : {message}"
+            "settingsSaveFailed": "Échec de l'enregistrement des paramètres de la galerie : {message}",
+            "loraLinkFailed": "Impossible d'ouvrir {name} dans la page LoRA"
         },
         "agent": {
             "llmNotConfigured": "Fournisseur d'IA non configuré. Activez-le dans Paramètres → Fournisseur d'IA.",
@@ -2976,7 +2979,8 @@
             "save": "Enregistrer",
             "clearFilter": "Effacer le filtre",
             "previous": "Page précédente",
-            "next": "Page suivante"
+            "next": "Page suivante",
+            "openInLoraPage": "Ouvrir dans la page LoRA"
         },
         "sort": {
             "label": "Trier par",
@@ -3100,6 +3104,12 @@
             "noRatio": "N/D",
             "rowHint": "Afficher les images de cette entrée",
             "empty": "Rien à classer pour le moment. Évaluez quelques images, puis revenez."
+        },
+        "loraTab": {
+            "title": "Galerie",
+            "summary": "Images : {total} · J'aime : {liked} · Je n'aime pas : {disliked} · Non évaluées : {unrated} · Net : {net}",
+            "empty": "Aucune image de la galerie n'utilise encore ce LoRA.",
+            "loadFailed": "Échec du chargement des images de la galerie. Réessayez plus tard."
         }
     }
 }

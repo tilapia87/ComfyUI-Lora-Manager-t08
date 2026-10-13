@@ -500,6 +500,16 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* The chip's second affordance: open the LoRA itself instead of filtering the
+   grid by it. Icon-sized and quieter than the name chip it sits next to, so a
+   row of chips stays readable; the shared .gallery-open-lora hook is what the
+   page uses to find the open-the-model action. */
+.gallery-chip-jump {
+    flex: 0 0 auto;
+    padding: 1px var(--space-1);
+    color: var(--text-muted);
+}
+
 .gallery-chip-muted {
     cursor: default;
     opacity: 0.6;

@@ -153,6 +153,91 @@ async def test_metadata_query_parameter_filters_the_listing(mixed_metadata_servi
     assert await names(metadata="WITH") == ["with.png"]
 
 
+@pytest.fixture
+def lora_hash_service(tmp_path, monkeypatch):
+    """Two images that both used the same locally installed LoRA."""
+    cache = GalleryCache(str(tmp_path / "gallery.sqlite"))
+
+    def _record(name):
+        return {
+            "image_path": str(tmp_path / "output" / name),
+            "file_name": name,
+            "mtime": 1.0,
+            "size": 10,
+            "width": 8,
+            "height": 8,
+            "prompt": "1girl, @nnn yryr",
+            "negative_prompt": None,
+            "parser": "comfy",
+            "gen_params": {},
+            "has_metadata": True,
+            "artists": [],
+            "loras": [
+                {
+                    "name": "style_a.safetensors",
+                    "weight": 0.8,
+                    "exists_locally": True,
+                    "hash": "a" * 64,
+                }
+            ],
+        }
+
+    cache.upsert_images([_record("a.png"), _record("b.png")])
+    instance = GalleryService(cache=cache)
+    monkeypatch.setattr(GalleryService, "_instance", instance)
+    return instance
+
+
+async def test_list_endpoint_exposes_the_resolved_lora_hash(lora_hash_service):
+    """The frontend decides whether a chip is linkable from this field."""
+    body = _payload(await GalleryHandlerSet().list_images(FakeRequest(query={})))
+    entry = body["data"]["items"][0]["loras"][0]
+    assert entry["hash"] == "a" * 64
+    assert entry["exists_locally"] is True
+
+
+async def test_for_lora_endpoint_requires_a_key(lora_hash_service):
+    # Asking for nothing must not silently mean "every image".
+    response = await GalleryHandlerSet().list_images_for_lora(FakeRequest(query={}))
+    assert response.status == 400
+    assert _payload(response)["success"] is False
+
+
+async def test_for_lora_endpoint_returns_images_and_a_summary(lora_hash_service):
+    response = await GalleryHandlerSet().list_images_for_lora(
+        FakeRequest(query={"hash": "a" * 64})
+    )
+    assert response.status == 200
+    data = _payload(response)["data"]
+    assert data["total"] == 2
+    assert data["lora"] == {"name": None, "hash": "a" * 64}
+    assert set(data["summary"]) == {"total", "liked", "disliked", "unrated", "net"}
+    assert data["summary"]["unrated"] == 2
+    for item in data["items"]:
+        assert item["image_url"].startswith("/api/lm/gallery/image?path=")
+
+
+async def test_for_lora_endpoint_falls_back_to_a_name(lora_hash_service):
+    data = _payload(
+        await GalleryHandlerSet().list_images_for_lora(
+            FakeRequest(query={"name": "style_a.safetensors"})
+        )
+    )["data"]
+    assert data["total"] == 2
+    assert data["lora"]["name"] == "style_a.safetensors"
+
+
+async def test_for_lora_endpoint_is_empty_for_an_unknown_lora(lora_hash_service):
+    response = await GalleryHandlerSet().list_images_for_lora(
+        FakeRequest(query={"hash": "f" * 64})
+    )
+    assert response.status == 200
+    body = _payload(response)
+    assert body["success"] is True
+    assert body["data"]["total"] == 0
+    assert body["data"]["items"] == []
+
+
 async def test_rating_accepts_a_post_body(service, tmp_path):
     image_path = str(tmp_path / "output" / "a.png")
     response = await GalleryHandlerSet().set_rating(

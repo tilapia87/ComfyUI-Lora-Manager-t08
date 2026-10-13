@@ -2502,7 +2502,9 @@
             "filenameTemplateSuccess": "已成功為 {count} 個 {type} 套用檔案名稱範本",
             "filenameTemplatePartialSuccess": "檔案名稱範本套用完成：已重新命名 {success} 個，{failures} 個失敗，共 {total} 個模型",
             "filenameTemplateFailed": "套用檔案名稱範本失敗：{error}",
-            "noModelsSelected": "未選擇任何模型"
+            "noModelsSelected": "未選擇任何模型",
+            "deepLinkNotFound": "模型庫中沒有這個 LoRA，已顯示一般清單。",
+            "deepLinkFailed": "無法開啟連結的 LoRA：{message}"
         },
         "recipes": {
             "fetchFailed": "取得配方失敗：{message}",
@@ -2846,7 +2848,8 @@
             "scanError": "掃描失敗：{message}",
             "scanComplete": "掃描完成：新增 {added}，更新 {updated}，移除 {removed}",
             "settingsSaved": "圖庫設定已儲存",
-            "settingsSaveFailed": "儲存圖庫設定失敗：{message}"
+            "settingsSaveFailed": "儲存圖庫設定失敗：{message}",
+            "loraLinkFailed": "無法在 LoRA 頁面開啟 {name}"
         },
         "agent": {
             "llmNotConfigured": "AI 提供者尚未設定。請在 設定 → AI 提供者 中進行設定。",
@@ -2976,7 +2979,8 @@
             "save": "儲存",
             "clearFilter": "清除篩選",
             "previous": "上一頁",
-            "next": "下一頁"
+            "next": "下一頁",
+            "openInLoraPage": "在 LoRA 頁面開啟"
         },
         "sort": {
             "label": "排序",
@@ -3100,6 +3104,12 @@
             "noRatio": "無",
             "rowHint": "顯示這一項的圖片",
             "empty": "還沒有可統計的資料。先給一些圖片評分，再回來看。"
+        },
+        "loraTab": {
+            "title": "圖庫",
+            "summary": "圖片：{total} · 按讚：{liked} · 倒讚：{disliked} · 未評分：{unrated} · 淨分：{net}",
+            "empty": "圖庫中還沒有使用這個 LoRA 的圖片。",
+            "loadFailed": "載入圖庫圖片失敗，請稍後重試。"
         }
     }
 }

@@ -18,6 +18,7 @@ class RouteDefinition:
 
 ROUTE_DEFINITIONS: tuple[RouteDefinition, ...] = (
     RouteDefinition("GET", "/api/lm/gallery/images", "list_gallery_images"),
+    RouteDefinition("GET", "/api/lm/gallery/for-lora", "list_gallery_images_for_lora"),
     # GET mirrors POST so the route also works from a plain link or the
     # GET-only companion extension, matching the project-wide convention.
     RouteDefinition("POST", "/api/lm/gallery/rating", "set_gallery_rating"),

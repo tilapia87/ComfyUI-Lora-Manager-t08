@@ -5,6 +5,7 @@ import { createPageControls } from './components/controls/index.js';
 import { confirmDelete, closeDeleteModal, confirmExclude, closeExcludeModal } from './utils/modalUtils.js';
 import { ModelDuplicatesManager } from './components/ModelDuplicatesManager.js';
 import { initActiveFiltersSync } from './utils/activeFiltersSync.js';
+import { openDeepLinkedModel } from './utils/modelDeepLink.js';
 
 // Initialize the LoRA page
 export class LoraPageManager {
@@ -45,6 +46,11 @@ export class LoraPageManager {
 
         // Mirror active filters to the backend for the ComfyUI-side autocomplete
         initActiveFiltersSync('loras');
+
+        // `/loras?model=<sha256>` opens that model on top of the listing that
+        // initializePageFeatures() just started. A hash that resolves to nothing
+        // is reported and the normal listing stays as it is.
+        await openDeepLinkedModel();
     }
 }
 

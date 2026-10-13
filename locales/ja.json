@@ -2502,7 +2502,9 @@
             "filenameTemplateSuccess": "{count} 件の{type}にファイル名テンプレートを正常に適用しました",
             "filenameTemplatePartialSuccess": "ファイル名テンプレートを適用しました：{total} 件中 {success} 件をリネーム、{failures} 件失敗",
             "filenameTemplateFailed": "ファイル名テンプレートの適用に失敗しました：{error}",
-            "noModelsSelected": "モデルが選択されていません"
+            "noModelsSelected": "モデルが選択されていません",
+            "deepLinkNotFound": "その LoRA はライブラリにないため、通常のリストを表示します。",
+            "deepLinkFailed": "リンクされた LoRA を開けませんでした：{message}"
         },
         "recipes": {
             "fetchFailed": "レシピの取得に失敗しました：{message}",
@@ -2846,7 +2848,8 @@
             "scanError": "スキャンに失敗しました：{message}",
             "scanComplete": "スキャン完了：新規 {added} 件、更新 {updated} 件、削除 {removed} 件",
             "settingsSaved": "ギャラリー設定を保存しました",
-            "settingsSaveFailed": "ギャラリー設定の保存に失敗しました：{message}"
+            "settingsSaveFailed": "ギャラリー設定の保存に失敗しました：{message}",
+            "loraLinkFailed": "LoRA ページで {name} を開けませんでした"
         },
         "agent": {
             "llmNotConfigured": "AIプロバイダーが設定されていません。設定 → AIプロバイダーで有効にしてください。",
@@ -2976,7 +2979,8 @@
             "save": "保存",
             "clearFilter": "フィルターをクリア",
             "previous": "前のページ",
-            "next": "次のページ"
+            "next": "次のページ",
+            "openInLoraPage": "LoRA ページで開く"
         },
         "sort": {
             "label": "並び順",
@@ -3100,6 +3104,12 @@
             "noRatio": "なし",
             "rowHint": "この項目の画像を表示",
             "empty": "まだ集計できるデータがありません。いくつか画像を評価してから戻ってきてください。"
+        },
+        "loraTab": {
+            "title": "ギャラリー",
+            "summary": "画像：{total} · いいね：{liked} · よくないね：{disliked} · 未評価：{unrated} · ネットスコア：{net}",
+            "empty": "この LoRA を使用したギャラリーの画像はまだありません。",
+            "loadFailed": "ギャラリー画像の読み込みに失敗しました。しばらくしてからもう一度お試しください。"
         }
     }
 }

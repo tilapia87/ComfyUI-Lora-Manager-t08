@@ -20,7 +20,7 @@ from ..settings_manager import get_settings_manager
 from ..websocket_manager import ws_manager
 from .gallery_cache import GalleryCache, VALID_RATINGS
 from .gallery_indexer import (
-    collect_lora_names,
+    build_lora_index,
     iter_image_paths,
     parse_image,
     resolve_output_dir,
@@ -144,13 +144,16 @@ class GalleryService:
             return
 
         recursive = bool(settings.get("gallery_recursive", True))
-        artist_index = load_gallery_artist_index(
-            str(settings.get("gallery_artist_list_path") or "")
-        )
-        known_loras = await self._collect_known_loras()
 
         poller = asyncio.create_task(self._broadcast_loop(), name="gallery_index_progress")
         try:
+            # Loading the artist list and the LoRA index sits inside the try on
+            # purpose: a malformed user file must end the job with an error, not
+            # leave the status stuck on "running" and the progress bar spinning.
+            artist_index = load_gallery_artist_index(
+                str(settings.get("gallery_artist_list_path") or "")
+            )
+            known_loras = await self._collect_known_loras()
             loop = asyncio.get_running_loop()
             summary = await loop.run_in_executor(
                 None, self._scan_sync, root, recursive, force, artist_index, known_loras
@@ -189,17 +192,22 @@ class GalleryService:
             await asyncio.sleep(_PROGRESS_INTERVAL_SECONDS)
             await self._broadcast()
 
-    async def _collect_known_loras(self) -> Set[str]:
-        """Best-effort LoRA name set so cards can mark local availability."""
+    async def _collect_known_loras(self) -> Dict[str, Optional[str]]:
+        """Best-effort name -> sha256 map of the local LoRA library.
+
+        Used for both the "exists locally" badge and the chip that links to the
+        LoRA page, so a cold or missing scanner cache degrades to "unknown"
+        instead of failing the scan.
+        """
         try:
             from ..service_registry import ServiceRegistry
 
             scanner = await ServiceRegistry.get_lora_scanner()
             cache = await scanner.get_cached_data()
-            return collect_lora_names(cache)
+            return build_lora_index(cache)
         except Exception as exc:
             logger.debug("LoRA names unavailable for gallery scan: %s", exc)
-            return set()
+            return {}
 
     def _scan_sync(
         self,
@@ -207,7 +215,7 @@ class GalleryService:
         recursive: bool,
         force: bool,
         artist_index: Any,
-        known_loras: Set[str],
+        known_loras: Dict[str, Optional[str]],
     ) -> Dict[str, Any]:
         """The blocking half of a scan; runs in the default executor."""
         facts = self.cache.get_indexed_facts()
@@ -232,7 +240,7 @@ class GalleryService:
                 record = parse_image(
                     image_path,
                     artist_index=artist_index,
-                    known_lora_names=known_loras,
+                    lora_index=known_loras,
                 )
             except Exception as exc:  # pragma: no cover - defensive
                 logger.debug("Gallery parse failed for %s: %s", image_path, exc)
@@ -331,10 +339,50 @@ class GalleryService:
         key = _STATS_SORT_KEYS.get(sort, _STATS_SORT_KEYS["net"])
         # Secondary key keeps equal scores in a stable, human-sensible order.
         rows.sort(key=lambda item: (key(item), item["total"], item["key"]), reverse=True)
+        for row in rows:
+            # The cache hands back paths; a ranking row needs URLs.
+            row["images"] = [
+                {**image, "image_url": self.image_url(image["image_path"])}
+                for image in row.get("images", [])
+            ]
         return {
             "by": "lora" if by == "lora" else "artist",
             "totals": self.cache.rating_totals(),
             "items": rows[: max(1, limit)],
+        }
+
+    async def list_images_for_lora(
+        self,
+        *,
+        lora_hash: Optional[str] = None,
+        lora_name: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 24,
+    ) -> Dict[str, Any]:
+        """Images that used one LoRA, for the LoRA modal's gallery tab.
+
+        An unknown hash or name is not an error: the caller gets an empty page,
+        which is what an unrated LoRA legitimately looks like.
+        """
+        items, total = self.cache.list_images_for_lora(
+            lora_hash=lora_hash,
+            lora_name=lora_name,
+            page=page,
+            page_size=page_size,
+        )
+        for item in items:
+            item["image_url"] = self.image_url(item["image_path"])
+        total_pages = (total + page_size - 1) // page_size if page_size else 1
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "summary": self.cache.lora_rating_summary(
+                lora_hash=lora_hash, lora_name=lora_name
+            ),
+            "lora": {"name": lora_name, "hash": lora_hash},
         }
 
     def get_config(self) -> Dict[str, Any]:

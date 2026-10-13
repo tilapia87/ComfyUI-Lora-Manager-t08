@@ -2502,7 +2502,9 @@
             "filenameTemplateSuccess": "תבנית שם הקובץ הוחלה בהצלחה עבור {count} {type}",
             "filenameTemplatePartialSuccess": "החלת תבנית שם הקובץ הושלמה עם {success} ששונה שמם, {failures} שנכשלו מתוך {total} מודלים",
             "filenameTemplateFailed": "החלת תבנית שם הקובץ נכשלה: {error}",
-            "noModelsSelected": "לא נבחרו מודלים"
+            "noModelsSelected": "לא נבחרו מודלים",
+            "deepLinkNotFound": "ה-LoRA הזה אינו בספרייה, מוצגת הרשימה הרגילה.",
+            "deepLinkFailed": "לא ניתן לפתוח את ה-LoRA המקושר: {message}"
         },
         "recipes": {
             "fetchFailed": "אחזור מתכונים נכשל: {message}",
@@ -2846,7 +2848,8 @@
             "scanError": "הסריקה נכשלה: {message}",
             "scanComplete": "הסריקה הושלמה: {added} נוספו, {updated} עודכנו, {removed} הוסרו",
             "settingsSaved": "הגדרות הגלריה נשמרו",
-            "settingsSaveFailed": "שמירת הגדרות הגלריה נכשלה: {message}"
+            "settingsSaveFailed": "שמירת הגדרות הגלריה נכשלה: {message}",
+            "loraLinkFailed": "לא ניתן לפתוח את {name} בעמוד ה-LoRA"
         },
         "agent": {
             "llmNotConfigured": "ספק AI לא הוגדר. הפעל אותו בהגדרות → ספק AI.",
@@ -2976,7 +2979,8 @@
             "save": "שמירה",
             "clearFilter": "נקה סינון",
             "previous": "העמוד הקודם",
-            "next": "העמוד הבא"
+            "next": "העמוד הבא",
+            "openInLoraPage": "פתח בעמוד ה-LoRA"
         },
         "sort": {
             "label": "מיון לפי",
@@ -3100,6 +3104,12 @@
             "noRatio": "לא זמין",
             "rowHint": "הצג את התמונות של רשומה זו",
             "empty": "אין עדיין מה לדרג. הערך כמה תמונות ואז חזור."
+        },
+        "loraTab": {
+            "title": "גלריה",
+            "summary": "תמונות: {total} · לייקים: {liked} · דיסלייקים: {disliked} · ללא הערכה: {unrated} · נטו: {net}",
+            "empty": "עדיין אין תמונות בגלריה שמשתמשות ב-LoRA הזה.",
+            "loadFailed": "טעינת תמונות הגלריה נכשלה. נסו שוב מאוחר יותר."
         }
     }
 }

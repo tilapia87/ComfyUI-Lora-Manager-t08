@@ -44,7 +44,7 @@
 |---|---|
 | `py/utils/artist_tags.py` | `@` 画师名提取；画师表加载（按 `路径+mtime+size` 缓存）；归一化 |
 | `py/services/gallery/gallery_cache.py` | SQLite 持久化：图片事实、画师/LoRA 子表、评分、聚合查询 |
-| `py/services/gallery/gallery_indexer.py` | 输出目录解析、目录遍历、单张图片的元数据解析 |
+| `py/services/gallery/gallery_indexer.py` | 输出目录解析、目录遍历、单张图片的元数据解析；提示词里的 LoRA 名 → 本地 sha256（`build_lora_index` / `resolve_lora_hash`） |
 | `py/services/gallery/gallery_service.py` | 单例；扫描编排与进度；列表/评分/统计；图片白名单校验 |
 | `py/routes/gallery_route_registrar.py` | 声明式路由注册（沿用仓库既有 registrar 约定） |
 | `py/routes/handlers/gallery_handlers.py` | HTTP 处理器：参数校验 → 服务 → 统一 JSON 契约 |
@@ -66,13 +66,17 @@ gallery_images(image_path PK, file_name, mtime, size, width, height,
                rating, rated_at, indexed_at, has_metadata)
 gallery_image_artists(image_path, artist_name, canonical_name, known,
                       PRIMARY KEY(image_path, artist_name))
-gallery_image_loras(image_path, lora_name, weight, exists_locally,
+gallery_image_loras(image_path, lora_name, weight, exists_locally, lora_hash,
                     PRIMARY KEY(image_path, lora_name))
 gallery_meta(key PK, value)
 ```
 
 画师与 LoRA 拆成子表，是为了让统计变成一次 `GROUP BY` 而不是全表 JSON 扫描。
 `rating` 存在主表且**重扫时不覆盖** —— 评分是用户数据，不可再生。
+
+`lora_hash` 是后加的列（老库靠 `ALTER TABLE ... ADD COLUMN` 就地迁移，不需要重建），
+存的是这个 LoRA 名在**本机 LoRA 库**里解析出的 sha256 —— 画廊 → LoRA 页的跳转就靠它。
+冷缓存时为空，只是暂时没有跳转入口，不影响评分与统计。
 
 ### 两条刻意的安全设计
 
@@ -95,12 +99,45 @@ gallery_meta(key PK, value)
 | GET | `/api/lm/gallery/index/status` | 扫描进度：`running/stage/progress/total/added/updated/removed/failed/root/root_source/error` |
 | GET | `/api/lm/gallery/image?path=` | 图片字节流（含包含性校验） |
 | GET | `/api/lm/gallery/config` | 生效的输出目录、目录来源、画师表状态、已索引数量 |
+| GET | `/api/lm/gallery/for-lora` | 用过某个 LoRA 的图（LoRA 弹窗的 Gallery 标签用）。参数 `hash` 或 `name` 二选一（都没有返回 400）、`page`、`page_size`；响应里的 `lora` 回显解析到的名字与 hash |
 | GET | `/gallery` | 页面 |
+
+图片记录里的每个 LoRA 带 `name` / `weight` / `exists_locally` / `hash`（`hash` 为空表示
+没解析到本地模型）；统计表的 LoRA 行也可能带 `hash`，只有名字时前端再调一次 `for-lora` 换 hash。
 
 同时通过 `/ws/fetch-progress` 广播 `{"type": "gallery_index_progress", ...}`，
 与仓库既有的扫描进度约定一致（也支持轮询 `index/status`）。
 
-## 4. 设置项
+## 4. 与 LoRA 页的互相联通
+
+画廊里的 LoRA 和 LoRA 库里的模型是同一个东西，所以两边互相能跳；两个方向都是**显式动作**，
+不会因为点错地方而顶掉对方正在看的视图。
+
+| 方向 | 入口 | 行为 |
+|---|---|---|
+| 画廊 → LoRA 页 | 卡片上 LoRA 芯片**旁边**的 ↗ 按钮 | `openModelInLoraPage(hash)` → `/loras?model=<sha256>`，直接打开那个模型的弹窗 |
+| 画廊 → LoRA 页 | 统计表 LoRA 分组每行的 ↗ 按钮 | 同上；行里只有名字（没有 hash）时先调 `for-lora` 换成 hash 再跳 |
+| LoRA 页 → 画廊 | 模型弹窗里的 **Gallery** 标签（仅 `loras` 类型） | `GalleryTab.js` 调 `/api/lm/gallery/for-lora`，列出用过这个 LoRA 的图 |
+
+- **芯片本身仍然只做过滤**（点击 = 按这个 LoRA 筛图），跳转是旁边一个独立的图标按钮。
+  两个动作语义不同，不共用同一次点击；两个按钮都带 `data-lora-hash` 与共享类
+  `gallery-open-lora`，页面脚本与测试按同一个选择器找「打开模型」这个动作。
+- **只有解析到本地模型的 LoRA 才有 ↗**：名字对不上、或一个名字匹配到多个文件
+  （无法确定是哪一个）时不给按钮，芯片照旧可以过滤。
+- hash 来自扫描阶段：把提示词里的 LoRA 名对照 LoRA 库缓存解析成 sha256，
+  写进 `gallery_image_loras.lora_hash`。冷缓存时为空，只是暂时没有 ↗。
+- 深链本身是仓库既有能力（`static/js/utils/modelDeepLink.js`，`/loras?model=<sha256>`），
+  画廊复用它而不是另造一套。
+
+前端文件：
+
+| 文件 | 职责 |
+|---|---|
+| `static/js/utils/modelDeepLink.js` | 构造/解析 `/loras?model=<sha256>` 深链；按 hash 取模型并打开弹窗 |
+| `static/js/components/shared/GalleryTab.js` | 模型弹窗的 Gallery 标签：加载、空态、失败态 |
+| `static/js/gallery.js` | 两处 ↗ 按钮的渲染与点击分流（`gallery-open-lora` / `[data-lora-hash]`） |
+
+## 5. 设置项
 
 新增于 `DEFAULT_SETTINGS`（`py/services/settings_manager.py`）：
 
@@ -111,14 +148,14 @@ gallery_meta(key PK, value)
 | `gallery_recursive` | `true` | 是否扫描输出目录的子目录 |
 | `gallery_sort` | `"newest"` | 记住的排序方式 |
 
-## 5. 测试
+## 6. 测试
 
 ```bash
 # 后端（本机沙箱需先钉住设置目录，否则导入期 Config() 会去写真实用户目录）
 export LORA_MANAGER_SETTINGS_DIR=/tmp/lm-settings     # Windows: $env:LORA_MANAGER_SETTINGS_DIR="..."
 pytest tests/utils/test_artist_tags.py tests/services/test_gallery_service.py tests/routes/test_gallery_handlers.py
 
-# 前端
+# 前端（联通相关的三个文件）
 npx vitest run tests/frontend
 ```
 
@@ -126,9 +163,12 @@ npx vitest run tests/frontend
 ComfyUI 图与 A1111 文本两种来源、`LoraLoaderModelOnly` 的 LoRA 抓取、
 无元数据图片的降级、递归开关与删除后的剪枝、**重扫保留评分**、
 统计聚合与排序、列表各过滤器（评分 / **元数据有无** / 画师 / LoRA / 关键词）及其组合、
-分页总计、包含性校验与扩展名白名单、路由注册完整性、评分接口的参数校验。
+分页总计、包含性校验与扩展名白名单、路由注册完整性、评分接口的参数校验、
+**LoRA 名 → hash 解析（名字对不上 / 一个名字多个文件时留空）**、
+**画廊 ↔ LoRA 页跳转**（芯片旁的 ↗ 只跳转不过滤、芯片本身仍过滤、
+统计行只有名字时先解析再跳、解析失败给提示且不跳）。
 
-## 6. 已知限制 / 后续可做
+## 7. 已知限制 / 后续可做
 
 - **画师表只用于确认，不做模糊匹配。** 表里没有的拼写会作为独立画师统计（标 `known: false`）。
   若同一画师的拼写变体很多，后续可加别名匹配（自带 CSV 的第 4 列就是别名，目前未使用）。
@@ -137,3 +177,6 @@ ComfyUI 图与 A1111 文本两种来源、`LoraLoaderModelOnly` 的 LoRA 抓取�
 - **不做服务端缩略图。** 卡片直接加载原图并配合浏览器懒加载；
   与仓库现状一致（`/api/lm/previews` 同样直接流式返回原图），但大图多时首屏偏重。
 - **`exists_locally` 依赖 LoRA 扫描器缓存**，冷缓存时统一为 `false`（仅影响角标显示）。
+- **LoRA 跳转入口同样依赖扫描器缓存。** 冷缓存（还没扫过 LoRA 库）时解析不出 hash，
+  芯片上的 ↗ 暂时不出现；扫描完成后重扫一次画廊即可补上。
+  一个 LoRA 名在本机匹配到**多个**文件时不猜，按"无法确定"处理，不给跳转入口。

@@ -20,6 +20,7 @@ import { renderTriggerWords, setupTriggerWordsEditMode } from './TriggerWords.js
 import { parsePresets, renderPresetTags } from './PresetTags.js';
 import { initVersionsTab } from './ModelVersionsTab.js';
 import { loadRecipesForModel } from './RecipeTab.js';
+import { loadGalleryForModel } from './GalleryTab.js';
 import { translate } from '../../utils/i18nHelpers.js';
 import { showDeleteModal } from '../../utils/modalUtils.js';
 import { state } from '../../state/index.js';
@@ -571,12 +572,19 @@ export async function showModelModal(model, modelType) {
             </button>`.trim();
 
     const supportsRecipesTab = modelType === 'loras' || modelType === 'checkpoints';
+    // The gallery index records the LoRAs every image used, so the tab has
+    // something to show for LoRAs only.
+    const supportsGalleryTab = modelType === 'loras';
+    const galleryText = translate('gallery.loraTab.title', {}, 'Gallery');
+    const galleryTabButton = supportsGalleryTab ?
+        `
+            <button class="tab-btn" data-tab="gallery">${galleryText}</button>` : '';
 
     const tabsContent = supportsRecipesTab ?
         `<button class="tab-btn active" data-tab="showcase">${examplesText}</button>
             <button class="tab-btn" data-tab="description">${descriptionText}</button>
             ${versionsTabButton}
-            <button class="tab-btn" data-tab="recipes">${recipesText}</button>` :
+            <button class="tab-btn" data-tab="recipes">${recipesText}</button>${galleryTabButton}` :
         `<button class="tab-btn active" data-tab="showcase">${examplesText}</button>
             <button class="tab-btn" data-tab="description">${descriptionText}</button>
             ${versionsTabButton}`;
@@ -585,6 +593,15 @@ export async function showModelModal(model, modelType) {
     const loadingDescriptionText = translate('modals.model.loading.description', {}, 'Loading model description...');
     const loadingRecipesText = translate('modals.model.loading.recipes', {}, 'Loading recipes...');
     const loadingExamplesText = translate('modals.model.loading.examples', {}, 'Loading examples...');
+    const loadingGalleryText = translate('gallery.status.loading', {}, 'Loading images...');
+    const galleryTabPane = supportsGalleryTab ?
+        `
+        
+        <div id="gallery-tab" class="tab-pane">
+            <div class="recipes-loading">
+                <i class="fas fa-spinner fa-spin"></i> ${loadingGalleryText}
+            </div>
+        </div>` : '';
 
     const loadingVersionsText = translate('modals.model.loading.versions', {}, 'Loading versions...');
     // Use CivitAI modelId, or derive a source group key for externally-linked models
@@ -638,7 +655,7 @@ export async function showModelModal(model, modelType) {
             <div class="recipes-loading">
                 <i class="fas fa-spinner fa-spin"></i> ${loadingRecipesText}
             </div>
-        </div>` :
+        </div>${galleryTabPane}` :
         `<div id="showcase-tab" class="tab-pane active">
             <div class="recipes-loading">
                 <i class="fas fa-spinner fa-spin"></i> ${loadingExamplesText}
@@ -895,6 +912,12 @@ export async function showModelModal(model, modelType) {
         onTabChange: async (tab) => {
             if (tab === 'versions') {
                 await versionsTabController.load();
+            } else if (tab === 'gallery') {
+                // Fetched on first open only - see GalleryTab's load guard.
+                loadGalleryForModel({
+                    loraName: modelWithFullData.file_name || modelWithFullData.model_name,
+                    sha256: modelWithFullData.sha256,
+                });
             }
         },
     });

@@ -10,8 +10,10 @@ import { showToast } from './utils/uiHelpers.js';
 import { translate } from './utils/i18nHelpers.js';
 import { openMediaViewer, isMediaViewerOpen } from './components/shared/MediaViewer.js';
 import { directoryPickerModal } from './components/DirectoryPickerModal.js';
+import { openModelInLoraPage } from './utils/modelDeepLink.js';
 import {
     fetchGalleryImages,
+    fetchGalleryImagesForLora,
     setGalleryImageRating,
     fetchGalleryStats,
     startGalleryIndex,
@@ -266,6 +268,11 @@ export class GalleryPage {
         });
 
         el.statsBody?.addEventListener('click', (event) => {
+            const jumpButton = event.target.closest('.gallery-open-lora');
+            if (jumpButton) {
+                this.openStatRowInLoraPage(jumpButton);
+                return;
+            }
             const row = event.target.closest('[data-key]');
             if (row) this._filterByStatRow(row.dataset.key);
         });
@@ -441,12 +448,34 @@ export class GalleryPage {
                     missing ? ' is-missing' : ''
                 }" data-lora="${escapeHtml(name)}" title="${escapeHtml(title)}">${escapeHtml(name)}${
                     weight ? `<span class="gallery-chip-weight">${weight}</span>` : ''
-                }</button>`
+                }</button>` + this._renderLoraJump(lora)
             );
         });
 
         if (!chips.length) return '';
         return `<div class="gallery-card-chips">${chips.join('')}</div>`;
+    }
+
+    /**
+     * The chip's second, explicit affordance: open the LoRA itself instead of
+     * filtering the grid by it.
+     *
+     * Only a LoRA the gallery resolved to a local model has a page to open, so
+     * an unresolved name (or one that matched several files) gets no button.
+     * @param {Object} lora - LoRA entry of an image record.
+     * @returns {string} Button markup, or '' when the LoRA is not linkable.
+     */
+    _renderLoraJump(lora) {
+        const hash = typeof lora?.hash === 'string' ? lora.hash.trim() : '';
+        if (!hash || lora.exists_locally === false) return '';
+
+        const label = translate('gallery.actions.openInLoraPage');
+        // `gallery-open-lora` is the shared hook for "this opens the model":
+        // the statistics row uses it too, so page code and tests can look for
+        // one class instead of the two different button shapes.
+        return `<button type="button" class="gallery-chip gallery-chip-jump gallery-open-lora" data-lora-hash="${escapeHtml(
+            hash
+        )}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}"><i class="fas fa-external-link-alt" aria-hidden="true"></i></button>`;
     }
 
     _onGridClick(event) {
@@ -459,6 +488,14 @@ export class GalleryPage {
         if (rateBtn) {
             const item = this.items[index];
             if (item) this.toggleRating(item, Number(rateBtn.dataset.rating));
+            return;
+        }
+
+        // Before either chip action: the jump button sits next to the LoRA chip
+        // and must not also trigger the chip's grid filter.
+        const loraJump = event.target.closest('[data-lora-hash]');
+        if (loraJump) {
+            openModelInLoraPage(loraJump.dataset.loraHash);
             return;
         }
 
@@ -761,10 +798,68 @@ export class GalleryPage {
                         <td class="gallery-col-num">${Number(row.total) || 0}</td>
                         <td class="gallery-col-num gallery-col-net${netClass}">${net > 0 ? `+${net}` : net}</td>
                         <td class="gallery-col-num">${escapeHtml(ratio)}</td>
+                        <td class="gallery-col-actions">${this._renderStatRowJump(row, label)}</td>
                     </tr>
                 `;
             })
             .join('');
+    }
+
+    /**
+     * The row's second, explicit affordance: open the LoRA on the LoRA page
+     * instead of filtering the grid by it.
+     *
+     * Only the LoRA grouping tracks models the library can open, and only a
+     * resolved LoRA has a page; an artist row gets nothing.
+     * @param {Object} row - Statistics row.
+     * @param {string} label - Displayed row name.
+     * @returns {string} Button markup, or '' when the row is not linkable.
+     */
+    _renderStatRowJump(row, label) {
+        if (this.statsBy !== 'lora' || row.known === false) return '';
+
+        const hash = typeof row.hash === 'string' ? row.hash.trim() : '';
+        const title = translate('gallery.actions.openInLoraPage');
+        return `<button type="button" class="gallery-btn gallery-btn-small gallery-open-lora"
+            data-lora-hash="${escapeHtml(hash)}" data-lora-name="${escapeHtml(label)}"
+            title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="fas fa-external-link-alt" aria-hidden="true"></i></button>`;
+    }
+
+    /**
+     * Open the LoRA behind a statistics row on the LoRA page.
+     *
+     * `/loras?model=<sha256>` addresses a model by hash, so a row that only
+     * knows the LoRA name (the statistics payload is keyed by name) resolves it
+     * through the gallery index first - the same name-to-hash resolution the
+     * image grid relies on.
+     * @param {HTMLElement} button - The clicked jump button.
+     * @returns {Promise<void>}
+     */
+    async openStatRowInLoraPage(button) {
+        const name = button.dataset.loraName || '';
+        const hash = button.dataset.loraHash || (await this._resolveLoraHashByName(name));
+        if (!hash) {
+            showToast('toast.gallery.loraLinkFailed', { name }, 'error');
+            return;
+        }
+        openModelInLoraPage(hash);
+    }
+
+    /**
+     * Look up a LoRA's sha256 from the images that used it.
+     * @param {string} name - Exact LoRA file name.
+     * @returns {Promise<string>} The hash, or '' when it cannot be resolved.
+     */
+    async _resolveLoraHashByName(name) {
+        if (!name) return '';
+        try {
+            const result = await fetchGalleryImagesForLora({ name, pageSize: 1 });
+            const entry = (result.items[0]?.loras || []).find((lora) => lora.name === name);
+            return typeof entry?.hash === 'string' ? entry.hash.trim() : '';
+        } catch (error) {
+            console.error('Error resolving the LoRA hash for the statistics row:', error);
+            return '';
+        }
     }
 
     _syncStatsBySwitch() {

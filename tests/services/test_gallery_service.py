@@ -215,6 +215,25 @@ async def test_scan_reports_missing_output_directory(tmp_path):
     assert status["error"] == "output_directory_not_found"
 
 
+async def test_a_failing_preparation_step_ends_the_job(service, monkeypatch):
+    """A corrupt user file must not leave the scan marked as running forever.
+
+    Loading the artist list happens before the walk, so if it raised outside the
+    job's try block the status stayed on ``running`` and the progress bar span
+    for good. ``_scan`` fails with "scan did not finish" if that regresses.
+    """
+    import py.services.gallery.gallery_service as gallery_service
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("corrupt artist list")
+
+    monkeypatch.setattr(gallery_service, "load_gallery_artist_index", _boom)
+    status = await _scan(service)
+    assert status["stage"] == "error"
+    assert status["running"] is False
+    assert "corrupt artist list" in (status["error"] or "")
+
+
 async def test_concurrent_scan_is_refused(service, monkeypatch):
     started = await service.start_index(force=True)
     assert started == {"started": True}
@@ -392,6 +411,168 @@ async def test_listed_items_carry_a_servable_url(service):
     await _scan(service)
     item = (await service.list_images())["items"][0]
     assert item["image_url"].startswith("/api/lm/gallery/image?path=")
+
+
+# ------------------------------------------------- LoRA hashes / per-LoRA gallery
+
+
+def _lora_cache_item(file_name, sha256, *, file_path=None, model_name=None):
+    return {
+        "file_name": file_name,
+        "model_name": model_name or file_name,
+        "file_path": file_path or f"/models/loras/{file_name}",
+        "sha256": sha256,
+    }
+
+
+def test_build_lora_index_resolves_every_prompt_spelling():
+    from types import SimpleNamespace
+
+    from py.services.gallery.gallery_indexer import build_lora_index, resolve_lora_hash
+
+    cache = SimpleNamespace(
+        raw_data=[
+            _lora_cache_item("style_a.safetensors", "a" * 64),
+            _lora_cache_item(
+                "style_b.safetensors", "b" * 64,
+                file_path="/models/loras/sub/style_b.safetensors",
+            ),
+        ]
+    )
+    index = build_lora_index(cache)
+
+    assert resolve_lora_hash("style_a.safetensors", index) == "a" * 64
+    # "<lora:style_a:0.8>" omits the extension.
+    assert resolve_lora_hash("style_a", index) == "a" * 64
+    # A prompt may carry the subfolder, or just the basename.
+    assert resolve_lora_hash("sub/style_b.safetensors", index) == "b" * 64
+    assert resolve_lora_hash("style_b.safetensors", index) == "b" * 64
+    assert resolve_lora_hash("not-installed.safetensors", index) is None
+    assert resolve_lora_hash("", index) is None
+
+
+def test_build_lora_index_refuses_an_ambiguous_name():
+    """Two different models behind one name must not be guessed at."""
+    from types import SimpleNamespace
+
+    from py.services.gallery.gallery_indexer import build_lora_index, resolve_lora_hash
+
+    cache = SimpleNamespace(
+        raw_data=[
+            _lora_cache_item("dup.safetensors", "a" * 64, file_path="/models/set1/dup.safetensors"),
+            _lora_cache_item("dup.safetensors", "b" * 64, file_path="/models/set2/dup.safetensors"),
+        ]
+    )
+    index = build_lora_index(cache)
+    assert index["dup.safetensors"] is None
+    assert resolve_lora_hash("dup.safetensors", index) is None
+
+
+def test_build_lora_index_survives_a_cold_or_missing_cache():
+    from types import SimpleNamespace
+
+    from py.services.gallery.gallery_indexer import build_lora_index, resolve_lora_hash
+
+    assert build_lora_index(None) == {}
+    assert build_lora_index(SimpleNamespace(raw_data=None)) == {}
+    assert build_lora_index(SimpleNamespace(raw_data=[{"file_name": "x"}, "junk"])) == {}
+    assert resolve_lora_hash("anything", {}) is None
+
+
+async def test_scan_records_the_resolved_lora_hash(service, monkeypatch):
+    async def _index(self):
+        return {"style_a.safetensors": "a" * 64, "style_a": "a" * 64}
+
+    monkeypatch.setattr(GalleryService, "_collect_known_loras", _index)
+    await _scan(service)
+
+    items = _by_name((await service.list_images())["items"])
+    loras = {entry["name"]: entry for entry in items["comfy_00001_.png"]["loras"]}
+    assert loras["style_a.safetensors"]["hash"] == "a" * 64
+    assert loras["style_a.safetensors"]["exists_locally"] is True
+    # Not in the library: no hash, so the UI must not offer a link.
+    assert loras["style_b.safetensors"]["hash"] is None
+    assert loras["style_b.safetensors"]["exists_locally"] is False
+
+
+async def test_images_for_lora_works_by_hash_and_by_name(service, monkeypatch):
+    async def _index(self):
+        return {"style_a.safetensors": "a" * 64, "style_a": "a" * 64}
+
+    monkeypatch.setattr(GalleryService, "_collect_known_loras", _index)
+    await _scan(service)
+
+    by_hash = await service.list_images_for_lora(lora_hash="a" * 64)
+    assert [i["file_name"] for i in by_hash["items"]] == ["comfy_00001_.png"]
+    assert by_hash["total"] == 1
+    assert by_hash["lora"]["hash"] == "a" * 64
+
+    # The name fallback covers a LoRA the library does not know about.
+    by_name = await service.list_images_for_lora(lora_name="style_b.safetensors")
+    assert [i["file_name"] for i in by_name["items"]] == ["comfy_00001_.png"]
+
+    # Neither key must not mean "everything".
+    assert (await service.list_images_for_lora())["total"] == 0
+    assert (await service.list_images_for_lora(lora_hash="f" * 64))["total"] == 0
+
+
+async def test_images_for_lora_carries_a_rating_summary(service):
+    await _scan(service)
+    items = _by_name((await service.list_images())["items"])
+    await service.set_rating(items["comfy_00001_.png"]["image_path"], 1)
+
+    page = await service.list_images_for_lora(lora_name="style_a.safetensors")
+    assert page["summary"] == {
+        "total": 1,
+        "liked": 1,
+        "disliked": 0,
+        "unrated": 0,
+        "net": 1,
+    }
+    assert page["items"][0]["image_url"].startswith("/api/lm/gallery/image?path=")
+
+
+async def test_images_for_lora_lists_liked_images_first(service):
+    await _scan(service)
+    items = _by_name((await service.list_images())["items"])
+    await service.set_rating(items["comfy_00001_.png"]["image_path"], 1)
+    page = await service.list_images_for_lora(lora_name="style_a.safetensors")
+    assert page["items"][0]["rating"] == 1
+
+
+async def test_images_for_lora_paginates(service):
+    await _scan(service)
+    page = await service.list_images_for_lora(lora_name="style_a.safetensors", page=2, page_size=1)
+    assert page["total"] == 1
+    assert page["total_pages"] == 1
+    assert page["items"] == []
+
+
+async def test_statistics_rows_carry_preview_images(service):
+    await _scan(service)
+    items = _by_name((await service.list_images())["items"])
+    await service.set_rating(items["comfy_00001_.png"]["image_path"], 1)
+    await service.set_rating(items["a1111_00002_.png"]["image_path"], -1)
+
+    stats = await service.stats(by="artist")
+    rows = {row["key"]: row for row in stats["items"]}
+
+    preview = rows["nnn yryr"]["images"]
+    assert len(preview) == 1
+    assert preview[0]["image_url"].startswith("/api/lm/gallery/image?path=")
+    assert preview[0]["rating"] == 1
+    assert rows["heripantomorrow"]["images"][0]["rating"] == -1
+
+
+async def test_statistics_previews_are_capped_and_carry_urls(service):
+    await _scan(service)
+    stats = await service.stats(by="lora")
+    assert stats["items"], "the fixture indexes images that use LoRAs"
+    for row in stats["items"]:
+        assert 0 < len(row["images"]) <= 3
+        for image in row["images"]:
+            assert image["image_url"].startswith("/api/lm/gallery/image?path=")
+            assert image["image_path"]
 
 
 # -------------------------------------------------------------- containment

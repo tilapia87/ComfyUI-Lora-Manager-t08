@@ -2502,7 +2502,9 @@
             "filenameTemplateSuccess": "Шаблон имён файлов успешно применён для {count} {type}",
             "filenameTemplatePartialSuccess": "Шаблон имён файлов применён: переименовано {success}, не удалось {failures} из {total} моделей",
             "filenameTemplateFailed": "Не удалось применить шаблон имён файлов: {error}",
-            "noModelsSelected": "Модели не выбраны"
+            "noModelsSelected": "Модели не выбраны",
+            "deepLinkNotFound": "Этого LoRA нет в библиотеке, показан обычный список.",
+            "deepLinkFailed": "Не удалось открыть связанный LoRA: {message}"
         },
         "recipes": {
             "fetchFailed": "Не удалось получить рецепты: {message}",
@@ -2846,7 +2848,8 @@
             "scanError": "Ошибка сканирования: {message}",
             "scanComplete": "Сканирование завершено: новых {added}, обновлено {updated}, удалено {removed}",
             "settingsSaved": "Настройки галереи сохранены",
-            "settingsSaveFailed": "Не удалось сохранить настройки галереи: {message}"
+            "settingsSaveFailed": "Не удалось сохранить настройки галереи: {message}",
+            "loraLinkFailed": "Не удалось открыть {name} на странице LoRA"
         },
         "agent": {
             "llmNotConfigured": "Поставщик ИИ не настроен. Включите его в Настройки → Поставщик ИИ.",
@@ -2976,7 +2979,8 @@
             "save": "Сохранить",
             "clearFilter": "Сбросить фильтр",
             "previous": "Предыдущая страница",
-            "next": "Следующая страница"
+            "next": "Следующая страница",
+            "openInLoraPage": "Открыть на странице LoRA"
         },
         "sort": {
             "label": "Сортировка",
@@ -3100,6 +3104,12 @@
             "noRatio": "н/д",
             "rowHint": "Показать изображения для этой записи",
             "empty": "Пока нечего ранжировать. Оцените несколько изображений и возвращайтесь."
+        },
+        "loraTab": {
+            "title": "Галерея",
+            "summary": "Изображения: {total} · Нравится: {liked} · Не нравится: {disliked} · Без оценки: {unrated} · Баланс: {net}",
+            "empty": "В галерее пока нет изображений с этим LoRA.",
+            "loadFailed": "Не удалось загрузить изображения галереи. Повторите попытку позже."
         }
     }
 }

@@ -63,6 +63,7 @@ _SCHEMA_STATEMENTS: Tuple[str, ...] = (
     CREATE TABLE IF NOT EXISTS gallery_image_loras (
         image_path TEXT NOT NULL,
         lora_name TEXT NOT NULL,
+        lora_hash TEXT,
         weight REAL,
         exists_locally INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (image_path, lora_name)
@@ -70,6 +71,13 @@ _SCHEMA_STATEMENTS: Tuple[str, ...] = (
     """,
     "CREATE INDEX IF NOT EXISTS idx_gallery_loras_name ON gallery_image_loras(lora_name)",
     "CREATE TABLE IF NOT EXISTS gallery_meta (key TEXT PRIMARY KEY, value TEXT)",
+)
+
+# Statements that touch a column added by a migration must run *after* it.
+# Creating them up front fails with "no such column" on a database that already
+# exists in the older shape, which is exactly the upgrade case.
+_SCHEMA_STATEMENTS_AFTER_MIGRATION: Tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_gallery_loras_hash ON gallery_image_loras(lora_hash)",
 )
 
 # Sort orders exposed to the page. The SQL fragment is fixed per key, never built
@@ -148,6 +156,18 @@ class GalleryCache:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             with self._connect() as conn:
                 for statement in _SCHEMA_STATEMENTS:
+                    conn.execute(statement)
+                # A gallery database created before LoRA hashes were recorded has
+                # the table without that column. Add it in place rather than
+                # rebuilding, and let the next rescan fill the values in: the
+                # existing rows keep their ratings either way.
+                columns = {
+                    row["name"]
+                    for row in conn.execute("PRAGMA table_info(gallery_image_loras)")
+                }
+                if "lora_hash" not in columns:
+                    conn.execute("ALTER TABLE gallery_image_loras ADD COLUMN lora_hash TEXT")
+                for statement in _SCHEMA_STATEMENTS_AFTER_MIGRATION:
                     conn.execute(statement)
                 conn.commit()
             self._schema_ready = True
@@ -279,11 +299,13 @@ class GalleryCache:
                     if loras:
                         conn.executemany(
                             "INSERT OR REPLACE INTO gallery_image_loras "
-                            "(image_path, lora_name, weight, exists_locally) VALUES (?, ?, ?, ?)",
+                            "(image_path, lora_name, lora_hash, weight, exists_locally) "
+                            "VALUES (?, ?, ?, ?, ?)",
                             [
                                 (
                                     image_path,
                                     lora.get("name") or "",
+                                    lora.get("hash"),
                                     lora.get("weight"),
                                     1 if lora.get("exists_locally") else 0,
                                 )
@@ -407,7 +429,7 @@ class GalleryCache:
                     conn, "gallery_image_artists", paths, ("artist_name", "canonical_name", "known")
                 )
                 loras = self._children_by_path(
-                    conn, "gallery_image_loras", paths, ("lora_name", "weight", "exists_locally")
+                    conn, "gallery_image_loras", paths, ("lora_name", "weight", "exists_locally", "lora_hash")
                 )
             finally:
                 conn.close()
@@ -475,6 +497,9 @@ class GalleryCache:
                     "name": lora["lora_name"],
                     "weight": lora["weight"],
                     "exists_locally": bool(lora["exists_locally"]),
+                    # Resolved against the local library at scan time, so the UI
+                    # can link a chip to the LoRA page. None = not resolvable.
+                    "hash": lora["lora_hash"],
                 }
                 for lora in lora_rows
             ],
@@ -487,6 +512,8 @@ class GalleryCache:
         table: str,
         name_column: str,
         extra_label: str = "",
+        *,
+        preview_limit: int = 3,
     ) -> List[Dict[str, Any]]:
         self._ensure_schema()
         label_sql = f", {extra_label}" if extra_label else ""
@@ -507,6 +534,9 @@ class GalleryCache:
                     GROUP BY c.{name_column}{group_extra}
                     """
                 ).fetchall()
+                previews = self._previews_by_key(
+                    conn, table, name_column, [row["key"] for row in rows], preview_limit
+                )
             finally:
                 conn.close()
 
@@ -524,11 +554,149 @@ class GalleryCache:
                 "total": int(row["total"] or 0),
                 "net": likes - dislikes,
                 "like_ratio": (likes / rated) if rated else None,
+                # A row without a thumbnail is hard to judge, so the ranking
+                # carries the images behind the number.
+                "images": previews.get(row["key"], []),
             }
             if extra_label:
                 entry["known"] = bool(row["known"])
             items.append(entry)
         return items
+
+    @staticmethod
+    def _previews_by_key(
+        conn: sqlite3.Connection,
+        table: str,
+        key_column: str,
+        keys: Sequence[str],
+        limit: int,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Up to *limit* representative images per ranking key.
+
+        Liked images sort first and the newest breaks ties, so a ranking row
+        shows the output the user actually approved of rather than an arbitrary
+        frame. Paths are returned raw; the service turns them into URLs.
+        """
+        if not keys or limit <= 0:
+            return {}
+        placeholders = ",".join("?" for _ in keys)
+        rows = conn.execute(
+            f"""
+            SELECT c.{key_column} AS key, i.image_path, i.rating
+            FROM {table} c
+            JOIN gallery_images i ON i.image_path = c.image_path
+            WHERE c.{key_column} IN ({placeholders})
+            ORDER BY c.{key_column}, i.rating DESC, i.mtime DESC
+            """,
+            list(keys),
+        ).fetchall()
+        grouped: Dict[str, List[Dict[str, Any]]] = {}
+        for row in rows:
+            bucket = grouped.setdefault(row["key"], [])
+            if len(bucket) < limit:
+                bucket.append({"image_path": row["image_path"], "rating": row["rating"]})
+        return grouped
+
+    @staticmethod
+    def _lora_filter(
+        lora_hash: Optional[str], lora_name: Optional[str]
+    ) -> Tuple[str, List[Any]]:
+        """``EXISTS`` clause matching a LoRA by resolved hash, raw name, or both.
+
+        With neither, the clause is ``0`` so the query returns nothing rather
+        than every image -- an empty request must not mean "all".
+        """
+        clauses: List[str] = []
+        params: List[Any] = []
+        if lora_hash:
+            clauses.append("l.lora_hash = ?")
+            params.append(lora_hash)
+        if lora_name:
+            clauses.append("l.lora_name = ?")
+            params.append(lora_name)
+        if not clauses:
+            return ("0", [])
+        joined = " OR ".join(clauses)
+        return (
+            "EXISTS (SELECT 1 FROM gallery_image_loras l "
+            f"WHERE l.image_path = i.image_path AND ({joined}))",
+            params,
+        )
+
+    def list_images_for_lora(
+        self,
+        *,
+        lora_hash: Optional[str] = None,
+        lora_name: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 24,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Images that used one LoRA, best-rated first."""
+        self._ensure_schema()
+        clause, params = self._lora_filter(lora_hash, lora_name)
+        offset = max(0, (max(1, page) - 1) * page_size)
+        with self._db_lock:
+            conn = self._connect(readonly=True)
+            try:
+                total = int(
+                    conn.execute(
+                        f"SELECT COUNT(*) AS n FROM gallery_images i WHERE {clause}", params
+                    ).fetchone()["n"]
+                )
+                rows = conn.execute(
+                    f"SELECT i.* FROM gallery_images i WHERE {clause} "
+                    "ORDER BY i.rating DESC, i.mtime DESC, i.image_path ASC LIMIT ? OFFSET ?",
+                    (*params, page_size, offset),
+                ).fetchall()
+                paths = [row["image_path"] for row in rows]
+                artists = self._children_by_path(
+                    conn, "gallery_image_artists", paths,
+                    ("artist_name", "canonical_name", "known"),
+                )
+                loras = self._children_by_path(
+                    conn, "gallery_image_loras", paths,
+                    ("lora_name", "weight", "exists_locally", "lora_hash"),
+                )
+            finally:
+                conn.close()
+        items = [
+            self._row_to_image(
+                row, artists.get(row["image_path"], []), loras.get(row["image_path"], [])
+            )
+            for row in rows
+        ]
+        return items, total
+
+    def lora_rating_summary(
+        self, *, lora_hash: Optional[str] = None, lora_name: Optional[str] = None
+    ) -> Dict[str, int]:
+        """Like/dislike counts across the images that used one LoRA."""
+        self._ensure_schema()
+        clause, params = self._lora_filter(lora_hash, lora_name)
+        with self._db_lock:
+            conn = self._connect(readonly=True)
+            try:
+                row = conn.execute(
+                    f"""
+                    SELECT COUNT(*) AS total,
+                           SUM(CASE WHEN i.rating > 0 THEN 1 ELSE 0 END) AS liked,
+                           SUM(CASE WHEN i.rating < 0 THEN 1 ELSE 0 END) AS disliked
+                    FROM gallery_images i WHERE {clause}
+                    """,
+                    params,
+                ).fetchone()
+            finally:
+                conn.close()
+        total = int(row["total"] or 0)
+        liked = int(row["liked"] or 0)
+        disliked = int(row["disliked"] or 0)
+        return {
+            "total": total,
+            "liked": liked,
+            "disliked": disliked,
+            "unrated": total - liked - disliked,
+            "net": liked - disliked,
+        }
 
     def stats_by_artist(self) -> List[Dict[str, Any]]:
         """Per-artist like/dislike counts, grouped by canonical artist name."""

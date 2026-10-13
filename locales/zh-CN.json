@@ -2502,7 +2502,9 @@
             "filenameTemplateSuccess": "文件名模板已成功应用，共 {count} 个 {type}",
             "filenameTemplatePartialSuccess": "文件名模板应用完成：已重命名 {success} 个，{failures} 个失败，共 {total} 个模型",
             "filenameTemplateFailed": "应用文件名模板失败：{error}",
-            "noModelsSelected": "未选中模型"
+            "noModelsSelected": "未选中模型",
+            "deepLinkNotFound": "模型库中没有这个 LoRA，已显示正常列表。",
+            "deepLinkFailed": "无法打开链接的 LoRA：{message}"
         },
         "recipes": {
             "fetchFailed": "获取配方失败：{message}",
@@ -2846,7 +2848,8 @@
             "scanError": "扫描失败：{message}",
             "scanComplete": "扫描完成：新增 {added}，更新 {updated}，移除 {removed}",
             "settingsSaved": "画廊设置已保存",
-            "settingsSaveFailed": "保存画廊设置失败：{message}"
+            "settingsSaveFailed": "保存画廊设置失败：{message}",
+            "loraLinkFailed": "无法在 LoRA 页面打开 {name}"
         },
         "agent": {
             "llmNotConfigured": "AI 提供商未配置。请在 设置 → AI 提供商 中进行配置。",
@@ -2976,7 +2979,8 @@
             "save": "保存",
             "clearFilter": "清除筛选",
             "previous": "上一页",
-            "next": "下一页"
+            "next": "下一页",
+            "openInLoraPage": "在 LoRA 页面打开"
         },
         "sort": {
             "label": "排序",
@@ -3100,6 +3104,12 @@
             "noRatio": "无",
             "rowHint": "显示这一项的图片",
             "empty": "还没有可统计的数据。先给一些图片评分，再回来看。"
+        },
+        "loraTab": {
+            "title": "画廊",
+            "summary": "图片：{total} · 点赞：{liked} · 点踩：{disliked} · 未评分：{unrated} · 净分：{net}",
+            "empty": "画廊中还没有使用这个 LoRA 的图片。",
+            "loadFailed": "加载画廊图片失败，请稍后重试。"
         }
     }
 }

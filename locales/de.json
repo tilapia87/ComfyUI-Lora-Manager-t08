@@ -2502,7 +2502,9 @@
             "filenameTemplateSuccess": "Dateinamen-Vorlage erfolgreich für {count} {type} angewendet",
             "filenameTemplatePartialSuccess": "Dateinamen-Vorlage angewendet: {success} umbenannt, {failures} von {total} Modellen fehlgeschlagen",
             "filenameTemplateFailed": "Anwendung der Dateinamen-Vorlage fehlgeschlagen: {error}",
-            "noModelsSelected": "Keine Modelle ausgewählt"
+            "noModelsSelected": "Keine Modelle ausgewählt",
+            "deepLinkNotFound": "Dieses LoRA ist nicht in der Bibliothek, die normale Liste wird angezeigt.",
+            "deepLinkFailed": "Das verlinkte LoRA konnte nicht geöffnet werden: {message}"
         },
         "recipes": {
             "fetchFailed": "Fehler beim Abrufen der Rezepte: {message}",
@@ -2846,7 +2848,8 @@
             "scanError": "Scan fehlgeschlagen: {message}",
             "scanComplete": "Scan abgeschlossen: {added} neu, {updated} aktualisiert, {removed} entfernt",
             "settingsSaved": "Galerie-Einstellungen gespeichert",
-            "settingsSaveFailed": "Galerie-Einstellungen konnten nicht gespeichert werden: {message}"
+            "settingsSaveFailed": "Galerie-Einstellungen konnten nicht gespeichert werden: {message}",
+            "loraLinkFailed": "{name} konnte nicht auf der LoRA-Seite geöffnet werden"
         },
         "agent": {
             "llmNotConfigured": "KI-Anbieter nicht konfiguriert. Aktivieren Sie ihn unter Einstellungen → KI-Anbieter.",
@@ -2976,7 +2979,8 @@
             "save": "Speichern",
             "clearFilter": "Filter löschen",
             "previous": "Vorherige Seite",
-            "next": "Nächste Seite"
+            "next": "Nächste Seite",
+            "openInLoraPage": "Auf der LoRA-Seite öffnen"
         },
         "sort": {
             "label": "Sortieren nach",
@@ -3100,6 +3104,12 @@
             "noRatio": "k. A.",
             "rowHint": "Bilder zu diesem Eintrag anzeigen",
             "empty": "Noch keine Rangliste möglich. Bewerten Sie einige Bilder und kommen Sie dann zurück."
+        },
+        "loraTab": {
+            "title": "Galerie",
+            "summary": "Bilder: {total} · Gefällt mir: {liked} · Gefällt mir nicht: {disliked} · Nicht bewertet: {unrated} · Netto: {net}",
+            "empty": "Noch keine Galerie-Bilder verwenden dieses LoRA.",
+            "loadFailed": "Galeriebilder konnten nicht geladen werden. Versuchen Sie es später erneut."
         }
     }
 }

@@ -122,7 +122,7 @@ def parse_image(
     image_path: str,
     *,
     artist_index: Optional[ArtistIndex] = None,
-    known_lora_names: Optional[Set[str]] = None,
+    lora_index: Optional[Dict[str, Optional[str]]] = None,
     read_metadata: bool = True,
 ) -> Dict[str, Any]:
     """Build the cache record for one image.
@@ -197,7 +197,7 @@ def parse_image(
     # negative side would manufacture a phantom artist.
     record["artists"] = extract_artists(prompt, index)
 
-    known = known_lora_names or set()
+    lora_index = lora_index or {}
     loras: List[Dict[str, Any]] = []
     seen: Set[str] = set()
     for name, model_weight, _clip_weight in result.loras:
@@ -205,34 +205,73 @@ def parse_image(
         if not lora_name or lora_name in seen:
             continue
         seen.add(lora_name)
+        resolved = resolve_lora_hash(lora_name, lora_index)
         loras.append(
             {
                 "name": lora_name,
                 "weight": model_weight,
-                "exists_locally": lora_name in known
-                or os.path.basename(lora_name) in known,
+                "exists_locally": resolved is not None,
+                "hash": resolved,
             }
         )
     record["loras"] = loras
     return record
 
 
-def collect_lora_names(scanner_cache: Any) -> Set[str]:
-    """Build the set of LoRA names a scan can recognise, cheaply.
+def _lora_name_keys(item: Dict[str, Any]) -> List[str]:
+    """Every spelling a prompt might use for one library LoRA.
 
-    ``exists_locally`` is cosmetic in the UI, so a cold or missing scanner cache
-    simply means "unknown", never a failed scan.
+    A prompt can reference ``style_a.safetensors``, the same file through a
+    subfolder, or (in the ``<lora:name:weight>`` syntax) without the extension,
+    so all of those resolve.
     """
-    names: Set[str] = set()
+    keys: List[str] = []
+    for field in ("file_name", "model_name", "file_path"):
+        value = item.get(field)
+        if not isinstance(value, str) or not value:
+            continue
+        base = os.path.basename(value) if field == "file_path" else value
+        for candidate in (base, os.path.splitext(base)[0]):
+            if candidate and candidate not in keys:
+                keys.append(candidate)
+    return keys
+
+
+def build_lora_index(scanner_cache: Any) -> Dict[str, Optional[str]]:
+    """Map every name a prompt may use to the local LoRA's sha256.
+
+    A name matching two different models maps to ``None``: linking a chip to the
+    wrong LoRA is worse than not linking it at all, and the caller treats
+    ``None`` as "no local match" (which is also how a cold scanner cache
+    behaves, so a missing cache never fails a scan).
+    """
+    index: Dict[str, Optional[str]] = {}
     try:
         raw = getattr(scanner_cache, "raw_data", None) or []
     except Exception:  # pragma: no cover - defensive
-        return names
+        return index
+
     for item in raw:
         if not isinstance(item, dict):
             continue
-        for key in ("file_name", "model_name"):
-            value = item.get(key)
-            if isinstance(value, str) and value:
-                names.add(value)
-    return names
+        digest = item.get("sha256")
+        if not isinstance(digest, str) or not digest:
+            continue
+        for key in _lora_name_keys(item):
+            if key not in index:
+                index[key] = digest
+            elif index[key] != digest:
+                # Same name, different models: stop claiming to know.
+                index[key] = None
+    return index
+
+
+def resolve_lora_hash(name: str, index: Dict[str, Optional[str]]) -> Optional[str]:
+    """Resolve one prompt LoRA reference to a local hash, or ``None``."""
+    if not name or not index:
+        return None
+    base = os.path.basename(name)
+    for candidate in (name, base, os.path.splitext(base)[0]):
+        if candidate and candidate in index:
+            return index[candidate]
+    return None
