@@ -499,6 +499,42 @@
                 "saveFailed": "לא ניתן לשמור את מודלי הבסיס המוחרגים: {message}"
             }
         },
+        "downloadRootRules": {
+            "title": "כללי שורש להורדות",
+            "help": "מנתב הורדות לתיקיית שורש אחרת בהתאם למודל הבסיס או לתגיות של המודל.",
+            "description": "הכללים נבדקים לפי הסדר. ההתאמה הראשונה מנצחת; הורדות ללא התאמה משתמשות בשורש ברירת המחדל.",
+            "defaultHint": "ברירת מחדל: {root} — הורדות ללא התאמה מגיעות לכאן",
+            "defaultSuffix": "ברירת מחדל",
+            "addBaseModelRule": "כלל מודל בסיס",
+            "addTagRule": "כלל תגית",
+            "removeRule": "הסר כלל",
+            "moveUp": "הזז למעלה",
+            "moveDown": "הזז למטה",
+            "noRoots": "לא הוגדרו שורשים עבור סוג מודל זה.",
+            "matchTypes": {
+                "baseModel": "מודל בסיס",
+                "tag": "תגית"
+            },
+            "matchTypeChips": {
+                "baseModel": "BM",
+                "tag": "תגית"
+            },
+            "tagPlaceholder": "character, style, realistic",
+            "summary": {
+                "selectBaseModels": "בחר מודלי בסיס...",
+                "enterTags": "הזן תגיות...",
+                "more": "+{count} נוספים"
+            },
+            "types": {
+                "loras": "LoRA",
+                "checkpoints": "Checkpoint",
+                "unet": "Diffusion Model",
+                "embeddings": "Embedding"
+            },
+            "validation": {
+                "saveFailed": "לא ניתן לשמור את כללי השורש להורדות: {message}"
+            }
+        },
         "skipPreviouslyDownloadedModelVersions": {
             "label": "דלג על גרסאות מודלים שהורדו בעבר",
             "help": "כאשר מופעל, LoRA Manager ידלג על הורדת גרסת מודל אם שירות היסטוריית ההורדות רושם את הגרסה המדויקת הזו ככבר שהורדה. חל על כל תהליכי ההורדה."
@@ -1420,7 +1456,8 @@
             "notEmptyMessageCount": "בתיקייה זו עדיין יש {count} קובצי מודלים. מחק או העבר אותם תחילה — מחיקת תיקייה לעולם אינה מוחקת קובצי מודלים.",
             "notEmptyMessageExcluded": "בתיקייה זו עדיין יש {count} קובצי מודלים, שמהם {excluded} מוחרגים מהספרייה. בטל את ההחרגה ב«ניהול מודלים מוחרגים» ומחק אותם תחילה — מחיקת תיקייה לעולם אינה מוחקת קובצי מודלים.",
             "missingTitle": "התיקייה לא נמצאה",
-            "missingMessage": "תיקייה זו אינה קיימת עוד בדיסק. רענן את סרגל הצד ונסה שוב.",
+            "missingMessage": "[TODO: Translate] This folder no longer exists on disk. You can remove it from the list.",
+            "removeFromList": "[TODO: Translate] Remove from list",
             "symlinkTitle": "התיקייה היא קישור סמלי",
             "symlinkMessage": "כל העותקים של תיקייה זו הם קישורים סמליים; מחק את הקישור או את היעד שלו מחוץ ל-LoRA Manager.",
             "protectedTitle": "תיקייה מוגנת",
@@ -1442,6 +1479,8 @@
             "busy": "מחיקה עדיין ממתינה בתיקייה זו. המתן לסיום חלון הביטול.",
             "unsupported": "מחיקת תיקיות אינה נתמכת בדף זה",
             "missing": "תיקייה זו אינה קיימת עוד בדיסק. רענן את סרגל הצד ונסה שוב.",
+            "forgotten": "[TODO: Translate] Folder \"{name}\" removed from the list",
+            "exists": "[TODO: Translate] The folder is back on disk. Delete it instead.",
             "symlink": "תיקייה זו היא קישור סמלי; לא ניתן למחוק אותה מסרגל הצד.",
             "successMulti": "התיקייה \"{name}\" נמחקה מ-{count} שורשי מודלים",
             "partial": "נמחקו {count} מתוך {total} עותקים — {failed} לא נמחקו. רענן את סרגל הצד ונסה שוב."
@@ -1631,6 +1670,10 @@
             "routingOverride": {
                 "label": "סוג יעד:",
                 "tooltip": "זוהה אוטומטית ממטא-נתוני המודל. החלף אם הזיהוי שגוי; החלפה מכבה את «השתמש בנתיב ברירת מחדל» עבור הורדה זו."
+            },
+            "routedByRule": {
+                "baseModel": "נותב לפי כלל: מודל בסיס «{value}»",
+                "tag": "נותב לפי כלל: תגית «{value}»"
             },
             "targetFolderPath": "נתיב תיקיית יעד:",
             "browseFolders": "דפדף בתיקיות:",

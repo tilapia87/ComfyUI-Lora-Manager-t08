@@ -499,6 +499,42 @@
                 "saveFailed": "无法保存已排除的基础模型：{message}"
             }
         },
+        "downloadRootRules": {
+            "title": "下载根目录规则",
+            "help": "根据模型的基础模型或标签，将下载路由到其他根目录。",
+            "description": "规则按顺序检查，首个命中的规则生效；未匹配的下载使用默认根目录。",
+            "defaultHint": "默认：{root} — 未匹配的下载将保存到这里",
+            "defaultSuffix": "默认",
+            "addBaseModelRule": "基础模型规则",
+            "addTagRule": "标签规则",
+            "removeRule": "移除规则",
+            "moveUp": "上移",
+            "moveDown": "下移",
+            "noRoots": "此模型类型尚未配置根目录。",
+            "matchTypes": {
+                "baseModel": "基础模型",
+                "tag": "标签"
+            },
+            "matchTypeChips": {
+                "baseModel": "BM",
+                "tag": "标签"
+            },
+            "tagPlaceholder": "character, style, realistic",
+            "summary": {
+                "selectBaseModels": "选择基础模型...",
+                "enterTags": "输入标签...",
+                "more": "还有 {count} 项"
+            },
+            "types": {
+                "loras": "LoRA",
+                "checkpoints": "Checkpoint",
+                "unet": "Diffusion Model",
+                "embeddings": "Embedding"
+            },
+            "validation": {
+                "saveFailed": "无法保存下载根目录规则：{message}"
+            }
+        },
         "skipPreviouslyDownloadedModelVersions": {
             "label": "跳过已下载的模型版本",
             "help": "启用后，如果下载历史服务记录显示该版本已下载，LoRA Manager 将跳过下载该模型版本。适用于所有下载流程。"
@@ -1420,7 +1456,8 @@
             "notEmptyMessageCount": "该文件夹中仍有 {count} 个模型文件，请先删除或移出这些模型 —— 删除文件夹不会级联删除模型文件。",
             "notEmptyMessageExcluded": "该文件夹中仍有 {count} 个模型文件，其中 {excluded} 个已从模型库中排除。请先在“管理已排除的模型”中取消排除并删除它们 —— 删除文件夹不会级联删除模型文件。",
             "missingTitle": "未找到文件夹",
-            "missingMessage": "该文件夹在磁盘上已不存在，请刷新侧边栏后重试。",
+            "missingMessage": "[TODO: Translate] This folder no longer exists on disk. You can remove it from the list.",
+            "removeFromList": "[TODO: Translate] Remove from list",
             "symlinkTitle": "文件夹是符号链接",
             "symlinkMessage": "该文件夹的每一份副本都是符号链接；请在 LoRA Manager 之外删除该链接或其指向的目标。",
             "protectedTitle": "文件夹受保护",
@@ -1442,6 +1479,8 @@
             "busy": "该文件夹内仍有待处理的删除操作，请等待撤销窗口结束。",
             "unsupported": "此页面不支持删除文件夹",
             "missing": "该文件夹在磁盘上已不存在，请刷新侧边栏后重试。",
+            "forgotten": "[TODO: Translate] Folder \"{name}\" removed from the list",
+            "exists": "[TODO: Translate] The folder is back on disk. Delete it instead.",
             "symlink": "该文件夹是符号链接，无法从侧边栏中删除。",
             "successMulti": "已从 {count} 个模型根目录中删除文件夹 \"{name}\"",
             "partial": "已删除 {total} 份副本中的 {count} 份 —— {failed} 份无法删除。请刷新侧边栏后重试。"
@@ -1631,6 +1670,10 @@
             "routingOverride": {
                 "label": "目标类型：",
                 "tooltip": "根据模型元数据自动检测。如果检测结果有误，请切换；切换会为本次下载关闭“使用默认路径”。"
+            },
+            "routedByRule": {
+                "baseModel": "已由规则路由：基础模型“{value}”",
+                "tag": "已由规则路由：标签“{value}”"
             },
             "targetFolderPath": "目标文件夹路径：",
             "browseFolders": "浏览文件夹：",
