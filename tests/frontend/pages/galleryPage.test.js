@@ -192,6 +192,7 @@ describe('GalleryPage', () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
+    window.localStorage.clear();
 
     initializeAppMock.mockResolvedValue(undefined);
     nativeFetch = globalThis.fetch;
@@ -225,6 +226,40 @@ describe('GalleryPage', () => {
     await page.initialize();
     return page;
   };
+
+  it('lets the user pick the thumbnail size and remembers it', async () => {
+    await boot();
+
+    const page = document.getElementById('galleryPage');
+    const grid = document.getElementById('galleryGrid');
+    expect(page.dataset.density).toBe('comfortable');
+    expect(grid.dataset.density).toBe('comfortable');
+
+    document.querySelector('#galleryDensitySwitch [data-density="large"]').click();
+
+    expect(page.dataset.density).toBe('large');
+    expect(grid.dataset.density).toBe('large');
+    expect(
+      document.querySelector('#galleryDensitySwitch [data-density="large"]').classList.contains('active')
+    ).toBe(true);
+    expect(document.querySelector('#galleryDensitySwitch [data-density="comfortable"]').classList.contains('active')).toBe(false);
+    expect(window.localStorage.getItem('gallery_card_density')).toBe('large');
+
+    // Switching down also sticks, and a re-render keeps the choice.
+    document.querySelector('#galleryDensitySwitch [data-density="compact"]').click();
+    expect(page.dataset.density).toBe('compact');
+  });
+
+  it('restores the remembered thumbnail size on boot', async () => {
+    window.localStorage.setItem('gallery_card_density', 'large');
+
+    await boot();
+
+    expect(document.getElementById('galleryPage').dataset.density).toBe('large');
+    expect(
+      document.querySelector('#galleryDensitySwitch [data-density="large"]').classList.contains('active')
+    ).toBe(true);
+  });
 
   it('renders the grid container and a card per returned image', async () => {
     await boot();
@@ -438,18 +473,20 @@ describe('GalleryPage', () => {
     await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody tr').length).toBe(3));
 
     const rows = document.querySelectorAll('#galleryStatsBody tr');
-    const cells = [...rows[0].querySelectorAll('td')].map((cell) => cell.textContent.trim());
-    // The first cell is the thumbnail; the payload has no images for these rows,
-    // so it renders the empty placeholder.
-    expect(cells[0]).toBe('');
-    expect(cells[1]).toBe('1');
-    expect(cells[2]).toBe('nnn yryr');
-    expect(cells[3]).toBe('5');
-    expect(cells[4]).toBe('1');
-    expect(cells[5]).toBe('2');
-    expect(cells[6]).toBe('8');
-    expect(cells[7]).toBe('+4');
-    expect(cells[8]).toBe('83%');
+    const first = rows[0];
+    // Preview, rank badge, label and the numbers each keep their own hook so
+    // the table can be restyled without rewriting the assertions.
+    expect(first.querySelector('.gallery-col-thumb .gallery-stats-thumb.is-placeholder')).not.toBeNull();
+    expect(first.querySelector('.gallery-rank-badge').textContent.trim()).toBe('1');
+    expect(first.querySelector('.gallery-stat-label').textContent.trim()).toBe('nnn yryr');
+    expect(first.querySelector('.gallery-stat-sub').textContent).toContain('8');
+    expect(first.querySelector('.gallery-col-liked').textContent.trim()).toBe('5');
+    expect(first.querySelector('.gallery-col-disliked').textContent.trim()).toBe('1');
+    expect(first.querySelector('.gallery-col-unrated').textContent.trim()).toBe('2');
+    expect(first.querySelector('.gallery-col-total').textContent.trim()).toBe('8');
+    expect(first.querySelector('.gallery-col-net').textContent.trim()).toBe('+4');
+    expect(first.querySelector('.gallery-ratio-value').textContent.trim()).toBe('83%');
+    expect(first.querySelector('.gallery-ratio-fill')).not.toBeNull();
 
     // Net score colouring and the unknown-artist flag come from the payload.
     expect(rows[0].querySelector('.gallery-col-net').classList.contains('is-positive')).toBe(true);

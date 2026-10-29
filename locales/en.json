@@ -3097,6 +3097,12 @@
       "images": "Images",
       "statistics": "Statistics"
     },
+    "density": {
+      "label": "Thumbnail size",
+      "compact": "Compact thumbnails",
+      "comfortable": "Standard thumbnails",
+      "large": "Large thumbnails"
+    },
     "actions": {
       "scan": "Scan output folder",
       "scanNow": "Scan now",

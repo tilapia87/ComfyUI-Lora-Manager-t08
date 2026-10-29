@@ -3097,6 +3097,12 @@
             "images": "תמונות",
             "statistics": "סטטיסטיקה"
         },
+        "density": {
+            "label": "[TODO: Translate] Thumbnail size",
+            "compact": "[TODO: Translate] Compact thumbnails",
+            "comfortable": "[TODO: Translate] Standard thumbnails",
+            "large": "[TODO: Translate] Large thumbnails"
+        },
         "actions": {
             "scan": "סרוק את תיקיית הפלט",
             "scanNow": "סרוק כעת",

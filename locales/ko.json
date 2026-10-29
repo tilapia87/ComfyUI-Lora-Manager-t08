@@ -3097,6 +3097,12 @@
             "images": "이미지",
             "statistics": "통계"
         },
+        "density": {
+            "label": "[TODO: Translate] Thumbnail size",
+            "compact": "[TODO: Translate] Compact thumbnails",
+            "comfortable": "[TODO: Translate] Standard thumbnails",
+            "large": "[TODO: Translate] Large thumbnails"
+        },
         "actions": {
             "scan": "출력 폴더 스캔",
             "scanNow": "지금 스캔",

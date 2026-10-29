@@ -30,6 +30,29 @@ const SCAN_POLL_INTERVAL_MS = 800;
 const PROGRESS_HIDE_DELAY_MS = 8000;
 const SEARCH_DEBOUNCE_MS = 300;
 
+// Thumbnail density is a viewing preference, not a gallery setting, so it is
+// remembered per browser instead of going through the settings API.
+const DENSITY_STORAGE_KEY = 'gallery_card_density';
+const DENSITY_LEVELS = ['compact', 'comfortable', 'large'];
+
+function readGalleryDensity() {
+    try {
+        const stored = window.localStorage.getItem(DENSITY_STORAGE_KEY);
+        if (DENSITY_LEVELS.includes(stored)) return stored;
+    } catch (error) {
+        // Private mode or disabled storage: fall through to the default.
+    }
+    return 'comfortable';
+}
+
+function persistGalleryDensity(density) {
+    try {
+        window.localStorage.setItem(DENSITY_STORAGE_KEY, density);
+    } catch (error) {
+        // Remembering the choice is best-effort only.
+    }
+}
+
 const ESCAPE_MAP = {
     '&': '&amp;',
     '<': '&lt;',
@@ -133,6 +156,7 @@ export class GalleryPage {
         this.isPolling = false;
         this.isLoading = false;
         this.pendingReload = false;
+        this.density = readGalleryDensity();
     }
 
     /**
@@ -148,6 +172,7 @@ export class GalleryPage {
 
         this._applySettingsToForm();
         this._bindEvents();
+        this._applyDensity();
 
         await this._loadConfig();
         await this.loadImages();
@@ -175,6 +200,7 @@ export class GalleryPage {
             imagesPanel: byId('galleryImagesPanel'),
             statsPanel: byId('galleryStatsPanel'),
             sortSelect: byId('gallerySortSelect'),
+            densitySwitch: byId('galleryDensitySwitch'),
             ratingSelect: byId('galleryRatingSelect'),
             metadataSelect: byId('galleryMetadataSelect'),
             searchInput: byId('gallerySearchInput'),
@@ -227,6 +253,11 @@ export class GalleryPage {
         el.viewSwitch?.addEventListener('click', (event) => {
             const button = event.target.closest('[data-view]');
             if (button) this.switchView(button.dataset.view);
+        });
+
+        el.densitySwitch?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-density]');
+            if (button) this.setDensity(button.dataset.density);
         });
 
         el.sortSelect?.addEventListener('change', () => {
@@ -360,6 +391,38 @@ export class GalleryPage {
     }
 
     /**
+     * Pick how large the thumbnails are.
+     * @param {string} density - compact|comfortable|large.
+     */
+    setDensity(density) {
+        if (!DENSITY_LEVELS.includes(density) || density === this.density) return;
+        this.density = density;
+        persistGalleryDensity(density);
+        this._applyDensity();
+    }
+
+    /**
+     * Push the current density onto the page and the switch.
+     *
+     * The size lives on `.gallery-page` so the image grid, the card aspect
+     * ratio and the statistics preview all follow one variable.
+     */
+    _applyDensity() {
+        const page = this.el.page;
+        const grid = this.el.grid;
+        if (page) page.dataset.density = this.density;
+        if (grid) grid.dataset.density = this.density;
+        const buttons = this.el.densitySwitch
+            ? this.el.densitySwitch.querySelectorAll('[data-density]')
+            : [];
+        buttons.forEach((button) => {
+            const active = button.dataset.density === this.density;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', String(active));
+        });
+    }
+
+    /**
      * Render the image grid from `this.items`.
      */
     renderImages() {
@@ -376,6 +439,7 @@ export class GalleryPage {
 
         this._hide(this.el.emptyState);
         this.el.grid.innerHTML = this.items.map((item, index) => this._renderCard(item, index)).join('');
+        this._applyDensity();
     }
 
     _renderCard(item, index) {
@@ -398,12 +462,7 @@ export class GalleryPage {
                     <img class="gallery-card-image" src="${escapeHtml(item.image_url)}"
                         alt="${escapeHtml(fileName)}" loading="lazy" decoding="async"${promptTitle}>
                     ${this._renderRatingBadge(item.rating)}
-                </div>
-                <div class="gallery-card-body">
-                    <div class="gallery-card-name" title="${escapeHtml(item.image_path)}">${escapeHtml(fileName)}</div>
-                    <div class="gallery-card-meta">${escapeHtml(metaParts.join(' · '))}</div>
-                    ${this._renderChips(item)}
-                    <div class="gallery-card-actions">
+                    <div class="gallery-card-overlay">
                         <button type="button" class="gallery-rate-btn gallery-rate-up${item.rating === 1 ? ' is-active' : ''}"
                             data-rating="1" aria-pressed="${item.rating === 1}"
                             title="${escapeHtml(translate('gallery.card.likeHint'))}">
@@ -415,6 +474,11 @@ export class GalleryPage {
                             <i class="fas fa-thumbs-down"></i>
                         </button>
                     </div>
+                </div>
+                <div class="gallery-card-body">
+                    <div class="gallery-card-name" title="${escapeHtml(item.image_path)}">${escapeHtml(fileName)}</div>
+                    <div class="gallery-card-meta">${escapeHtml(metaParts.join(' · '))}</div>
+                    ${this._renderChips(item)}
                 </div>
             </article>
         `;
@@ -826,25 +890,38 @@ export class GalleryPage {
             .map((row, index) => {
                 const net = Number(row.net) || 0;
                 const netClass = net > 0 ? ' is-positive' : net < 0 ? ' is-negative' : '';
-                const ratio = row.like_ratio === null || row.like_ratio === undefined
-                    ? translate('gallery.stats.noRatio')
-                    : `${Math.round(Number(row.like_ratio) * 100)}%`;
+                const hasRatio = row.like_ratio !== null && row.like_ratio !== undefined;
+                const ratioPercent = hasRatio ? Math.round(Number(row.like_ratio) * 100) : null;
+                const ratio = hasRatio
+                    ? `${ratioPercent}%`
+                    : translate('gallery.stats.noRatio');
                 const unknownClass = row.known === false ? ' is-unknown' : '';
                 const label = row.label || row.key || '';
                 const artistAttr = this.statsBy === 'artist' ? ` data-artist="${escapeHtml(label)}"` : '';
+                const total = Number(row.total) || 0;
+                // The sub-line repeats the sample size next to the name so a
+                // row can be judged without reading across to the numbers.
+                const sub = `${total} ${translate('gallery.stats.columns.total')}`;
+                const rank = rankOffset + index + 1;
+                const ratioBar = hasRatio
+                    ? `<span class="gallery-ratio-track"><span class="gallery-ratio-fill" style="width:${ratioPercent}%"></span></span>`
+                    : '';
 
                 return `
                     <tr class="gallery-stats-row${unknownClass}" data-key="${escapeHtml(row.key || label)}"${artistAttr}
                         tabindex="0" title="${escapeHtml(translate('gallery.stats.rowHint'))}">
                         <td class="gallery-col-thumb">${this._statsThumbMarkup(row)}</td>
-                        <td class="gallery-col-rank">${rankOffset + index + 1}</td>
-                        <td class="gallery-col-name">${escapeHtml(label)}</td>
-                        <td class="gallery-col-num">${Number(row.likes) || 0}</td>
-                        <td class="gallery-col-num">${Number(row.dislikes) || 0}</td>
-                        <td class="gallery-col-num">${Number(row.unrated) || 0}</td>
-                        <td class="gallery-col-num">${Number(row.total) || 0}</td>
+                        <td class="gallery-col-rank"><span class="gallery-rank-badge">${rank}</span></td>
+                        <td class="gallery-col-name">
+                            <div class="gallery-stat-label">${escapeHtml(label)}</div>
+                            <div class="gallery-stat-sub">${escapeHtml(sub)}</div>
+                        </td>
+                        <td class="gallery-col-num gallery-col-liked">${Number(row.likes) || 0}</td>
+                        <td class="gallery-col-num gallery-col-disliked">${Number(row.dislikes) || 0}</td>
+                        <td class="gallery-col-num gallery-col-unrated">${Number(row.unrated) || 0}</td>
+                        <td class="gallery-col-num gallery-col-total">${total}</td>
                         <td class="gallery-col-num gallery-col-net${netClass}">${net > 0 ? `+${net}` : net}</td>
-                        <td class="gallery-col-num">${escapeHtml(ratio)}</td>
+                        <td class="gallery-col-num gallery-col-ratio">${ratioBar}<span class="gallery-ratio-value">${escapeHtml(ratio)}</span></td>
                         <td class="gallery-col-actions">${this._renderStatRowJump(row, label)}</td>
                     </tr>
                 `;

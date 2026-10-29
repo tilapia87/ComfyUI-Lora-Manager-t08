@@ -143,6 +143,28 @@
                     </div>
                 </div>
 
+                <div class="gallery-control gallery-control-size">
+                    <span class="gallery-control-label">{{ t('gallery.density.label') }}</span>
+                    <div class="gallery-segmented gallery-density-switch" id="galleryDensitySwitch" role="group"
+                        aria-label="{{ t('gallery.density.label') }}">
+                        <button type="button" class="gallery-segmented-btn" data-density="compact"
+                            title="{{ t('gallery.density.compact') }}" aria-label="{{ t('gallery.density.compact') }}"
+                            aria-pressed="false">
+                            <i class="fas fa-th" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="gallery-segmented-btn active" data-density="comfortable"
+                            title="{{ t('gallery.density.comfortable') }}" aria-label="{{ t('gallery.density.comfortable') }}"
+                            aria-pressed="true">
+                            <i class="fas fa-th-large" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="gallery-segmented-btn" data-density="large"
+                            title="{{ t('gallery.density.large') }}" aria-label="{{ t('gallery.density.large') }}"
+                            aria-pressed="false">
+                            <i class="fas fa-square" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
                 <div class="gallery-control gallery-control-count">
                     <span class="gallery-total" id="galleryTotalCount"></span>
                 </div>

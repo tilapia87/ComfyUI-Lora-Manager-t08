@@ -3097,6 +3097,12 @@
             "images": "Images",
             "statistics": "Statistiques"
         },
+        "density": {
+            "label": "[TODO: Translate] Thumbnail size",
+            "compact": "[TODO: Translate] Compact thumbnails",
+            "comfortable": "[TODO: Translate] Standard thumbnails",
+            "large": "[TODO: Translate] Large thumbnails"
+        },
         "actions": {
             "scan": "Analyser le dossier de sortie",
             "scanNow": "Analyser maintenant",
