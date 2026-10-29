@@ -203,3 +203,52 @@ def thumbnail_cache_size() -> int:
         if shard.is_dir():
             count += sum(1 for entry in os.scandir(shard.path) if entry.name.endswith(".webp"))
     return count
+
+def cache_stats(service: Optional[ThumbnailService] = None) -> dict:
+    """Count and byte size of the thumbnail cache."""
+    instance = service or ThumbnailService.get_instance()
+    root = instance.cache_root()
+    count = 0
+    total_bytes = 0
+    try:
+        shards = [entry for entry in os.scandir(root) if entry.is_dir()]
+    except OSError:
+        shards = []
+    for shard in shards:
+        try:
+            for entry in os.scandir(shard.path):
+                if not entry.name.endswith(".webp"):
+                    continue
+                try:
+                    total_bytes += entry.stat().st_size
+                    count += 1
+                except OSError:
+                    continue
+        except OSError:
+            continue
+    return {"count": count, "bytes": total_bytes, "directory": root}
+
+
+def clear_cache(service: Optional[ThumbnailService] = None) -> dict:
+    """Delete every cached thumbnail. Returns what was removed."""
+    instance = service or ThumbnailService.get_instance()
+    before = cache_stats(instance)
+    root = before["directory"]
+    removed = 0
+    try:
+        shards = [entry for entry in os.scandir(root) if entry.is_dir()]
+    except OSError:
+        shards = []
+    for shard in shards:
+        try:
+            for entry in os.scandir(shard.path):
+                if not entry.name.endswith(".webp"):
+                    continue
+                try:
+                    os.remove(entry.path)
+                    removed += 1
+                except OSError:
+                    continue
+        except OSError:
+            continue
+    return {"removed": removed, "count": 0, "bytes": 0, "directory": root}

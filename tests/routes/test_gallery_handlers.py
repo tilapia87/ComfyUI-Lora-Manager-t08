@@ -439,6 +439,48 @@ async def test_list_images_carries_a_thumbnail_url(service):
     assert "size=" in data["items"][0]["thumb_url"]
 
 
+def test_thumbnail_cache_routes_are_registered():
+    paths = {(definition.method, definition.path) for definition in ROUTE_DEFINITIONS}
+    assert ("GET", "/api/lm/gallery/thumbnail-cache") in paths
+    assert ("POST", "/api/lm/gallery/thumbnail-cache/clear") in paths
+    mapping = GalleryHandlerSet().to_route_mapping()
+    assert "get_gallery_thumbnail_cache" in mapping
+    assert "clear_gallery_thumbnail_cache" in mapping
+
+
+async def test_thumbnail_cache_info_and_clear(service, tmp_path, monkeypatch):
+    from PIL import Image
+
+    from py.services.gallery.thumbnails import ThumbnailService
+
+    ThumbnailService.reset_instance()
+    monkeypatch.setenv("LORA_MANAGER_THUMBNAIL_DIR", str(tmp_path / "thumbs"))
+    try:
+        output = tmp_path / "output"
+        output.mkdir(exist_ok=True)
+        image_path = output / "shot.png"
+        Image.new("RGB", (400, 600), (5, 90, 150)).save(image_path)
+        get_settings_manager().set("gallery_output_path", str(output))
+
+        await GalleryHandlerSet().serve_thumbnail(
+            FakeRequest(query={"path": str(image_path), "size": "128"})
+        )
+
+        info = _payload(await GalleryHandlerSet().get_thumbnail_cache(FakeRequest()))["data"]
+        assert info["count"] == 1
+        assert info["bytes"] > 0
+        assert info["size"] >= 64
+        assert info["directory"]
+
+        cleared = _payload(await GalleryHandlerSet().clear_thumbnail_cache(FakeRequest()))["data"]
+        assert cleared["removed"] == 1
+
+        after = _payload(await GalleryHandlerSet().get_thumbnail_cache(FakeRequest()))["data"]
+        assert after["count"] == 0
+    finally:
+        ThumbnailService.reset_instance()
+
+
 def test_gallery_handler_set_is_a_frozen_dataclass():
     import dataclasses
 

@@ -33,6 +33,10 @@ ROUTE_DEFINITIONS: tuple[RouteDefinition, ...] = (
     RouteDefinition("GET", "/api/lm/gallery/image", "serve_gallery_image"),
     # Downscaled, disk-cached preview so the grid does not download originals.
     RouteDefinition("GET", "/api/lm/gallery/thumbnail", "serve_gallery_thumbnail"),
+    RouteDefinition("GET", "/api/lm/gallery/thumbnail-cache", "get_gallery_thumbnail_cache"),
+    # POST mirrors GET so the route also works from the GET-only extension.
+    RouteDefinition("POST", "/api/lm/gallery/thumbnail-cache/clear", "clear_gallery_thumbnail_cache"),
+    RouteDefinition("GET", "/api/lm/gallery/thumbnail-cache/clear", "clear_gallery_thumbnail_cache"),
     RouteDefinition("GET", "/api/lm/gallery/config", "get_gallery_config"),
 )
 

@@ -532,13 +532,39 @@ class GalleryService:
         return f"/api/lm/gallery/image?path={urllib.parse.quote(normalized, safe='')}"
 
     @staticmethod
-    def thumbnail_url(image_path: str, size: int = THUMBNAIL_SIZE) -> str:
-        """Grid-sized preview URL for one image."""
+    def thumbnail_url(image_path: str, size: Optional[int] = None) -> str:
+        """Grid-sized preview URL for one image.
+
+        The side comes from the `gallery_thumbnail_size` setting so the whole
+        grid can be resized from the gallery settings panel.
+        """
+        if not size:
+            try:
+                size = int(get_settings_manager().get("gallery_thumbnail_size") or THUMBNAIL_SIZE)
+            except (TypeError, ValueError):
+                size = THUMBNAIL_SIZE
         normalized = os.path.normpath(image_path).replace(os.sep, "/")
         return (
             "/api/lm/gallery/thumbnail"
             f"?path={urllib.parse.quote(normalized, safe='')}&size={int(size)}"
         )
+
+    def thumbnail_cache_info(self) -> Dict[str, Any]:
+        """What the on-disk thumbnail cache currently holds."""
+        from .thumbnails import cache_stats
+
+        info = cache_stats()
+        try:
+            info["size"] = int(get_settings_manager().get("gallery_thumbnail_size") or THUMBNAIL_SIZE)
+        except (TypeError, ValueError):
+            info["size"] = THUMBNAIL_SIZE
+        return info
+
+    def clear_thumbnail_cache(self) -> Dict[str, Any]:
+        """Drop every cached thumbnail (the next request regenerates them)."""
+        from .thumbnails import clear_cache
+
+        return clear_cache()
 
     def resolve_servable_image(self, image_path: str) -> Optional[str]:
         """Return the absolute path to stream, or ``None`` when not allowed.

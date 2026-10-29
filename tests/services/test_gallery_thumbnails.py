@@ -73,3 +73,21 @@ def test_a_broken_image_yields_no_thumbnail(tmp_path):
     broken.write_bytes(b"definitely not an image")
 
     assert ThumbnailService.get_instance().get(str(broken), 128) is None
+
+
+def test_cache_stats_and_clear(tmp_path):
+    from py.services.gallery.thumbnails import cache_stats, clear_cache
+
+    source = _noisy_image(tmp_path / "big.png")
+    service = ThumbnailService.get_instance()
+    service.get(source, 128)
+    service.get(source, 256)
+
+    stats = cache_stats()
+    assert stats["count"] == 2
+    assert stats["bytes"] > 0
+    assert stats["directory"] == service.cache_root()
+
+    cleared = clear_cache()
+    assert cleared["removed"] == 2
+    assert cache_stats()["count"] == 0

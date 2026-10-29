@@ -55,6 +55,8 @@ class GalleryHandlerSet:
             "get_gallery_index_status": self.get_index_status,
             "serve_gallery_image": self.serve_image,
             "serve_gallery_thumbnail": self.serve_thumbnail,
+            "get_gallery_thumbnail_cache": self.get_thumbnail_cache,
+            "clear_gallery_thumbnail_cache": self.clear_thumbnail_cache,
             "get_gallery_config": self.get_config,
         }
 
@@ -240,6 +242,24 @@ class GalleryHandlerSet:
             chunk_size=256 * 1024,
             headers={"Cache-Control": _CACHE_CONTROL, "Content-Type": "image/webp"},
         )
+
+    async def get_thumbnail_cache(self, request: web.Request) -> web.Response:
+        """How many thumbnails are cached and how much space they take."""
+        try:
+            service = await self._service()
+            return web.json_response({"success": True, "data": service.thumbnail_cache_info()})
+        except Exception as exc:
+            logger.error("Gallery thumbnail cache info failed: %s", exc, exc_info=True)
+            return _error(str(exc))
+
+    async def clear_thumbnail_cache(self, request: web.Request) -> web.Response:
+        """Delete the cached thumbnails; they are regenerated on demand."""
+        try:
+            service = await self._service()
+            return web.json_response({"success": True, "data": service.clear_thumbnail_cache()})
+        except Exception as exc:
+            logger.error("Gallery thumbnail cache clear failed: %s", exc, exc_info=True)
+            return _error(str(exc))
 
     async def get_config(self, request: web.Request) -> web.Response:
         try:
