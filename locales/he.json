@@ -3105,6 +3105,14 @@
             "comfortable": "[TODO: Translate] Standard thumbnails",
             "large": "[TODO: Translate] Large thumbnails"
         },
+        "filters": {
+            "label": "[TODO: Translate] Filters"
+        },
+        "order": {
+            "label": "[TODO: Translate] Order",
+            "desc": "[TODO: Translate] Default",
+            "asc": "[TODO: Translate] Reversed"
+        },
         "actions": {
             "scan": "סרוק את תיקיית הפלט",
             "loadMore": "[TODO: Translate] Load more images",

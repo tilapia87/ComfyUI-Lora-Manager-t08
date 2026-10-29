@@ -15,9 +15,6 @@
     --gallery-stats-thumb: 96px;
     --gallery-rank-card-min: 260px;
 
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3, 12px);
     padding: var(--space-3, 12px) var(--space-4, 16px) var(--space-8, 32px);
     max-width: 2200px;
     margin: 0 auto;
@@ -39,28 +36,100 @@
     --gallery-rank-card-min: 340px;
 }
 
-/* ---------------------------------------------------------------- toolbar */
+/* ------------------------------------------------------------ page layout */
 
-.gallery-toolbar {
+.gallery-layout {
+    display: grid;
+    grid-template-columns: 274px minmax(0, 1fr);
+    gap: var(--space-4, 16px);
+    align-items: start;
+}
+
+/* The sidebar owns every control, so the grid stays a pure browsing surface. */
+.gallery-sidebar {
     position: sticky;
-    top: 0;
-    z-index: var(--z-sticky, 20);
+    top: var(--space-3, 12px);
     display: flex;
     flex-direction: column;
     gap: var(--space-3, 12px);
-    padding: var(--space-3, 12px) var(--space-4, 16px);
-    margin: calc(var(--space-4, 16px) * -1) calc(var(--space-6, 24px) * -1) 0;
-    background: var(--bg-elevated-solid, #232326);
-    background: color-mix(in srgb, var(--bg-base, #1e1e1e) 88%, transparent);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+    padding: var(--space-3, 12px);
+    border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+    border-radius: var(--radius-lg, 12px);
+    background: var(--bg-elevated, rgba(127, 127, 127, 0.06));
 }
 
-.gallery-toolbar-row {
+.gallery-sidebar-head {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.gallery-sidebar-actions {
+    display: grid;
+    gap: var(--space-2, 8px);
+}
+
+.gallery-sidebar-actions .gallery-btn {
+    width: 100%;
+}
+
+.gallery-sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2, 8px);
+    padding-top: var(--space-3, 12px);
+    border-top: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+}
+
+.gallery-sidebar-label {
+    font-size: var(--text-xs, 12px);
+    font-weight: var(--weight-semibold, 600);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary, #b8b8b8);
+}
+
+.gallery-sidebar-foot {
+    margin-top: auto;
+    padding-top: var(--space-2, 8px);
+    border-top: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+}
+
+.gallery-sidebar .gallery-control {
+    min-width: 0;
+}
+
+.gallery-sidebar .gallery-segmented,
+.gallery-view-switch {
+    display: flex;
+    width: 100%;
+}
+
+.gallery-sidebar .gallery-segmented-btn,
+.gallery-view-switch .gallery-segmented-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 0 var(--space-2, 8px);
+    font-size: var(--text-xs, 12px);
+}
+
+.gallery-sidebar .gallery-search-box input {
+    width: 100%;
+}
+
+.gallery-content {
+    display: flex;
+    flex-direction: column;
     gap: var(--space-3, 12px);
-    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.gallery-content-toolbar {
+    position: sticky;
+    top: var(--space-3, 12px);
+    z-index: var(--z-sticky, 20);
 }
 
 .gallery-heading {
@@ -68,7 +137,7 @@
     align-items: center;
     gap: var(--space-2, 8px);
     margin: 0;
-    font-size: var(--text-xl, 20px);
+    font-size: var(--text-lg, 16px);
     font-weight: var(--weight-semibold, 600);
     letter-spacing: -0.01em;
     color: var(--text-primary, #f2f2f2);
@@ -76,13 +145,6 @@
 
 .gallery-heading i {
     color: var(--color-accent, #4f8cff);
-}
-
-.gallery-toolbar-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2, 8px);
-    margin-left: auto;
 }
 
 /* -------------------------------------------------------------- buttons */
@@ -1008,22 +1070,38 @@
 
 /* ------------------------------------------------------------ responsive */
 
+@media (max-width: 1100px) {
+    .gallery-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .gallery-sidebar {
+        position: static;
+        max-height: none;
+    }
+
+    .gallery-sidebar-actions {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+
+    .gallery-sidebar-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        align-items: start;
+    }
+
+    .gallery-sidebar-label {
+        grid-column: 1 / -1;
+    }
+
+    .gallery-content-toolbar {
+        position: static;
+    }
+}
+
 @media (max-width: 900px) {
     .gallery-page {
         padding: var(--space-3, 12px) var(--space-3, 12px) var(--space-8, 32px);
-    }
-
-    .gallery-toolbar {
-        margin: calc(var(--space-3, 12px) * -1) calc(var(--space-3, 12px) * -1) 0;
-    }
-
-    .gallery-toolbar-actions {
-        width: 100%;
-        margin-left: 0;
-    }
-
-    .gallery-toolbar-actions .gallery-btn {
-        flex: 1;
     }
 
     .gallery-page:not([data-density="large"]) {

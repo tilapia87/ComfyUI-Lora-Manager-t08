@@ -462,7 +462,7 @@ describe('GalleryPage', () => {
     // The three states the backend understands: all | with | without.
     expect([...metadata.options].map((option) => option.value)).toEqual(['all', 'with', 'without']);
 
-    const selects = [...document.querySelectorAll('#galleryImagesPanel .gallery-control select')].map(
+    const selects = [...document.querySelectorAll('#gallerySidebar .gallery-control select')].map(
       (node) => node.id
     );
     expect(selects).toEqual(['gallerySortSelect', 'galleryRatingSelect', 'galleryMetadataSelect']);
@@ -737,6 +737,35 @@ describe('GalleryPage', () => {
     expect(imageCalls(fetchStub.calls)[1].url).toContain('page=2');
     // Nothing left to load, so the block disappears.
     await vi.waitFor(() => expect(loadMore.classList.contains('hidden')).toBe(true));
+  });
+
+  it('reverses the listing and the ranking from one switch', async () => {
+    await boot();
+
+    const ascButton = document.querySelector('#galleryOrderSwitch [data-order="asc"]');
+    ascButton.click();
+
+    await vi.waitFor(() => expect(imageCalls(fetchStub.calls).length).toBe(2));
+    expect(imageCalls(fetchStub.calls)[1].url).toContain('order=asc');
+    expect(ascButton.classList.contains('active')).toBe(true);
+    expect(window.localStorage.getItem('gallery_order')).toBe('asc');
+
+    // The ranking honours the same switch.
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(3)
+    );
+    const statsCalls = () =>
+      fetchStub.calls.filter((call) => call.url.startsWith('/api/lm/gallery/stats'));
+    const ascCalls = statsCalls();
+    expect(ascCalls[ascCalls.length - 1].url).toContain('order=asc');
+
+    // Switching back restores the default ordering.
+    document.querySelector('#galleryOrderSwitch [data-order="desc"]').click();
+    await vi.waitFor(() => {
+        const calls = statsCalls();
+        expect(calls[calls.length - 1].url).toContain('order=desc');
+    });
   });
 
   it('sorts the ranking from the metric pills and from a card metric', async () => {

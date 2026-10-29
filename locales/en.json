@@ -3105,6 +3105,14 @@
       "comfortable": "Standard thumbnails",
       "large": "Large thumbnails"
     },
+    "filters": {
+      "label": "Filters"
+    },
+    "order": {
+      "label": "Order",
+      "desc": "Default",
+      "asc": "Reversed"
+    },
     "actions": {
       "scan": "Scan output folder",
       "loadMore": "Load more images",

@@ -55,6 +55,27 @@ function formatBytes(bytes) {
     return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+const ORDER_STORAGE_KEY = 'gallery_order';
+const ORDER_LEVELS = ['desc', 'asc'];
+
+function readGalleryOrder() {
+    try {
+        const stored = window.localStorage.getItem(ORDER_STORAGE_KEY);
+        if (ORDER_LEVELS.includes(stored)) return stored;
+    } catch (error) {
+        // Private mode or disabled storage: fall through to the default.
+    }
+    return 'desc';
+}
+
+function persistGalleryOrder(order) {
+    try {
+        window.localStorage.setItem(ORDER_STORAGE_KEY, order);
+    } catch (error) {
+        // Best effort only.
+    }
+}
+
 function persistGalleryDensity(density) {
     try {
         window.localStorage.setItem(DENSITY_STORAGE_KEY, density);
@@ -173,6 +194,9 @@ export class GalleryPage {
         this.loadingMore = false;
         this.hasMoreImages = false;
         this.thumbnailCache = null;
+        // Newest/highest first by default; the toggle walks everything from the
+        // other end without changing the chosen sort key.
+        this.order = readGalleryOrder();
         this._sentinelObserver = null;
     }
 
@@ -190,6 +214,7 @@ export class GalleryPage {
         this._applySettingsToForm();
         this._bindEvents();
         this._applyDensity();
+        this._syncOrderSwitch();
         this._setupInfiniteScroll();
 
         await this._loadConfig();
@@ -219,6 +244,7 @@ export class GalleryPage {
             statsPanel: byId('galleryStatsPanel'),
             sortSelect: byId('gallerySortSelect'),
             densitySwitch: byId('galleryDensitySwitch'),
+            orderSwitch: byId('galleryOrderSwitch'),
             ratingSelect: byId('galleryRatingSelect'),
             metadataSelect: byId('galleryMetadataSelect'),
             searchInput: byId('gallerySearchInput'),
@@ -284,6 +310,11 @@ export class GalleryPage {
         el.densitySwitch?.addEventListener('click', (event) => {
             const button = event.target.closest('[data-density]');
             if (button) this.setDensity(button.dataset.density);
+        });
+
+        el.orderSwitch?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-order]');
+            if (button) this.setOrder(button.dataset.order);
         });
 
         el.sortSelect?.addEventListener('change', () => {
@@ -421,6 +452,7 @@ export class GalleryPage {
                 artist: this.artist,
                 lora: this.lora,
                 q: this.search,
+                order: this.order,
             });
 
             const incoming = result.items;
@@ -1019,6 +1051,7 @@ export class GalleryPage {
                 sort: this.statsSort,
                 limit: STATS_PAGE_SIZE,
                 offset,
+                order: this.order,
             });
             this.statsLoaded = true;
 
@@ -1330,6 +1363,32 @@ export class GalleryPage {
         this.statsPage = 1;
         this._syncStatsSortPills();
         this.loadStats();
+    }
+
+    /**
+     * Walk the listing/ranking from the other end.
+     * @param {string} order - desc (default) or asc (reversed).
+     */
+    setOrder(order) {
+        if (!ORDER_LEVELS.includes(order) || order === this.order) return;
+        this.order = order;
+        persistGalleryOrder(order);
+        this._syncOrderSwitch();
+        this.page = 1;
+        this.statsPage = 1;
+        this.statsLoaded = false;
+        this.loadImages();
+        if (this.view === 'stats') this.loadStats();
+    }
+
+    _syncOrderSwitch() {
+        const group = this.el.orderSwitch;
+        if (!group) return;
+        for (const button of group.querySelectorAll('[data-order]')) {
+            const active = button.dataset.order === this.order;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', String(active));
+        }
     }
 
     _syncStatsSortPills() {

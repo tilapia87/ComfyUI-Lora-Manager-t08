@@ -92,6 +92,7 @@ export async function fetchGalleryImages(params = {}) {
         artist = '',
         lora = '',
         q = '',
+        order = 'desc',
     } = params;
 
     const query = new URLSearchParams({
@@ -100,6 +101,7 @@ export async function fetchGalleryImages(params = {}) {
         sort,
         rating,
         metadata,
+        order,
     });
 
     if (artist) query.append('artist', artist);
@@ -227,10 +229,11 @@ export async function setGalleryImageRating(imagePath, rating) {
  * @param {number} [params.limit=200] - Maximum number of rows.
  * @param {number} [params.offset=0] - Number of ranked rows to skip (paging).
  * @param {number} [params.minTotal=1] - Minimum rated+unrated total per row.
+ * @param {string} [params.order='desc'] - desc (default) or asc (reversed).
  * @returns {Promise<{by: string, totals: Object, total: number, offset: number, items: Array}>}
  */
 export async function fetchGalleryStats(params = {}) {
-    const { by = 'artist', sort = 'net', limit = 200, offset = 0, minTotal = 1 } = params;
+    const { by = 'artist', sort = 'net', limit = 200, offset = 0, minTotal = 1, order = 'desc' } = params;
 
     const query = new URLSearchParams({
         by,
@@ -238,6 +241,7 @@ export async function fetchGalleryStats(params = {}) {
         limit: String(limit),
         offset: String(offset),
         min_total: String(minTotal),
+        order,
     });
 
     try {
