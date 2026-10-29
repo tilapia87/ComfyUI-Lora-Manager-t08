@@ -439,14 +439,17 @@ describe('GalleryPage', () => {
 
     const rows = document.querySelectorAll('#galleryStatsBody tr');
     const cells = [...rows[0].querySelectorAll('td')].map((cell) => cell.textContent.trim());
-    expect(cells[0]).toBe('1');
-    expect(cells[1]).toBe('nnn yryr');
-    expect(cells[2]).toBe('5');
-    expect(cells[3]).toBe('1');
-    expect(cells[4]).toBe('2');
-    expect(cells[5]).toBe('8');
-    expect(cells[6]).toBe('+4');
-    expect(cells[7]).toBe('83%');
+    // The first cell is the thumbnail; the payload has no images for these rows,
+    // so it renders the empty placeholder.
+    expect(cells[0]).toBe('');
+    expect(cells[1]).toBe('1');
+    expect(cells[2]).toBe('nnn yryr');
+    expect(cells[3]).toBe('5');
+    expect(cells[4]).toBe('1');
+    expect(cells[5]).toBe('2');
+    expect(cells[6]).toBe('8');
+    expect(cells[7]).toBe('+4');
+    expect(cells[8]).toBe('83%');
 
     // Net score colouring and the unknown-artist flag come from the payload.
     expect(rows[0].querySelector('.gallery-col-net').classList.contains('is-positive')).toBe(true);
@@ -504,7 +507,9 @@ describe('GalleryPage', () => {
     const pagination = document.getElementById('galleryStatsPagination');
     expect(pagination.classList.contains('hidden')).toBe(false);
     expect(document.getElementById('galleryStatsPageInfo').textContent).toContain('1,3');
-    expect(document.querySelector('#galleryStatsBody tr td').textContent.trim()).toBe('1');
+    expect(
+      document.querySelector('#galleryStatsBody tr .gallery-col-rank').textContent.trim()
+    ).toBe('1');
 
     document.getElementById('galleryStatsNextPage').click();
 
@@ -513,8 +518,96 @@ describe('GalleryPage', () => {
 
     // Ranks keep counting instead of restarting at 1 on every page.
     await vi.waitFor(() =>
-      expect(document.querySelector('#galleryStatsBody tr td').textContent.trim()).toBe('101')
+      expect(
+        document.querySelector('#galleryStatsBody tr .gallery-col-rank').textContent.trim()
+      ).toBe('101')
     );
+  });
+
+  it('shows a thumbnail per ranking row and prefers the model preview', async () => {
+    fetchStub.setRoute('/api/lm/gallery/stats', {
+      success: true,
+      data: {
+        by: 'lora',
+        totals: { images: 2, rated: 2, liked: 2, disliked: 0 },
+        total: 2,
+        offset: 0,
+        items: [
+          {
+            key: 'style_a.safetensors',
+            label: 'style_a.safetensors',
+            known: true,
+            hash: 'a'.repeat(64),
+            likes: 2,
+            dislikes: 0,
+            unrated: 0,
+            total: 2,
+            net: 2,
+            like_ratio: 1,
+            preview_url: '/api/lm/previews?path=root1%2Fpreview%2Fstyle_a.png',
+            images: [{ image_path: 'C:\\out\\a.png', image_url: '/api/lm/gallery/image?path=a' }],
+          },
+          {
+            key: 'style_b.safetensors',
+            label: 'style_b.safetensors',
+            known: true,
+            hash: 'b'.repeat(64),
+            likes: 0,
+            dislikes: 0,
+            unrated: 2,
+            total: 2,
+            net: 0,
+            like_ratio: null,
+            preview_url: '',
+            images: [{ image_path: 'C:\\out\\b.png', image_url: '/api/lm/gallery/image?path=b' }],
+          },
+        ],
+      },
+    });
+
+    await boot();
+
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody tr').length).toBe(2));
+
+    const thumbs = () => document.querySelectorAll('#galleryStatsBody .gallery-stats-thumb');
+    // The model's own preview wins, the gallery image is the documented fallback.
+    expect(thumbs()[0].tagName).toBe('IMG');
+    expect(thumbs()[0].getAttribute('src')).toContain('/api/lm/previews');
+    expect(thumbs()[1].getAttribute('src')).toContain('/api/lm/gallery/image');
+  });
+
+  it('upgrades artist thumbnails with the animadex preview', async () => {
+    fetchStub.setRoute('/api/lm/gallery/artist-preview', (url) => {
+      const name = new URL(url, 'http://localhost').searchParams.get('name') || '';
+      return jsonResponse({
+        success: true,
+        data: {
+          artist: name,
+          matched_name: name,
+          thumb_url: `https://blobs.animadex.net/ArtistOutputs/thumbs/${encodeURIComponent(name)}.webp`,
+          page_url: '',
+          count: 12,
+        },
+      });
+    });
+
+    await boot();
+
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody tr').length).toBe(3));
+
+    const firstThumb = () =>
+      document.querySelector('#galleryStatsBody tr .gallery-stats-thumb');
+    await vi.waitFor(() =>
+      expect(firstThumb().getAttribute('src')).toContain('blobs.animadex.net')
+    );
+
+    // One lookup per artist, not per render.
+    const previewCalls = () =>
+      fetchStub.calls.filter((call) => call.url.startsWith('/api/lm/gallery/artist-preview'));
+    expect(previewCalls().length).toBe(3);
+    expect(previewCalls()[0].url).toContain('name=nnn+yryr');
   });
 
   it('filters the grid by an artist when a statistics row is clicked', async () => {

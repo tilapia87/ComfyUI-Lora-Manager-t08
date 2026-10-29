@@ -699,6 +699,27 @@
     font-style: italic;
 }
 
+.gallery-col-thumb {
+    width: 56px;
+    padding-right: 0;
+}
+
+/* Ranking thumbnails: LoRA rows show the model's own preview, artist rows a
+   sample artwork (gallery image first, animadex thumb once it answers). */
+.gallery-stats-thumb {
+    display: block;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-sm, 4px);
+    border: 1px solid var(--border-color);
+    object-fit: cover;
+    background: var(--surface-secondary, rgba(127, 127, 127, 0.15));
+}
+
+.gallery-stats-thumb.is-placeholder {
+    background: var(--surface-secondary, rgba(127, 127, 127, 0.15));
+}
+
 .gallery-col-rank {
     width: 3ch;
     color: var(--text-muted);

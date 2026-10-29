@@ -513,11 +513,13 @@ class GalleryCache:
         name_column: str,
         extra_label: str = "",
         *,
+        group_extra: Optional[str] = None,
         preview_limit: int = 3,
     ) -> List[Dict[str, Any]]:
         self._ensure_schema()
         label_sql = f", {extra_label}" if extra_label else ""
-        group_extra = ", known" if extra_label else ""
+        if group_extra is None:
+            group_extra = ", known" if extra_label else ""
         with self._db_lock:
             conn = self._connect(readonly=True)
             try:
@@ -560,6 +562,10 @@ class GalleryCache:
             }
             if extra_label:
                 entry["known"] = bool(row["known"])
+                # The LoRA grouping also carries the resolved hash so the row
+                # can show the model preview and link to the LoRA page.
+                if "lora_hash" in row.keys():
+                    entry["hash"] = row["lora_hash"] or ""
             items.append(entry)
         return items
 
@@ -705,8 +711,15 @@ class GalleryCache:
         )
 
     def stats_by_lora(self) -> List[Dict[str, Any]]:
-        """Per-LoRA like/dislike counts."""
-        return self._aggregate("gallery_image_loras", "lora_name")
+        """Per-LoRA like/dislike counts, with the hash the scan resolved."""
+        return self._aggregate(
+            "gallery_image_loras",
+            "lora_name",
+            extra_label="MAX(c.lora_hash) AS lora_hash, MAX(c.exists_locally) AS known",
+            # One row per name: the hash is only needed for the thumbnail link,
+            # so the aggregate above is enough and must not split the group.
+            group_extra="",
+        )
 
     def rating_totals(self) -> Dict[str, int]:
         self._ensure_schema()

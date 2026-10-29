@@ -575,6 +575,52 @@ async def test_statistics_previews_are_capped_and_carry_urls(service):
             assert image["image_path"]
 
 
+def test_lora_preview_index_maps_hashes_to_static_urls():
+    from types import SimpleNamespace
+
+    from py.services.gallery.lora_previews import build_lora_preview_index
+
+    cache = SimpleNamespace(
+        raw_data=[
+            {"sha256": "a" * 64, "preview_url": "root1/preview/style_a.png"},
+            # No preview, no hash, and junk entries are all skipped.
+            {"sha256": "b" * 64, "preview_url": ""},
+            {"sha256": "", "preview_url": "root1/preview/orphan.png"},
+            "junk",
+        ]
+    )
+    index = build_lora_preview_index(cache)
+    assert list(index) == ["a" * 64]
+    assert index["a" * 64].startswith("/api/lm/previews?path=")
+    assert build_lora_preview_index(None) == {}
+    assert build_lora_preview_index(SimpleNamespace(raw_data=None)) == {}
+
+
+async def test_lora_statistics_rows_carry_the_model_preview(service, monkeypatch):
+    async def _index(self):
+        return {"style_a.safetensors": "a" * 64, "style_a": "a" * 64}
+
+    monkeypatch.setattr(GalleryService, "_collect_known_loras", _index)
+    await _scan(service)
+
+    async def _previews(self):
+        return {"a" * 64: "/api/lm/previews?path=root1%2Fpreview%2Fstyle_a.png"}
+
+    monkeypatch.setattr(GalleryService, "_lora_preview_map", _previews)
+
+    stats = await service.stats(by="lora")
+    rows = {row["key"]: row for row in stats["items"]}
+    assert rows["style_a.safetensors"]["preview_url"].startswith("/api/lm/previews")
+    # A LoRA whose hash never resolved has nothing to show, so the UI keeps the
+    # gallery image it already had.
+    assert rows["style_b.safetensors"]["preview_url"] == ""
+
+    # The artist ranking is about people: animadex supplies those thumbnails,
+    # so the stats payload must not pretend to have a model preview.
+    artist_stats = await service.stats(by="artist")
+    assert all("preview_url" not in row for row in artist_stats["items"])
+
+
 async def test_statistics_report_the_full_ranking_and_page_through_it(service):
     await _scan(service)
 

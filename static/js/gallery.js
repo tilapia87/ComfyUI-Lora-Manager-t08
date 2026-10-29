@@ -16,6 +16,7 @@ import {
     fetchGalleryImagesForLora,
     setGalleryImageRating,
     fetchGalleryStats,
+    fetchArtistPreview,
     startGalleryIndex,
     fetchGalleryIndexStatus,
     fetchGalleryConfig,
@@ -121,6 +122,10 @@ export class GalleryPage {
         this.statsLoaded = false;
         this.statsPage = 1;
         this.statsTotalPages = 0;
+        // Artist thumbnails come from animadex.net one lookup at a time; the
+        // cache keeps a page change from asking again for the same artist.
+        this.artistPreviews = new Map();
+        this._artistPreviewToken = 0;
 
         this.scanTimer = null;
         this.searchTimer = null;
@@ -826,10 +831,12 @@ export class GalleryPage {
                     : `${Math.round(Number(row.like_ratio) * 100)}%`;
                 const unknownClass = row.known === false ? ' is-unknown' : '';
                 const label = row.label || row.key || '';
+                const artistAttr = this.statsBy === 'artist' ? ` data-artist="${escapeHtml(label)}"` : '';
 
                 return `
-                    <tr class="gallery-stats-row${unknownClass}" data-key="${escapeHtml(row.key || label)}"
+                    <tr class="gallery-stats-row${unknownClass}" data-key="${escapeHtml(row.key || label)}"${artistAttr}
                         tabindex="0" title="${escapeHtml(translate('gallery.stats.rowHint'))}">
+                        <td class="gallery-col-thumb">${this._statsThumbMarkup(row)}</td>
                         <td class="gallery-col-rank">${rankOffset + index + 1}</td>
                         <td class="gallery-col-name">${escapeHtml(label)}</td>
                         <td class="gallery-col-num">${Number(row.likes) || 0}</td>
@@ -843,6 +850,117 @@ export class GalleryPage {
                 `;
             })
             .join('');
+
+        this._wireThumbFallbacks();
+        this._applyArtistPreviews(items);
+    }
+
+    /**
+     * Fall back to the gallery image when a model preview fails to load.
+     *
+     * Previews can go stale (a LoRA was moved or its preview deleted), and a
+     * broken `<img>` in the ranking looks worse than the gallery thumbnail.
+     */
+    _wireThumbFallbacks() {
+        const body = this.el.statsBody;
+        if (!body) return;
+        for (const img of body.querySelectorAll('img.gallery-stats-thumb[data-fallback]')) {
+            if (!img.dataset.fallback) continue;
+            img.addEventListener(
+                'error',
+                () => {
+                    const fallback = img.dataset.fallback;
+                    img.dataset.fallback = '';
+                    if (fallback) img.src = fallback;
+                },
+                { once: true }
+            );
+        }
+    }
+
+    /**
+     * Thumbnail cell for one ranking row.
+     *
+     * A LoRA row reuses the LoRA page's own preview (video previews fall back
+     * to the gallery image, since an `<img>` cannot show a clip). An artist row
+     * starts from the gallery image and is upgraded by `_applyArtistPreviews`
+     * once animadex answers.
+     * @param {Object} row - Statistics row.
+     * @returns {string} Cell markup.
+     */
+    _statsThumbMarkup(row) {
+        const galleryThumb = row?.images?.[0]?.image_url || '';
+        const rawPreview = typeof row?.preview_url === 'string' ? row.preview_url : '';
+        const isVideo = /\.(mp4|webm)(\?|$)/i.test(rawPreview);
+        const src = (isVideo ? '' : rawPreview) || galleryThumb;
+        if (!src) {
+            return '<span class="gallery-stats-thumb is-placeholder" aria-hidden="true"></span>';
+        }
+        const fallback = galleryThumb && galleryThumb !== src ? escapeHtml(galleryThumb) : '';
+        return `<img class="gallery-stats-thumb" src="${escapeHtml(src)}" alt="" loading="lazy"
+            data-fallback="${fallback}">`;
+    }
+
+    /**
+     * Serve already-known artist thumbnails and start the missing lookups.
+     * @param {Array} items - Statistics rows of the current page.
+     */
+    _applyArtistPreviews(items) {
+        if (this.statsBy !== 'artist') return;
+        const missing = [];
+        for (const row of items) {
+            const label = row?.label || row?.key || '';
+            if (!label) continue;
+            const cached = this.artistPreviews.get(label);
+            if (cached) {
+                if (cached.thumb_url) this._setArtistThumb(label, cached.thumb_url);
+            } else {
+                missing.push(label);
+            }
+        }
+        if (missing.length) {
+            void this._loadArtistPreviews(missing);
+        }
+    }
+
+    /**
+     * Look up missing artist thumbnails with a small, bounded concurrency.
+     * @param {string[]} names - Artist names to resolve.
+     * @returns {Promise<void>}
+     */
+    async _loadArtistPreviews(names) {
+        const token = ++this._artistPreviewToken;
+        const queue = names.slice();
+        const worker = async () => {
+            while (queue.length) {
+                const name = queue.shift();
+                if (!name || this.artistPreviews.has(name)) continue;
+                const preview = await fetchArtistPreview(name);
+                this.artistPreviews.set(name, preview);
+                // A newer render (page/sort change) owns the table now.
+                if (token !== this._artistPreviewToken) return;
+                if (preview.thumb_url) this._setArtistThumb(name, preview.thumb_url);
+            }
+        };
+        await Promise.all([worker(), worker(), worker()]);
+    }
+
+    /**
+     * Swap one artist row's thumbnail once animadex has an answer.
+     * @param {string} name - Artist name as rendered in the row.
+     * @param {string} url - Thumbnail URL.
+     */
+    _setArtistThumb(name, url) {
+        const body = this.el.statsBody;
+        if (!body || !url) return;
+        const rows = body.querySelectorAll('tr[data-artist]');
+        for (const row of rows) {
+            if (row.dataset.artist !== name) continue;
+            const cell = row.querySelector('.gallery-col-thumb');
+            if (!cell) return;
+            cell.innerHTML = `<img class="gallery-stats-thumb" src="${escapeHtml(url)}" alt="" loading="lazy">`;
+            return;
+        }
     }
 
     /**

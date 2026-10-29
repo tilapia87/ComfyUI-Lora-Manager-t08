@@ -10,6 +10,8 @@ const GALLERY_ENDPOINTS = {
     forLora: '/api/lm/gallery/for-lora',
     rating: '/api/lm/gallery/rating',
     stats: '/api/lm/gallery/stats',
+    // Artist thumbnails are proxied through the backend (animadex.net lookup).
+    artistPreview: '/api/lm/gallery/artist-preview',
     index: '/api/lm/gallery/index',
     indexStatus: '/api/lm/gallery/index/status',
     config: '/api/lm/gallery/config',
@@ -250,6 +252,32 @@ export async function fetchGalleryStats(params = {}) {
         console.error('Error fetching gallery statistics:', error);
         showToast('toast.gallery.statsFailed', { message: error.message }, 'error');
         throw error;
+    }
+}
+
+/**
+ * Fetch one artist's sample thumbnail (proxied through animadex.net).
+ *
+ * Returns `{artist, matched_name, thumb_url, page_url, count}`; `thumb_url` is
+ * empty when the artist has no match upstream, so callers keep their fallback.
+ * @param {string} name - Artist name as indexed by the gallery.
+ * @returns {Promise<{artist: string, matched_name: string, thumb_url: string, page_url: string, count: number}>}
+ */
+export async function fetchArtistPreview(name) {
+    const query = new URLSearchParams({ name: name || '' });
+    try {
+        const data = await requestJson(`${GALLERY_ENDPOINTS.artistPreview}?${query.toString()}`);
+        return {
+            artist: data?.artist || name,
+            matched_name: data?.matched_name || '',
+            thumb_url: data?.thumb_url || '',
+            page_url: data?.page_url || '',
+            count: Number(data?.count) || 0,
+        };
+    } catch (error) {
+        // A preview is decoration: never toast, never break the table.
+        console.debug('Artist preview unavailable:', name, error?.message);
+        return { artist: name, matched_name: '', thumb_url: '', page_url: '', count: 0 };
     }
 }
 

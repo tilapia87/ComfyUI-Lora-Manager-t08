@@ -43,6 +43,7 @@ class GalleryHandlerSet:
             "list_gallery_images_for_lora": self.list_images_for_lora,
             "set_gallery_rating": self.set_rating,
             "get_gallery_stats": self.get_stats,
+            "get_gallery_artist_preview": self.get_artist_preview,
             "start_gallery_index": self.start_index,
             "get_gallery_index_status": self.get_index_status,
             "serve_gallery_image": self.serve_image,
@@ -148,6 +149,19 @@ class GalleryHandlerSet:
             return web.json_response({"success": True, "data": data})
         except Exception as exc:
             logger.error("Gallery stats failed: %s", exc, exc_info=True)
+            return _error(str(exc))
+
+    async def get_artist_preview(self, request: web.Request) -> web.Response:
+        """Sample thumbnail for one artist of the ranking (animadex.net)."""
+        try:
+            name = (request.query.get("name") or "").strip()
+            if not name:
+                return _error("name is required", 400)
+            service = await self._service()
+            data = await service.artist_preview(name)
+            return web.json_response({"success": True, "data": data})
+        except Exception as exc:
+            logger.error("Gallery artist preview failed: %s", exc, exc_info=True)
             return _error(str(exc))
 
     async def start_index(self, request: web.Request) -> web.Response:

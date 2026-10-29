@@ -24,6 +24,9 @@ ROUTE_DEFINITIONS: tuple[RouteDefinition, ...] = (
     RouteDefinition("POST", "/api/lm/gallery/rating", "set_gallery_rating"),
     RouteDefinition("GET", "/api/lm/gallery/rating", "set_gallery_rating"),
     RouteDefinition("GET", "/api/lm/gallery/stats", "get_gallery_stats"),
+    # Artist thumbnails come from animadex.net; the endpoint proxies the lookup
+    # so the browser never talks to a third party directly.
+    RouteDefinition("GET", "/api/lm/gallery/artist-preview", "get_gallery_artist_preview"),
     RouteDefinition("POST", "/api/lm/gallery/index", "start_gallery_index"),
     RouteDefinition("GET", "/api/lm/gallery/index", "start_gallery_index"),
     RouteDefinition("GET", "/api/lm/gallery/index/status", "get_gallery_index_status"),

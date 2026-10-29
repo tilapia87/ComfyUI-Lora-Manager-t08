@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 from ...utils.artist_tags import load_gallery_artist_index
 from ..settings_manager import get_settings_manager
 from ..websocket_manager import ws_manager
+from .artist_previews import ArtistPreviewService
 from .gallery_cache import GalleryCache, VALID_RATINGS
 from .gallery_indexer import (
     build_lora_index,
@@ -25,11 +26,16 @@ from .gallery_indexer import (
     parse_image,
     resolve_output_dir,
 )
+from .lora_previews import build_lora_preview_index
 
 logger = logging.getLogger(__name__)
 
 # How often the scan reports progress while the blocking walk runs.
 _PROGRESS_INTERVAL_SECONDS = 0.5
+
+# The LoRA ranking asks for previews on every page, so the hash -> preview map
+# is reused for a short while instead of re-walking the scanner cache.
+_LORA_PREVIEW_TTL_SECONDS = 30.0
 
 _STATS_SORT_KEYS = {
     "net": lambda item: item["net"],
@@ -61,6 +67,8 @@ class GalleryService:
         self.cache = cache or GalleryCache.get_instance()
         self._task: Optional[asyncio.Task] = None
         self._status: Dict[str, Any] = self._idle_status()
+        self._lora_previews: Dict[str, str] = {}
+        self._lora_previews_at: float = 0.0
 
     @classmethod
     async def get_instance(cls) -> "GalleryService":
@@ -354,6 +362,14 @@ class GalleryService:
                 {**image, "image_url": self.image_url(image["image_path"])}
                 for image in row.get("images", [])
             ]
+
+        if by == "lora":
+            # The ranking row is the same model the LoRA page shows, so reuse
+            # that page's preview instead of making the client look it up.
+            previews = await self._lora_preview_map()
+            for row in page_rows:
+                row["preview_url"] = previews.get(str(row.get("hash") or ""), "")
+
         return {
             "by": "lora" if by == "lora" else "artist",
             "totals": self.cache.rating_totals(),
@@ -362,6 +378,30 @@ class GalleryService:
             "limit": limit,
             "items": page_rows,
         }
+
+    async def _lora_preview_map(self) -> Dict[str, str]:
+        """``sha256`` -> preview URL of the local LoRA library.
+
+        Reused for a short while because every statistics page asks for it; a
+        cold scanner cache degrades to "no previews", never to an error.
+        """
+        now = time.monotonic()
+        if self._lora_previews and now - self._lora_previews_at < _LORA_PREVIEW_TTL_SECONDS:
+            return self._lora_previews
+        try:
+            from ..service_registry import ServiceRegistry
+
+            scanner = await ServiceRegistry.get_lora_scanner()
+            cache = await scanner.get_cached_data()
+            self._lora_previews = build_lora_preview_index(cache)
+            self._lora_previews_at = now
+        except Exception as exc:
+            logger.debug("LoRA previews unavailable for gallery stats: %s", exc)
+        return self._lora_previews
+
+    async def artist_preview(self, artist: str) -> Dict[str, Any]:
+        """Best-effort artist thumbnail from animadex.net."""
+        return await ArtistPreviewService.get_instance().get(artist)
 
     async def list_images_for_lora(
         self,

@@ -353,6 +353,44 @@ async def test_index_status_and_config_shapes(service, tmp_path):
     assert config_body["data"]["indexed_images"] == 1
 
 
+async def test_artist_preview_requires_a_name(service):
+    response = await GalleryHandlerSet().get_artist_preview(FakeRequest(query={}))
+    assert response.status == 400
+    assert _payload(response)["success"] is False
+
+
+async def test_artist_preview_proxies_the_lookup(service, monkeypatch):
+    from py.services.gallery.artist_previews import ArtistPreviewService
+
+    async def _lookup(artist):
+        return {
+            "artist": artist,
+            "matched_name": "Kedama Milk",
+            "thumb_url": "https://blobs.animadex.net/ArtistOutputs/thumbs/kedama%20milk.webp",
+            "page_url": "https://danbooru.donmai.us/posts?tags=kedama_milk",
+            "count": 628,
+        }
+
+    monkeypatch.setattr(ArtistPreviewService, "_lookup", lambda self, artist: _lookup(artist))
+    ArtistPreviewService.reset_instance()
+    try:
+        response = await GalleryHandlerSet().get_artist_preview(
+            FakeRequest(query={"name": "kedama milk"})
+        )
+        data = _payload(response)["data"]
+        assert data["thumb_url"].startswith("https://blobs.animadex.net/")
+        assert data["matched_name"] == "Kedama Milk"
+        assert data["count"] == 628
+    finally:
+        ArtistPreviewService.reset_instance()
+
+
+def test_artist_preview_route_is_registered():
+    paths = {(definition.method, definition.path) for definition in ROUTE_DEFINITIONS}
+    assert ("GET", "/api/lm/gallery/artist-preview") in paths
+    assert "get_gallery_artist_preview" in GalleryHandlerSet().to_route_mapping()
+
+
 def test_gallery_handler_set_is_a_frozen_dataclass():
     import dataclasses
 
