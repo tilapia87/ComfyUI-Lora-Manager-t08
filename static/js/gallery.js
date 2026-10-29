@@ -654,7 +654,12 @@ export class GalleryPage {
                         data-full-image="${escapeHtml(item.image_url || '')}"
                         alt="${escapeHtml(fileName)}" loading="lazy" decoding="async"${promptTitle}>
                     ${this._renderRatingBadge(item.rating)}
-                    <div class="gallery-card-overlay">
+                </div>
+                <div class="gallery-card-body">
+                    <div class="gallery-card-name" title="${escapeHtml(item.image_path)}">${escapeHtml(fileName)}</div>
+                    <div class="gallery-card-meta">${escapeHtml(metaParts.join(' · '))}</div>
+                    ${this._renderChips(item)}
+                    <div class="gallery-card-actions">
                         <button type="button" class="gallery-rate-btn gallery-rate-up${item.rating === 1 ? ' is-active' : ''}"
                             data-rating="1" aria-pressed="${item.rating === 1}"
                             title="${escapeHtml(translate('gallery.card.likeHint'))}">
@@ -666,11 +671,6 @@ export class GalleryPage {
                             <i class="fas fa-thumbs-down"></i>
                         </button>
                     </div>
-                </div>
-                <div class="gallery-card-body">
-                    <div class="gallery-card-name" title="${escapeHtml(item.image_path)}">${escapeHtml(fileName)}</div>
-                    <div class="gallery-card-meta">${escapeHtml(metaParts.join(' · '))}</div>
-                    ${this._renderChips(item)}
                 </div>
             </article>
         `;

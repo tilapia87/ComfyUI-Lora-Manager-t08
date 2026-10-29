@@ -2971,8 +2971,8 @@
             "settingsSaved": "圖庫設定已儲存",
             "settingsSaveFailed": "儲存圖庫設定失敗：{message}",
             "loraLinkFailed": "無法在 LoRA 頁面開啟 {name}",
-            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
-            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
+            "cacheCleared": "已清除 {count} 張縮圖快取",
+            "cacheClearFailed": "清除縮圖快取失敗：{message}"
         },
         "agent": {
             "llmNotConfigured": "AI 提供者尚未設定。請在 設定 → AI 提供者 中進行設定。",
@@ -3100,23 +3100,23 @@
             "statistics": "統計"
         },
         "density": {
-            "label": "[TODO: Translate] Thumbnail size",
-            "compact": "[TODO: Translate] Compact thumbnails",
-            "comfortable": "[TODO: Translate] Standard thumbnails",
-            "large": "[TODO: Translate] Large thumbnails"
+            "label": "縮圖尺寸",
+            "compact": "緊湊",
+            "comfortable": "標準",
+            "large": "大圖"
         },
         "filters": {
-            "label": "[TODO: Translate] Filters"
+            "label": "篩選"
         },
         "order": {
-            "label": "[TODO: Translate] Order",
-            "desc": "[TODO: Translate] Default",
-            "asc": "[TODO: Translate] Reversed"
+            "label": "順序",
+            "desc": "正序",
+            "asc": "倒序"
         },
         "actions": {
             "scan": "掃描輸出資料夾",
-            "loadMore": "[TODO: Translate] Load more images",
-            "loadingMore": "[TODO: Translate] Loading more...",
+            "loadMore": "載入更多圖片",
+            "loadingMore": "正在載入…",
             "scanNow": "立即掃描",
             "settings": "圖庫設定",
             "setOutputFolder": "設定輸出資料夾",
@@ -3210,13 +3210,13 @@
             "recursiveHint": "同時掃描輸出資料夾的子資料夾。",
             "effectivePath": "目前生效資料夾：{path}（{source}）",
             "effectivePathUnset": "未能偵測到輸出資料夾。",
-            "thumbnailSize": "[TODO: Translate] Thumbnail size",
-            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
-            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
-            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
-            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
-            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
-            "clearCache": "[TODO: Translate] Clear cache",
+            "thumbnailSize": "縮圖尺寸",
+            "thumbnailSizeHint": "網格與統計預覽使用此尺寸。",
+            "thumbnailCache": "縮圖快取",
+            "thumbnailCacheHint": "縮圖按需產生，可安全刪除。",
+            "thumbnailCacheValue": "{count} 張 · {size}",
+            "thumbnailCacheUnavailable": "無法讀取快取資訊",
+            "clearCache": "清除快取",
             "source": {
                 "comfyui": "自動偵測",
                 "setting": "來自您的設定",

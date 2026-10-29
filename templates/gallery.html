@@ -42,42 +42,43 @@
                 <section class="gallery-sidebar-section" aria-label="{{ t('gallery.filters.label') }}">
                     <span class="gallery-sidebar-label">{{ t('gallery.filters.label') }}</span>
 
-                    <div class="gallery-control">
-                        <label class="gallery-control-label" for="gallerySortSelect">
-                            {{ t('gallery.sort.label') }}
-                        </label>
-                        <select id="gallerySortSelect">
-                            <option value="newest">{{ t('gallery.sort.newest') }}</option>
-                            <option value="oldest">{{ t('gallery.sort.oldest') }}</option>
-                            <option value="rating_desc">{{ t('gallery.sort.ratingDesc') }}</option>
-                            <option value="rating_asc">{{ t('gallery.sort.ratingAsc') }}</option>
-                            <option value="name">{{ t('gallery.sort.name') }}</option>
-                        </select>
-                    </div>
+                    <div class="gallery-field-grid">
+                        <div class="gallery-control">
+                            <label class="gallery-control-label" for="gallerySortSelect">
+                                {{ t('gallery.sort.label') }}
+                            </label>
+                            <select id="gallerySortSelect">
+                                <option value="newest">{{ t('gallery.sort.newest') }}</option>
+                                <option value="oldest">{{ t('gallery.sort.oldest') }}</option>
+                                <option value="rating_desc">{{ t('gallery.sort.ratingDesc') }}</option>
+                                <option value="rating_asc">{{ t('gallery.sort.ratingAsc') }}</option>
+                                <option value="name">{{ t('gallery.sort.name') }}</option>
+                            </select>
+                        </div>
 
-                    <div class="gallery-control">
-                        <label class="gallery-control-label" for="galleryRatingSelect">
-                            {{ t('gallery.rating.label') }}
-                        </label>
-                        <select id="galleryRatingSelect">
-                            <option value="all">{{ t('gallery.rating.all') }}</option>
-                            <option value="liked">{{ t('gallery.rating.liked') }}</option>
-                            <option value="disliked">{{ t('gallery.rating.disliked') }}</option>
-                            <option value="unrated">{{ t('gallery.rating.unrated') }}</option>
-                        </select>
-                    </div>
+                        <div class="gallery-control">
+                            <label class="gallery-control-label" for="galleryRatingSelect">
+                                {{ t('gallery.rating.label') }}
+                            </label>
+                            <select id="galleryRatingSelect">
+                                <option value="all">{{ t('gallery.rating.all') }}</option>
+                                <option value="liked">{{ t('gallery.rating.liked') }}</option>
+                                <option value="disliked">{{ t('gallery.rating.disliked') }}</option>
+                                <option value="unrated">{{ t('gallery.rating.unrated') }}</option>
+                            </select>
+                        </div>
 
-                    <div class="gallery-control">
-                        <label class="gallery-control-label" for="galleryMetadataSelect">
-                            {{ t('gallery.metadata.label') }}
-                        </label>
-                        <select id="galleryMetadataSelect">
-                            <option value="all">{{ t('gallery.metadata.all') }}</option>
-                            <option value="with">{{ t('gallery.metadata.with') }}</option>
-                            <option value="without">{{ t('gallery.metadata.without') }}</option>
-                        </select>
+                        <div class="gallery-control gallery-field-wide">
+                            <label class="gallery-control-label" for="galleryMetadataSelect">
+                                {{ t('gallery.metadata.label') }}
+                            </label>
+                            <select id="galleryMetadataSelect">
+                                <option value="all">{{ t('gallery.metadata.all') }}</option>
+                                <option value="with">{{ t('gallery.metadata.with') }}</option>
+                                <option value="without">{{ t('gallery.metadata.without') }}</option>
+                            </select>
+                        </div>
                     </div>
-
                     <div class="gallery-control">
                         <label class="gallery-control-label" for="gallerySearchInput">
                             {{ t('gallery.search.label') }}

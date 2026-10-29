@@ -51,10 +51,12 @@
     top: var(--space-3, 12px);
     display: flex;
     flex-direction: column;
-    gap: var(--space-3, 12px);
-    max-height: calc(100vh - 24px);
-    overflow: auto;
-    padding: var(--space-3, 12px);
+    gap: var(--space-2, 8px);
+    max-height: calc(100vh - var(--space-4, 16px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding: var(--space-3, 12px) var(--space-3, 12px) var(--space-4, 16px);
     border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
     border-radius: var(--radius-lg, 12px);
     background: var(--bg-elevated, rgba(127, 127, 127, 0.06));
@@ -79,7 +81,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2, 8px);
-    padding-top: var(--space-3, 12px);
+    padding-top: var(--space-2, 8px);
     border-top: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
 }
 
@@ -99,6 +101,29 @@
 
 .gallery-sidebar .gallery-control {
     min-width: 0;
+}
+
+/* Two selects side by side keeps the panel inside one screen. */
+.gallery-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2, 8px);
+}
+
+.gallery-field-grid .gallery-field-wide {
+    grid-column: 1 / -1;
+}
+
+.gallery-sidebar .gallery-control-label {
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0.02em;
+}
+
+.gallery-sidebar select,
+.gallery-sidebar .gallery-search-box input {
+    height: 34px;
+    font-size: var(--text-xs, 12px);
 }
 
 .gallery-sidebar .gallery-segmented,
@@ -127,9 +152,8 @@
 }
 
 .gallery-content-toolbar {
-    position: sticky;
-    top: var(--space-3, 12px);
-    z-index: var(--z-sticky, 20);
+    /* In normal flow: a sticky bar here covered the first row of cards. */
+    position: static;
 }
 
 .gallery-heading {
@@ -220,9 +244,14 @@
 .gallery-segmented-btn {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-2, 8px);
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
     min-height: 32px;
-    padding: 0 var(--space-3, 12px);
+    padding: 0 var(--space-2, 8px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     border: 0;
     border-radius: var(--radius-sm, 6px);
     background: transparent;
@@ -519,6 +548,39 @@
 .gallery-rate-down.is-active {
     background: var(--color-error, #e74c3c);
     border-color: var(--color-error, #e74c3c);
+}
+
+.gallery-card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.gallery-card-actions .gallery-rate-btn {
+    flex: 1;
+    width: auto;
+    height: 36px;
+    pointer-events: auto;
+    border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.2));
+    background: var(--bg-hover, rgba(127, 127, 127, 0.12));
+    color: var(--text-secondary, #b8b8b8);
+}
+
+.gallery-card-actions .gallery-rate-btn:hover {
+    color: var(--text-primary, #f2f2f2);
+    border-color: var(--color-accent, #4f8cff);
+}
+
+.gallery-card-actions .gallery-rate-up.is-active {
+    background: var(--color-success, #2ecc71);
+    border-color: var(--color-success, #2ecc71);
+    color: #ffffff;
+}
+
+.gallery-card-actions .gallery-rate-down.is-active {
+    background: var(--color-error, #e74c3c);
+    border-color: var(--color-error, #e74c3c);
+    color: #ffffff;
 }
 
 .gallery-card-body {
@@ -1009,9 +1071,11 @@
 }
 
 .gallery-metric[data-sort-metric] {
-    padding: 2px 6px;
-    margin: -2px -6px;
-    border-radius: var(--radius-xs, 4px);
+    padding: 4px 8px;
+    margin: -4px -8px;
+    min-height: 28px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm, 6px);
     cursor: pointer;
     transition: background var(--transition-fast, 150ms) ease,
         color var(--transition-fast, 150ms) ease;
@@ -1019,6 +1083,7 @@
 
 .gallery-metric[data-sort-metric]:hover {
     background: var(--bg-hover, rgba(127, 127, 127, 0.18));
+    border-color: var(--border-subtle, rgba(127, 127, 127, 0.24));
     color: var(--text-primary, #f2f2f2);
 }
 
