@@ -575,6 +575,87 @@ async def test_statistics_previews_are_capped_and_carry_urls(service):
             assert image["image_path"]
 
 
+def test_build_lora_index_matches_names_that_differ_only_in_spelling():
+    """A name copied from a prompt rarely matches the file name byte for byte."""
+    from types import SimpleNamespace
+
+    from py.services.gallery.gallery_indexer import build_lora_index, resolve_lora_hash
+
+    cache = SimpleNamespace(
+        raw_data=[
+            _lora_cache_item(
+                "[Marvel Comics (Capcom)] Marvel vs. Capcom 2 (2009) Concept Art Style Anima.safetensors",
+                "m" * 64,
+            ),
+        ]
+    )
+    index = build_lora_index(cache)
+    expected = "m" * 64
+
+    # Same string, with and without the extension.
+    assert resolve_lora_hash(
+        "[Marvel Comics (Capcom)] Marvel vs. Capcom 2 (2009) Concept Art Style Anima", index
+    ) == expected
+    # The bracket decoration is present on one side only.
+    assert resolve_lora_hash("Marvel vs. Capcom 2 (2009) Concept Art Style Anima", index) == expected
+    # Underscores / case / punctuation drift.
+    assert resolve_lora_hash(
+        "MARVEL_VS_CAPCOM_2_2009_CONCEPT_ART_STYLE_ANIMA", index
+    ) == expected
+    assert resolve_lora_hash("something else entirely", index) is None
+
+
+async def test_newly_installed_lora_is_matched_without_a_rescan(service, monkeypatch):
+    async def _scan_index(self):
+        # The library did not know the LoRA when the gallery was scanned.
+        return {}
+
+    monkeypatch.setattr(GalleryService, "_collect_known_loras", _scan_index)
+    await _scan(service)
+
+    items = _by_name((await service.list_images())["items"])
+    before = {entry["name"]: entry for entry in items["comfy_00001_.png"]["loras"]}
+    assert before["style_a.safetensors"]["exists_locally"] is False
+    assert before["style_a.safetensors"]["hash"] is None
+
+    async def _current_library(self):
+        return {"style_a.safetensors": "a" * 64}
+
+    monkeypatch.setattr(GalleryService, "_lora_index", _current_library)
+
+    # Same database rows, no rescan: the chip resolves because the read path
+    # asks the current library.
+    items = _by_name((await service.list_images())["items"])
+    after = {entry["name"]: entry for entry in items["comfy_00001_.png"]["loras"]}
+    assert after["style_a.safetensors"]["exists_locally"] is True
+    assert after["style_a.safetensors"]["hash"] == "a" * 64
+    # A LoRA that is still missing stays missing.
+    assert after["style_b.safetensors"]["exists_locally"] is False
+
+
+async def test_statistics_reresolve_a_lora_installed_after_the_scan(service, monkeypatch):
+    async def _scan_index(self):
+        return {}
+
+    monkeypatch.setattr(GalleryService, "_collect_known_loras", _scan_index)
+    await _scan(service)
+
+    async def _current_library(self):
+        return {"style_a.safetensors": "a" * 64}
+
+    async def _previews(self):
+        return {"a" * 64: "/api/lm/previews?path=root1%2Fpreview%2Fstyle_a.png"}
+
+    monkeypatch.setattr(GalleryService, "_lora_index", _current_library)
+    monkeypatch.setattr(GalleryService, "_lora_preview_map", _previews)
+
+    stats = await service.stats(by="lora")
+    rows = {row["key"]: row for row in stats["items"]}
+    assert rows["style_a.safetensors"]["hash"] == "a" * 64
+    assert rows["style_a.safetensors"]["known"] is True
+    assert rows["style_a.safetensors"]["preview_url"].startswith("/api/lm/previews")
+
+
 def test_lora_preview_index_maps_hashes_to_static_urls():
     from types import SimpleNamespace
 

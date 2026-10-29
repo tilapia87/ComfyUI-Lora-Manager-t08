@@ -24,6 +24,7 @@ from .gallery_indexer import (
     build_lora_index,
     iter_image_paths,
     parse_image,
+    resolve_lora_hash,
     resolve_output_dir,
 )
 from .lora_previews import build_lora_preview_index
@@ -69,6 +70,8 @@ class GalleryService:
         self._status: Dict[str, Any] = self._idle_status()
         self._lora_previews: Dict[str, str] = {}
         self._lora_previews_at: float = 0.0
+        self._lora_index_map: Dict[str, Optional[str]] = {}
+        self._lora_index_at: float = 0.0
 
     @classmethod
     async def get_instance(cls) -> "GalleryService":
@@ -320,6 +323,12 @@ class GalleryService:
         )
         for item in items:
             item["image_url"] = self.image_url(item["image_path"])
+
+        # The scan bakes the LoRA match into the database, so re-resolving it on
+        # read is what keeps a newly added or renamed LoRA from showing up as
+        # "not in the local library" until a full rescan.
+        await self._refresh_lora_matches(items)
+
         total_pages = (total + page_size - 1) // page_size if page_size else 1
         return {
             "items": items,
@@ -365,9 +374,16 @@ class GalleryService:
 
         if by == "lora":
             # The ranking row is the same model the LoRA page shows, so reuse
-            # that page's preview instead of making the client look it up.
+            # that page's preview instead of making the client look it up. The
+            # name is re-resolved first: the database hash can be stale when the
+            # LoRA was installed (or renamed) after the last scan.
+            index = await self._lora_index()
             previews = await self._lora_preview_map()
             for row in page_rows:
+                digest = resolve_lora_hash(str(row.get("key") or ""), index)
+                if digest:
+                    row["hash"] = digest
+                    row["known"] = True
                 row["preview_url"] = previews.get(str(row.get("hash") or ""), "")
 
         return {
@@ -378,6 +394,44 @@ class GalleryService:
             "limit": limit,
             "items": page_rows,
         }
+
+    async def _lora_index(self) -> Dict[str, Optional[str]]:
+        """``name -> sha256`` of the current local LoRA library.
+
+        Shared by the read-time chip refresh and the ranking, and reused for a
+        short while because both run on every page request.
+        """
+        now = time.monotonic()
+        if self._lora_index_map and now - self._lora_index_at < _LORA_PREVIEW_TTL_SECONDS:
+            return self._lora_index_map
+        try:
+            from ..service_registry import ServiceRegistry
+
+            scanner = await ServiceRegistry.get_lora_scanner()
+            cache = await scanner.get_cached_data()
+            self._lora_index_map = build_lora_index(cache)
+            self._lora_index_at = now
+        except Exception as exc:
+            logger.debug("LoRA library unavailable for gallery: %s", exc)
+        return self._lora_index_map
+
+    async def _refresh_lora_matches(self, items: Sequence[Dict[str, Any]]) -> None:
+        """Re-resolve each image's LoRA chips against the current library.
+
+        Only upgrades a chip: an entry the scan already resolved keeps its hash,
+        and a miss never turns a previously resolved chip back into "missing".
+        """
+        index = await self._lora_index()
+        if not index:
+            return
+        for item in items:
+            for lora in item.get("loras") or []:
+                if lora.get("hash"):
+                    continue
+                digest = resolve_lora_hash(str(lora.get("name") or ""), index)
+                if digest:
+                    lora["hash"] = digest
+                    lora["exists_locally"] = True
 
     async def _lora_preview_map(self) -> Dict[str, str]:
         """``sha256`` -> preview URL of the local LoRA library.

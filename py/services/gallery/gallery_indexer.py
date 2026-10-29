@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
 from ...utils.artist_tags import ArtistIndex, EMPTY_ARTIST_INDEX, extract_artists
@@ -218,21 +219,112 @@ def parse_image(
     return record
 
 
+# Model containers we may see in a library. Used to drop a real extension
+# without eating the dots inside a name like `Marvel vs. Capcom 2`.
+_MODEL_EXTENSIONS = (
+    ".safetensors",
+    ".ckpt",
+    ".pt",
+    ".pth",
+    ".bin",
+    ".sft",
+    ".gguf",
+    ".onnx",
+    ".msgpack",
+)
+
+
+def _strip_model_extension(name: str) -> str:
+    lowered = name.lower()
+    for extension in _MODEL_EXTENSIONS:
+        if lowered.endswith(extension):
+            return name[: -len(extension)]
+    return name
+
+
+def normalize_lora_name(name: str) -> str:
+    """Spelling-insensitive identity for a LoRA name.
+
+    The same model is spelled differently by the three sources we mix: the file
+    name on disk, CivitAI's model name, and the reference embedded in a prompt.
+    Case, separators (``_``/``-``/``.``) and punctuation around the words carry
+    no meaning, so both sides collapse to lower-case words.
+    """
+    if not name:
+        return ""
+    base = os.path.basename(str(name).replace("\\", "/")).strip()
+    base = _strip_model_extension(base)
+    if not base:
+        return ""
+    # Brackets and parentheses only decorate a name: `[Marvel Comics (Capcom)]
+    # Marvel vs. Capcom 2` and `Marvel vs. Capcom 2` are the same file.
+    words = re.sub(r"[^0-9A-Za-z]+", " ", base)
+    return " ".join(words.lower().split())
+
+
+def _strip_leading_brackets(name: str) -> str:
+    """Drop balanced ``[...]`` / ``(...)`` groups at the start of a name.
+
+    ``[Marvel Comics (Capcom)] Marvel vs. Capcom 2`` is the same file as
+    ``Marvel vs. Capcom 2``, and the decoration can contain its own brackets.
+    """
+    text = (name or "").strip()
+    while text and text[0] in "[(":
+        depth = 0
+        closed_at = -1
+        for index, char in enumerate(text):
+            if char in "[(":
+                depth += 1
+            elif char in "])":
+                depth -= 1
+                if depth == 0:
+                    closed_at = index
+                    break
+        if closed_at < 0:
+            break
+        text = text[closed_at + 1 :].lstrip()
+    return text
+
+
+def _lora_name_variants(name: str) -> List[str]:
+    """The spellings worth comparing for one LoRA name, best first."""
+    if not name:
+        return []
+    base = os.path.basename(str(name).replace("\\", "/")).strip()
+    without_extension = _strip_model_extension(base)
+    variants: List[str] = []
+
+    def add(candidate: str) -> None:
+        candidate = (candidate or "").strip()
+        if candidate and candidate not in variants:
+            variants.append(candidate)
+
+    add(str(name).strip())
+    add(base)
+    add(without_extension)
+
+    stripped = _strip_leading_brackets(without_extension)
+    if stripped and stripped != without_extension:
+        add(stripped)
+    for raw in (without_extension, stripped):
+        add(normalize_lora_name(raw))
+    return variants
+
+
 def _lora_name_keys(item: Dict[str, Any]) -> List[str]:
     """Every spelling a prompt might use for one library LoRA.
 
     A prompt can reference ``style_a.safetensors``, the same file through a
-    subfolder, or (in the ``<lora:name:weight>`` syntax) without the extension,
-    so all of those resolve.
+    subfolder, the ``<lora:name:weight>`` syntax without the extension, or a
+    name that only differs in punctuation and case, so all of those resolve.
     """
     keys: List[str] = []
     for field in ("file_name", "model_name", "file_path"):
         value = item.get(field)
         if not isinstance(value, str) or not value:
             continue
-        base = os.path.basename(value) if field == "file_path" else value
-        for candidate in (base, os.path.splitext(base)[0]):
-            if candidate and candidate not in keys:
+        for candidate in _lora_name_variants(value):
+            if candidate not in keys:
                 keys.append(candidate)
     return keys
 
@@ -270,8 +362,9 @@ def resolve_lora_hash(name: str, index: Dict[str, Optional[str]]) -> Optional[st
     """Resolve one prompt LoRA reference to a local hash, or ``None``."""
     if not name or not index:
         return None
-    base = os.path.basename(name)
-    for candidate in (name, base, os.path.splitext(base)[0]):
-        if candidate and candidate in index:
+    # ``_lora_name_variants`` already yields the exact spellings first and the
+    # normalized ones last, which is the order we want to accept matches in.
+    for candidate in _lora_name_variants(name):
+        if candidate in index:
             return index[candidate]
     return None
