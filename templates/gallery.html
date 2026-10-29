@@ -253,24 +253,8 @@
 
             <div class="gallery-stats-summary" id="galleryStatsSummary"></div>
 
-            <div class="gallery-table-wrap" id="galleryStatsTableWrap">
-                <table class="gallery-table">
-                    <thead>
-                        <tr>
-                            <th class="gallery-col-thumb" aria-hidden="true"></th>
-                            <th class="gallery-col-rank">{{ t('gallery.stats.columns.rank') }}</th>
-                            <th class="gallery-col-name">{{ t('gallery.stats.columns.name') }}</th>
-                            <th class="gallery-col-num">{{ t('gallery.stats.columns.likes') }}</th>
-                            <th class="gallery-col-num">{{ t('gallery.stats.columns.dislikes') }}</th>
-                            <th class="gallery-col-num">{{ t('gallery.stats.columns.unrated') }}</th>
-                            <th class="gallery-col-num">{{ t('gallery.stats.columns.total') }}</th>
-                            <th class="gallery-col-num">{{ t('gallery.stats.columns.net') }}</th>
-                            <th class="gallery-col-num">{{ t('gallery.stats.columns.ratio') }}</th>
-                            <th class="gallery-col-actions"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="galleryStatsBody"></tbody>
-                </table>
+            <div class="gallery-rank-grid-wrap" id="galleryStatsTableWrap">
+                <div class="gallery-rank-grid" id="galleryStatsBody"></div>
             </div>
 
             <div class="gallery-pagination hidden" id="galleryStatsPagination">

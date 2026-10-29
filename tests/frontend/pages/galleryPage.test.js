@@ -470,13 +470,13 @@ describe('GalleryPage', () => {
 
     document.getElementById('galleryStatsTab').click();
 
-    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody tr').length).toBe(3));
+    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(3));
 
-    const rows = document.querySelectorAll('#galleryStatsBody tr');
+    const rows = document.querySelectorAll('#galleryStatsBody .gallery-rank-card');
     const first = rows[0];
     // Preview, rank badge, label and the numbers each keep their own hook so
-    // the table can be restyled without rewriting the assertions.
-    expect(first.querySelector('.gallery-col-thumb .gallery-stats-thumb.is-placeholder')).not.toBeNull();
+    // the ranking can be restyled without rewriting the assertions.
+    expect(first.querySelector('.gallery-rank-media .gallery-stats-thumb.is-placeholder')).not.toBeNull();
     expect(first.querySelector('.gallery-rank-badge').textContent.trim()).toBe('1');
     expect(first.querySelector('.gallery-stat-label').textContent.trim()).toBe('nnn yryr');
     expect(first.querySelector('.gallery-stat-sub').textContent).toContain('8');
@@ -534,7 +534,7 @@ describe('GalleryPage', () => {
     await boot();
 
     document.getElementById('galleryStatsTab').click();
-    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody tr').length).toBe(100));
+    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(100));
 
     const statsCalls = () => fetchStub.calls.filter((call) => call.url.startsWith('/api/lm/gallery/stats'));
     expect(statsCalls()[0].url).toContain('limit=100');
@@ -545,7 +545,7 @@ describe('GalleryPage', () => {
     expect(pagination.classList.contains('hidden')).toBe(false);
     expect(document.getElementById('galleryStatsPageInfo').textContent).toContain('1,3');
     expect(
-      document.querySelector('#galleryStatsBody tr .gallery-col-rank').textContent.trim()
+      document.querySelector('#galleryStatsBody .gallery-rank-badge').textContent.trim()
     ).toBe('1');
 
     document.getElementById('galleryStatsNextPage').click();
@@ -556,7 +556,7 @@ describe('GalleryPage', () => {
     // Ranks keep counting instead of restarting at 1 on every page.
     await vi.waitFor(() =>
       expect(
-        document.querySelector('#galleryStatsBody tr .gallery-col-rank').textContent.trim()
+        document.querySelector('#galleryStatsBody .gallery-rank-badge').textContent.trim()
       ).toBe('101')
     );
   });
@@ -605,7 +605,7 @@ describe('GalleryPage', () => {
     await boot();
 
     document.getElementById('galleryStatsTab').click();
-    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody tr').length).toBe(2));
+    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(2));
 
     const thumbs = () => document.querySelectorAll('#galleryStatsBody .gallery-stats-thumb');
     // The model's own preview wins, the gallery image is the documented fallback.
@@ -632,10 +632,10 @@ describe('GalleryPage', () => {
     await boot();
 
     document.getElementById('galleryStatsTab').click();
-    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody tr').length).toBe(3));
+    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(3));
 
     const firstThumb = () =>
-      document.querySelector('#galleryStatsBody tr .gallery-stats-thumb');
+      document.querySelector('#galleryStatsBody .gallery-stats-thumb');
     await vi.waitFor(() =>
       expect(firstThumb().getAttribute('src')).toContain('blobs.animadex.net')
     );
@@ -651,9 +651,9 @@ describe('GalleryPage', () => {
     await boot();
 
     document.getElementById('galleryStatsTab').click();
-    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody tr').length).toBe(3));
+    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(3));
 
-    document.querySelectorAll('#galleryStatsBody tr')[0].click();
+    document.querySelectorAll('#galleryStatsBody .gallery-rank-card')[0].click();
 
     await vi.waitFor(() => expect(imageCalls(fetchStub.calls).length).toBe(2));
     expect(imageCalls(fetchStub.calls)[1].url).toContain('artist=nnn+yryr');

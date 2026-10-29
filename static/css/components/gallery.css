@@ -11,13 +11,14 @@
     /* Thumbnail size presets. The density switch flips this one variable, and
        the grid, the card aspect ratio and the stats preview all follow. */
     --gallery-card-min: 240px;
-    --gallery-card-aspect: 3 / 4;
+    --gallery-card-aspect: 16 / 9;
     --gallery-stats-thumb: 96px;
+    --gallery-rank-card-min: 260px;
 
     display: flex;
     flex-direction: column;
-    gap: var(--space-4, 16px);
-    padding: var(--space-4, 16px) var(--space-6, 24px) var(--space-12, 48px);
+    gap: var(--space-3, 12px);
+    padding: var(--space-3, 12px) var(--space-4, 16px) var(--space-8, 32px);
     max-width: 2200px;
     margin: 0 auto;
     width: 100%;
@@ -28,12 +29,14 @@
     --gallery-card-min: 150px;
     --gallery-card-aspect: 1 / 1;
     --gallery-stats-thumb: 64px;
+    --gallery-rank-card-min: 190px;
 }
 
 .gallery-page[data-density="large"] {
     --gallery-card-min: 380px;
-    --gallery-card-aspect: 4 / 5;
+    --gallery-card-aspect: 16 / 9;
     --gallery-stats-thumb: 132px;
+    --gallery-rank-card-min: 340px;
 }
 
 /* ---------------------------------------------------------------- toolbar */
@@ -189,9 +192,9 @@
 .gallery-controls {
     display: flex;
     align-items: flex-end;
-    gap: var(--space-3, 12px);
+    gap: var(--space-2, 8px);
     flex-wrap: wrap;
-    padding: var(--space-3, 12px);
+    padding: var(--space-2, 8px);
     border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
     border-radius: var(--radius-lg, 12px);
     background: var(--bg-elevated, rgba(127, 127, 127, 0.06));
@@ -318,7 +321,7 @@
 .gallery-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--gallery-card-min), 1fr));
-    gap: var(--space-4, 16px);
+    gap: var(--space-2, 8px);
     align-content: start;
 }
 
@@ -458,8 +461,8 @@
 .gallery-card-body {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: var(--space-3, 12px);
+    gap: 2px;
+    padding: var(--space-2, 8px);
     min-width: 0;
 }
 
@@ -766,113 +769,141 @@
     color: var(--text-secondary, #b8b8b8);
 }
 
-.gallery-table-wrap {
-    overflow-x: auto;
+/* ------------------------------------------------- statistics card grid */
+
+.gallery-rank-grid-wrap {
+    min-height: 160px;
+}
+
+.gallery-rank-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--gallery-rank-card-min), 1fr));
+    gap: var(--space-2, 8px);
+    align-content: start;
+}
+
+.gallery-rank-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
     border-radius: var(--radius-lg, 12px);
     background: var(--bg-elevated, rgba(127, 127, 127, 0.06));
-}
-
-.gallery-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: var(--text-sm, 13px);
-}
-
-.gallery-table th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    padding: var(--space-3, 12px);
-    text-align: left;
-    font-weight: var(--weight-semibold, 600);
-    font-size: var(--text-xs, 12px);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-secondary, #b8b8b8);
-    background: var(--bg-elevated-solid, var(--bg-base, #1e1e1e));
-    border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
-    white-space: nowrap;
-}
-
-.gallery-table td {
-    padding: var(--space-2, 8px) var(--space-3, 12px);
-    border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.12));
-    color: var(--text-primary, #f2f2f2);
-    vertical-align: middle;
-}
-
-.gallery-stats-row {
     cursor: pointer;
-    transition: background var(--transition-fast, 150ms) ease;
+    transition: transform var(--transition-fast, 150ms) ease,
+        border-color var(--transition-fast, 150ms) ease,
+        box-shadow var(--transition-fast, 150ms) ease;
 }
 
-.gallery-stats-row:hover,
-.gallery-stats-row:focus-visible {
-    background: var(--bg-hover, rgba(127, 127, 127, 0.12));
+.gallery-rank-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-accent, #4f8cff);
+    box-shadow: var(--shadow-elevated, 0 6px 18px rgba(0, 0, 0, 0.28));
+}
+
+.gallery-rank-card:focus-visible {
     outline: none;
+    border-color: var(--color-accent, #4f8cff);
+    box-shadow: var(--shadow-focus, 0 0 0 2px var(--color-accent, #4f8cff));
 }
 
-.gallery-stats-row.is-unknown .gallery-stat-label {
-    opacity: 0.72;
-    font-style: italic;
+.gallery-rank-media {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--surface-subtle, rgba(0, 0, 0, 0.25));
 }
 
-/* Preview column: big enough to recognise the artwork at a glance. */
-.gallery-col-thumb {
-    width: calc(var(--gallery-stats-thumb) + var(--space-3, 12px));
-    padding-right: 0;
-}
-
-.gallery-stats-thumb {
+/* The preview fills the card, so the thumbnail is the anchor of the row. */
+.gallery-rank-media .gallery-stats-thumb,
+.gallery-rank-thumb {
     display: block;
-    width: var(--gallery-stats-thumb);
-    height: var(--gallery-stats-thumb);
-    border-radius: var(--radius-md, 8px);
-    border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.22));
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
     object-fit: cover;
     background: var(--surface-subtle, rgba(0, 0, 0, 0.25));
+    transition: transform var(--transition-base, 250ms) ease;
 }
 
 .gallery-stats-thumb.is-placeholder {
-    background: var(--surface-subtle, rgba(0, 0, 0, 0.25));
+    background: linear-gradient(
+        135deg,
+        var(--surface-subtle, rgba(0, 0, 0, 0.25)),
+        var(--bg-hover, rgba(127, 127, 127, 0.14))
+    );
 }
 
-.gallery-col-rank {
-    width: 4.5ch;
-    color: var(--text-secondary, #b8b8b8);
-    font-variant-numeric: tabular-nums;
+.gallery-rank-card:hover .gallery-stats-thumb {
+    transform: scale(1.04);
 }
 
 .gallery-rank-badge {
+    position: absolute;
+    top: var(--space-2, 8px);
+    left: var(--space-2, 8px);
+    z-index: 2;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 30px;
     height: 30px;
     padding: 0 6px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
     border-radius: var(--radius-full, 9999px);
-    background: var(--bg-hover, rgba(127, 127, 127, 0.16));
+    background: rgba(0, 0, 0, 0.62);
+    color: #fff;
     font-size: var(--text-sm, 13px);
     font-weight: var(--weight-semibold, 600);
-    color: var(--text-primary, #f2f2f2);
+    font-variant-numeric: tabular-nums;
+    backdrop-filter: blur(6px);
 }
 
-.gallery-stats-row:nth-child(1) .gallery-rank-badge {
+.gallery-rank-grid .gallery-rank-card:first-child .gallery-rank-badge {
     background: var(--color-warning, #f1c40f);
+    border-color: var(--color-warning, #f1c40f);
     color: #2b2100;
 }
 
-.gallery-col-name {
-    max-width: 420px;
+.gallery-rank-media .gallery-open-lora {
+    position: absolute;
+    top: var(--space-2, 8px);
+    right: var(--space-2, 8px);
+    z-index: 2;
+    width: 34px;
+    min-height: 34px;
+    padding: 0;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(0, 0, 0, 0.62);
+    color: #fff;
+    backdrop-filter: blur(6px);
+}
+
+.gallery-rank-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1, 4px);
+    padding: var(--space-2, 8px);
+    min-width: 0;
+}
+
+.gallery-rank-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
 .gallery-stat-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: var(--text-sm, 13px);
     font-weight: var(--weight-semibold, 600);
+    color: var(--text-primary, #f2f2f2);
 }
 
 .gallery-stat-sub {
@@ -881,10 +912,29 @@
     font-variant-numeric: tabular-nums;
 }
 
-.gallery-col-num {
-    width: 9ch;
-    text-align: right;
+.gallery-rank-card.is-unknown .gallery-stat-label {
+    opacity: 0.72;
+    font-style: italic;
+}
+
+.gallery-rank-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font-size: var(--text-xs, 12px);
+    color: var(--text-secondary, #b8b8b8);
     font-variant-numeric: tabular-nums;
+}
+
+.gallery-metric {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.gallery-metric i {
+    font-size: 11px;
+    opacity: 0.75;
 }
 
 .gallery-col-net.is-positive {
@@ -898,13 +948,15 @@
 }
 
 .gallery-col-ratio {
-    min-width: 150px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 8px);
 }
 
 .gallery-ratio-track {
     position: relative;
+    flex: 1;
     height: 6px;
-    margin-bottom: 4px;
     overflow: hidden;
     border-radius: var(--radius-full, 9999px);
     background: var(--bg-hover, rgba(127, 127, 127, 0.18));
@@ -913,25 +965,17 @@
 .gallery-ratio-fill {
     position: absolute;
     inset: 0 auto 0 0;
-    background: linear-gradient(90deg, var(--color-success, #2ecc71), var(--color-accent, #4f8cff));
+    display: block;
     border-radius: inherit;
+    background: linear-gradient(90deg, var(--color-success, #2ecc71), var(--color-accent, #4f8cff));
 }
 
 .gallery-ratio-value {
+    min-width: 4ch;
+    text-align: right;
     font-size: var(--text-xs, 12px);
     color: var(--text-secondary, #b8b8b8);
-}
-
-.gallery-col-actions {
-    width: 1%;
-    white-space: nowrap;
-    text-align: right;
-}
-
-.gallery-open-lora {
-    width: 34px;
-    padding: 0;
-    justify-content: center;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------ responsive */

@@ -231,7 +231,7 @@ function installFetchStub(overrides = {}) {
 const imageCalls = (calls) => calls.filter((call) => call.url.startsWith('/api/lm/gallery/images'));
 const forLoraCalls = (calls) => calls.filter((call) => call.url.startsWith('/api/lm/gallery/for-lora'));
 const cardAt = (index) => document.querySelectorAll('.gallery-card')[index];
-const statsRows = () => document.querySelectorAll('#galleryStatsBody tr');
+const statsRows = () => document.querySelectorAll('#galleryStatsBody .gallery-rank-card');
 const jumpButtons = (root = document) => root.querySelectorAll('.gallery-open-lora');
 
 describe('Gallery to LoRA page links', () => {

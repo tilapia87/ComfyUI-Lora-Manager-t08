@@ -326,6 +326,17 @@ export class GalleryPage {
             const row = event.target.closest('[data-key]');
             if (row) this._filterByStatRow(row.dataset.key);
         });
+
+        // The ranking cards are focusable, so Enter/Space must do what a click
+        // does. The jump button keeps its own native activation.
+        el.statsBody?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            if (event.target.closest('.gallery-open-lora')) return;
+            const card = event.target.closest('[data-key]');
+            if (!card) return;
+            event.preventDefault();
+            this._filterByStatRow(card.dataset.key);
+        });
     }
 
     // ── Images ────────────────────────────────────────────────────────────
@@ -900,30 +911,50 @@ export class GalleryPage {
                 const artistAttr = this.statsBy === 'artist' ? ` data-artist="${escapeHtml(label)}"` : '';
                 const total = Number(row.total) || 0;
                 // The sub-line repeats the sample size next to the name so a
-                // row can be judged without reading across to the numbers.
+                // card can be judged without reading the metric row.
                 const sub = `${total} ${translate('gallery.stats.columns.total')}`;
                 const rank = rankOffset + index + 1;
                 const ratioBar = hasRatio
                     ? `<span class="gallery-ratio-track"><span class="gallery-ratio-fill" style="width:${ratioPercent}%"></span></span>`
                     : '';
+                const tooltip = (key) => escapeHtml(translate(`gallery.stats.columns.${key}`));
 
                 return `
-                    <tr class="gallery-stats-row${unknownClass}" data-key="${escapeHtml(row.key || label)}"${artistAttr}
+                    <article class="gallery-rank-card${unknownClass}" data-key="${escapeHtml(row.key || label)}"${artistAttr}
                         tabindex="0" title="${escapeHtml(translate('gallery.stats.rowHint'))}">
-                        <td class="gallery-col-thumb">${this._statsThumbMarkup(row)}</td>
-                        <td class="gallery-col-rank"><span class="gallery-rank-badge">${rank}</span></td>
-                        <td class="gallery-col-name">
-                            <div class="gallery-stat-label">${escapeHtml(label)}</div>
-                            <div class="gallery-stat-sub">${escapeHtml(sub)}</div>
-                        </td>
-                        <td class="gallery-col-num gallery-col-liked">${Number(row.likes) || 0}</td>
-                        <td class="gallery-col-num gallery-col-disliked">${Number(row.dislikes) || 0}</td>
-                        <td class="gallery-col-num gallery-col-unrated">${Number(row.unrated) || 0}</td>
-                        <td class="gallery-col-num gallery-col-total">${total}</td>
-                        <td class="gallery-col-num gallery-col-net${netClass}">${net > 0 ? `+${net}` : net}</td>
-                        <td class="gallery-col-num gallery-col-ratio">${ratioBar}<span class="gallery-ratio-value">${escapeHtml(ratio)}</span></td>
-                        <td class="gallery-col-actions">${this._renderStatRowJump(row, label)}</td>
-                    </tr>
+                        <div class="gallery-rank-media">
+                            ${this._statsThumbMarkup(row)}
+                            <span class="gallery-rank-badge">${rank}</span>
+                            ${this._renderStatRowJump(row, label)}
+                        </div>
+                        <div class="gallery-rank-body">
+                            <div class="gallery-rank-head">
+                                <div class="gallery-stat-label" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+                                <div class="gallery-stat-sub">${escapeHtml(sub)}</div>
+                            </div>
+                            <div class="gallery-rank-metrics">
+                                <span class="gallery-metric gallery-col-liked" title="${tooltip('likes')}">
+                                    <i class="fas fa-thumbs-up" aria-hidden="true"></i>${Number(row.likes) || 0}
+                                </span>
+                                <span class="gallery-metric gallery-col-disliked" title="${tooltip('dislikes')}">
+                                    <i class="fas fa-thumbs-down" aria-hidden="true"></i>${Number(row.dislikes) || 0}
+                                </span>
+                                <span class="gallery-metric gallery-col-unrated" title="${tooltip('unrated')}">
+                                    <i class="fas fa-minus" aria-hidden="true"></i>${Number(row.unrated) || 0}
+                                </span>
+                                <span class="gallery-metric gallery-col-total" title="${tooltip('total')}">
+                                    <i class="fas fa-layer-group" aria-hidden="true"></i>${total}
+                                </span>
+                                <span class="gallery-metric gallery-col-net${netClass}" title="${tooltip('net')}">
+                                    ${net > 0 ? `+${net}` : net}
+                                </span>
+                            </div>
+                            <div class="gallery-col-ratio">
+                                ${ratioBar}
+                                <span class="gallery-ratio-value">${escapeHtml(ratio)}</span>
+                            </div>
+                        </div>
+                    </article>
                 `;
             })
             .join('');
@@ -1030,12 +1061,24 @@ export class GalleryPage {
     _setArtistThumb(name, url) {
         const body = this.el.statsBody;
         if (!body || !url) return;
-        const rows = body.querySelectorAll('tr[data-artist]');
-        for (const row of rows) {
-            if (row.dataset.artist !== name) continue;
-            const cell = row.querySelector('.gallery-col-thumb');
-            if (!cell) return;
-            cell.innerHTML = `<img class="gallery-stats-thumb" src="${escapeHtml(url)}" alt="" loading="lazy">`;
+        for (const card of body.querySelectorAll('[data-artist]')) {
+            if (card.dataset.artist !== name) continue;
+            const media = card.querySelector('.gallery-rank-media');
+            if (!media) return;
+            const image = media.querySelector('img.gallery-stats-thumb');
+            const markup = `<img class="gallery-stats-thumb gallery-rank-thumb" src="${escapeHtml(url)}" alt="" loading="lazy">`;
+            if (!image) {
+                // The card started as an empty frame: swap it for the sample.
+                const placeholder = media.querySelector('.gallery-stats-thumb.is-placeholder');
+                if (placeholder) {
+                    placeholder.outerHTML = markup;
+                } else {
+                    media.insertAdjacentHTML('afterbegin', markup);
+                }
+                return;
+            }
+            image.classList.add('gallery-rank-thumb');
+            image.src = url;
             return;
         }
     }
