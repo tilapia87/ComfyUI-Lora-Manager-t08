@@ -10,11 +10,33 @@ from pathlib import Path
 from aiohttp import web
 
 from ...config import config as global_config
+from ...services.gallery.thumbnails import (
+    DEFAULT_THUMBNAIL_SIZE,
+    MAX_THUMBNAIL_SIZE,
+    MIN_THUMBNAIL_SIZE,
+    thumbnail_for,
+)
 from ...utils.file_responses import platform_file_response_class
 
 logger = logging.getLogger(__name__)
 
 _CHUNK_SIZE = 1024 * 1024  # 1 MB — balance between streaming iteration overhead and per-chunk memory
+
+# Containers Pillow can turn into a thumbnail. GIFs stay as they are (animating
+# thumbnails are not worth the complexity), and videos are never resized.
+_THUMBNAIL_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
+
+
+def _requested_thumbnail_size(request: web.Request) -> int:
+    """Longest side the card asked for, or 0 when it wants the original."""
+    raw = request.query.get("size")
+    if not raw:
+        return 0
+    try:
+        size = int(raw)
+    except (TypeError, ValueError):
+        size = DEFAULT_THUMBNAIL_SIZE
+    return max(MIN_THUMBNAIL_SIZE, min(MAX_THUMBNAIL_SIZE, size))
 
 _FileResponse = platform_file_response_class()
 
@@ -65,6 +87,17 @@ class PreviewHandler:
                     str(resolved.parent),
                 )
             raise web.HTTPNotFound(text="Preview file not found")
+
+        # Cards append `?size=` to get a downscaled copy; the modal and the
+        # showcase request the same URL without it and get the original.
+        thumbnail_size = _requested_thumbnail_size(request)
+        if thumbnail_size and resolved.suffix.lower() in _THUMBNAIL_EXTENSIONS:
+            thumb_path = await asyncio.to_thread(thumbnail_for, str(resolved), thumbnail_size)
+            if thumb_path:
+                thumb_response = _FileResponse(path=Path(thumb_path), chunk_size=256 * 1024)
+                thumb_response.headers["Cache-Control"] = "public, max-age=86400"
+                thumb_response.headers["Content-Type"] = "image/webp"
+                return thumb_response
 
         # FileResponse handles range requests and content headers, and uses
         # kernel sendfile on Linux/macOS (chunked on Windows, see above).

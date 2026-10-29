@@ -452,3 +452,48 @@ async def test_preview_chunked_response_serves_ranges_without_sendfile(tmp_path)
             assert await part.read() == payload[100:200]
     finally:
         await client.close()
+
+async def test_preview_handler_serves_a_downscaled_copy_when_asked(tmp_path, monkeypatch):
+    from PIL import Image
+
+    from py.services.gallery.thumbnails import ThumbnailService
+
+    ThumbnailService.reset_instance()
+    monkeypatch.setenv("LORA_MANAGER_THUMBNAIL_DIR", str(tmp_path / "thumbs"))
+    try:
+        library_root = tmp_path / "library"
+        library_root.mkdir()
+        preview_file = library_root / "model.png"
+        Image.new("RGB", (900, 1200), (20, 80, 160)).save(preview_file)
+
+        config = Config()
+        config.apply_library_settings(
+            {
+                "folder_paths": {
+                    "loras": [str(library_root)],
+                    "checkpoints": [],
+                    "unet": [],
+                    "embeddings": [],
+                }
+            }
+        )
+        handler = PreviewHandler(config=config)
+        encoded_path = urllib.parse.quote(str(preview_file), safe="")
+
+        downscaled = await handler.serve_preview(
+            make_mocked_request("GET", f"/api/lm/previews?path={encoded_path}&size=128")
+        )
+
+        assert downscaled.status == 200
+        assert downscaled.headers.get("Content-Type") == "image/webp"
+        assert str(downscaled._path).endswith(".webp")
+        with Image.open(downscaled._path) as image:
+            assert max(image.size) <= 128
+
+        # Without `size` the controller serves the untouched original.
+        original = await handler.serve_preview(
+            make_mocked_request("GET", f"/api/lm/previews?path={encoded_path}")
+        )
+        assert Path(original._path) == preview_file
+    finally:
+        ThumbnailService.reset_instance()

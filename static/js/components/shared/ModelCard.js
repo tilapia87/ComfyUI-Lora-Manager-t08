@@ -1,4 +1,5 @@
 import { showToast, openCivitai, openHuggingFace, copyToClipboard, copyLoraSyntax, sendLoraToWorkflow, sendEmbeddingToWorkflow, openExampleImagesFolder, buildLoraSyntax, sendModelPathToWorkflow } from '../../utils/uiHelpers.js';
+import { withCardThumbnail } from '../../utils/previewThumb.js';
 import { getModelSourceInfo, getModelSourceGroupKey, getModelSourceViewTitle, openModelSource } from '../../utils/modelSourceHelpers.js';
 import { state, getCurrentPageState } from '../../state/index.js';
 import { showModelModal } from './ModelModal.js';
@@ -323,9 +324,9 @@ function handleCardClick(card, modelType, extendSelection = false) {
 function getCardPreviewUrl(card) {
     const cardMedia = card.querySelector('.card-preview img, .card-preview video');
     if (!cardMedia) return '';
-    return cardMedia.tagName === 'VIDEO'
-        ? (cardMedia.dataset.src || '')
-        : (cardMedia.src || '');
+    if (cardMedia.tagName === 'VIDEO') return cardMedia.dataset.src || '';
+    // The card shows a downscaled copy; the modal must open the original.
+    return cardMedia.dataset.fullPreview || cardMedia.src || '';
 }
 
 async function showModelModalFromCard(card, modelType) {
@@ -583,6 +584,9 @@ export function createModelCard(model, modelType) {
     const version = previewVersions.get(model.file_path);
     const previewUrl = model.preview_url || '/loras_static/images/no-preview.png';
     const versionedPreviewUrl = version ? `${previewUrl}${previewUrl.includes('?') ? '&' : '?'}t=${version}` : previewUrl;
+    // The grid card draws a downscaled copy; `data-full-preview` keeps the URL
+    // the modal has to open. Video URLs are returned unchanged by the helper.
+    const cardPreviewUrl = withCardThumbnail(versionedPreviewUrl);
 
     // Determine NSFW warning text based on level with i18n support
     let nsfwText = translate('modelCard.nsfw.matureContent', {}, 'Mature Content');
@@ -685,7 +689,7 @@ export function createModelCard(model, modelType) {
         <div class="card-preview ${shouldBlur ? 'blurred' : ''}">
             ${isVideo ?
             `<video ${videoAttrs.join(' ')} style="pointer-events: none;"></video>` :
-            `<img draggable="false" src="${versionedPreviewUrl}" alt="${model.model_name}" onerror="this.onerror=null; this.src='/loras_static/images/no-preview.png'">`
+            `<img draggable="false" src="${cardPreviewUrl}" data-full-preview="${versionedPreviewUrl}" alt="${model.model_name}" onerror="this.onerror=null; this.src='/loras_static/images/no-preview.png'">`
         }
             <div class="card-header">
                 ${shouldBlur ?

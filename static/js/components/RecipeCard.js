@@ -1,5 +1,6 @@
 // Recipe Card Component
 import { showToast, showActionToast, copyToClipboard, sendLoraToWorkflow } from '../utils/uiHelpers.js';
+import { withCardThumbnail } from '../utils/previewThumb.js';
 import { updateRecipeMetadata } from '../api/recipeApi.js';
 import { configureModelCardVideo } from './shared/ModelCard.js';
 import { modalManager } from '../managers/ModalManager.js';
@@ -102,6 +103,9 @@ class RecipeCard {
             videoAttrs.push('data-autoplay="true"');
         }
 
+        // The grid card draws a downscaled copy; the modal opens the original.
+        const cardPreviewUrl = isVideo ? previewUrl : withCardThumbnail(previewUrl);
+
         // NSFW blur logic - similar to LoraCard
         const nsfwLevel = this.recipe.preview_nsfw_level !== undefined ? this.recipe.preview_nsfw_level : 0;
         const matureBlurThreshold = getMatureBlurThreshold(state.settings);
@@ -125,7 +129,7 @@ class RecipeCard {
             <div class="card-preview ${shouldBlur ? 'blurred' : ''}">
                 ${isVideo ?
                 `<video ${videoAttrs.join(' ')} style="pointer-events: none;"></video>` :
-                `<img src="${previewUrl}" alt="${this.recipe.title}">`
+                `<img src="${cardPreviewUrl}" data-full-preview="${previewUrl}" alt="${this.recipe.title}">`
             }
                 ${!isDuplicatesMode ? `
                 <div class="card-header">
