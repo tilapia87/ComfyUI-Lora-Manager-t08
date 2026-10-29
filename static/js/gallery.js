@@ -402,6 +402,7 @@ export class GalleryPage {
         }
         if (append && !this.hasMoreImages) return;
         this.isLoading = true;
+        this.el.grid?.setAttribute('aria-busy', 'true');
         if (append) {
             this.loadingMore = true;
             this.renderPagination();
@@ -443,6 +444,7 @@ export class GalleryPage {
         } finally {
             this.isLoading = false;
             this.loadingMore = false;
+            this.el.grid?.setAttribute('aria-busy', 'false');
             if (this.pendingReload) {
                 this.pendingReload = false;
                 this.loadImages();
@@ -583,7 +585,19 @@ export class GalleryPage {
                 continue;
             }
             image.addEventListener('load', () => settle(true), { once: true });
-            image.addEventListener('error', () => settle(false), { once: true });
+            image.addEventListener('error', () => {
+                // A thumbnail can be missing (cache cleared while the tab was
+                // open, or Pillow refused the file): the original still works.
+                const full = image.dataset.fullImage;
+                if (full && image.src !== full && !image.dataset.retried) {
+                    image.dataset.retried = 'true';
+                    image.src = full;
+                    image.addEventListener('load', () => settle(true), { once: true });
+                    image.addEventListener('error', () => settle(false), { once: true });
+                    return;
+                }
+                settle(false);
+            }, { once: true });
         }
     }
 
@@ -605,6 +619,7 @@ export class GalleryPage {
             <article class="gallery-card" data-index="${index}" data-path="${escapeHtml(item.image_path)}" tabindex="0">
                 <div class="gallery-card-media is-loading">
                     <img class="gallery-card-image" src="${escapeHtml(item.thumb_url || item.image_url)}"
+                        data-full-image="${escapeHtml(item.image_url || '')}"
                         alt="${escapeHtml(fileName)}" loading="lazy" decoding="async"${promptTitle}>
                     ${this._renderRatingBadge(item.rating)}
                     <div class="gallery-card-overlay">

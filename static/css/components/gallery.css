@@ -50,6 +50,7 @@
     gap: var(--space-3, 12px);
     padding: var(--space-3, 12px) var(--space-4, 16px);
     margin: calc(var(--space-4, 16px) * -1) calc(var(--space-6, 24px) * -1) 0;
+    background: var(--bg-elevated-solid, #232326);
     background: color-mix(in srgb, var(--bg-base, #1e1e1e) 88%, transparent);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
@@ -861,10 +862,23 @@
     backdrop-filter: blur(6px);
 }
 
-.gallery-rank-grid .gallery-rank-card:first-child .gallery-rank-badge {
-    background: var(--color-warning, #f1c40f);
-    border-color: var(--color-warning, #f1c40f);
+/* The podium reads as medals rather than as three identical pills. */
+.gallery-rank-grid .gallery-rank-card:nth-child(1) .gallery-rank-badge {
+    background: linear-gradient(135deg, #f7d774, #e0a800);
+    border-color: #e0a800;
     color: #2b2100;
+}
+
+.gallery-rank-grid .gallery-rank-card:nth-child(2) .gallery-rank-badge {
+    background: linear-gradient(135deg, #e6e8ee, #b9bec9);
+    border-color: #b9bec9;
+    color: #23262b;
+}
+
+.gallery-rank-grid .gallery-rank-card:nth-child(3) .gallery-rank-badge {
+    background: linear-gradient(135deg, #e0a878, #c07d43);
+    border-color: #c07d43;
+    color: #2b1a0d;
 }
 
 .gallery-rank-media .gallery-open-lora {
@@ -930,6 +944,20 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+}
+
+.gallery-metric[data-sort-metric] {
+    padding: 2px 6px;
+    margin: -2px -6px;
+    border-radius: var(--radius-xs, 4px);
+    cursor: pointer;
+    transition: background var(--transition-fast, 150ms) ease,
+        color var(--transition-fast, 150ms) ease;
+}
+
+.gallery-metric[data-sort-metric]:hover {
+    background: var(--bg-hover, rgba(127, 127, 127, 0.18));
+    color: var(--text-primary, #f2f2f2);
 }
 
 .gallery-metric i {
