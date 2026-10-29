@@ -1060,3 +1060,54 @@
         transform: none;
     }
 }
+
+/* ------------------------------------------------ thumbnail load states */
+
+/* A thumbnail is a network round trip, so the card reserves its space and shows
+   a quiet shimmer instead of an empty hole. */
+.gallery-card-media.is-loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        100deg,
+        transparent 20%,
+        rgba(255, 255, 255, 0.07) 40%,
+        transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: gallery-shimmer 1.4s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.gallery-card-media.is-loading .gallery-card-image {
+    opacity: 0;
+}
+
+.gallery-card-media.is-loaded .gallery-card-image {
+    opacity: 1;
+    transition: opacity var(--transition-base, 250ms) ease;
+}
+
+.gallery-card-media.is-failed {
+    background: repeating-linear-gradient(
+        45deg,
+        transparent 0 8px,
+        rgba(127, 127, 127, 0.1) 8px 16px
+    );
+}
+
+@keyframes gallery-shimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gallery-card-media.is-loading::after {
+        animation: none;
+    }
+}

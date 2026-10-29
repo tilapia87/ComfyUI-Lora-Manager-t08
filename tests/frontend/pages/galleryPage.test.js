@@ -20,6 +20,7 @@ const IMAGE_LIKED = {
   image_path: 'C:\\ComfyUI\\output\\anima_00001_.png',
   file_name: 'anima_00001_.png',
   image_url: '/api/lm/gallery/image?path=C%3A%5CComfyUI%5Coutput%5Canima_00001_.png',
+  thumb_url: '/api/lm/gallery/thumbnail?path=C%3A%5CComfyUI%5Coutput%5Canima_00001_.png&size=512',
   mtime: 1760000000.0,
   size: 1234567,
   width: 832,
@@ -37,6 +38,7 @@ const IMAGE_UNRATED = {
   image_path: 'C:\\ComfyUI\\output\\anima_00002_.png',
   file_name: 'anima_00002_.png',
   image_url: '/api/lm/gallery/image?path=C%3A%5CComfyUI%5Coutput%5Canima_00002_.png',
+  thumb_url: '/api/lm/gallery/thumbnail?path=C%3A%5CComfyUI%5Coutput%5Canima_00002_.png&size=512',
   mtime: 1760000100.0,
   size: 2345678,
   width: 832,
@@ -270,10 +272,47 @@ describe('GalleryPage', () => {
     const first = cardAt(0);
     expect(first.dataset.path).toBe(IMAGE_LIKED.image_path);
     expect(first.querySelector('.gallery-card-name').textContent).toBe('anima_00001_.png');
-    expect(first.querySelector('.gallery-card-image').getAttribute('src')).toBe(IMAGE_LIKED.image_url);
+    expect(first.querySelector('.gallery-card-image').getAttribute('src')).toBe(IMAGE_LIKED.thumb_url);
     expect(first.querySelector('.gallery-card-image').getAttribute('loading')).toBe('lazy');
     // 832 x 1216 from the payload, not from the browser.
     expect(first.querySelector('.gallery-card-meta').textContent).toContain('832');
+  });
+
+  it('draws the thumbnail and settles the card once it loads', async () => {
+    await boot();
+
+    const media = cardAt(0).querySelector('.gallery-card-media');
+    const image = cardAt(0).querySelector('.gallery-card-image');
+
+    // The grid loads the downscaled thumbnail, not the multi-megabyte output.
+    expect(image.getAttribute('src')).toBe(IMAGE_LIKED.thumb_url);
+    expect(media.classList.contains('is-loading')).toBe(true);
+
+    image.dispatchEvent(new Event('load'));
+
+    expect(media.classList.contains('is-loading')).toBe(false);
+    expect(media.classList.contains('is-loaded')).toBe(true);
+  });
+
+  it('moves focus between cards with the arrow keys', async () => {
+    await boot();
+
+    cardAt(0).focus();
+    cardAt(0).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(document.activeElement).toBe(cardAt(1));
+
+    cardAt(1).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    expect(document.activeElement).toBe(cardAt(0));
+
+    // End/Home jump to the edges of the page.
+    cardAt(0).dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(document.activeElement).toBe(cardAt(1));
+    cardAt(1).dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(document.activeElement).toBe(cardAt(0));
+
+    // Rating keys keep working after navigating.
+    cardAt(0).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    await vi.waitFor(() => expect(ratingCalls(fetchStub.calls).length).toBe(1));
   });
 
   it('renders artist chips with the @ prefix and flags unknown artists', async () => {

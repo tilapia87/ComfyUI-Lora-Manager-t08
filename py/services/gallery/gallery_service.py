@@ -31,6 +31,10 @@ from .lora_previews import build_lora_preview_index
 
 logger = logging.getLogger(__name__)
 
+# The grid draws cards a few hundred pixels wide, so it asks for a downscaled
+# thumbnail instead of the full output (see thumbnails.py).
+THUMBNAIL_SIZE = 512
+
 # How often the scan reports progress while the blocking walk runs.
 _PROGRESS_INTERVAL_SECONDS = 0.5
 
@@ -323,6 +327,7 @@ class GalleryService:
         )
         for item in items:
             item["image_url"] = self.image_url(item["image_path"])
+            item["thumb_url"] = self.thumbnail_url(item["image_path"])
 
         # The scan bakes the LoRA match into the database, so re-resolving it on
         # read is what keeps a newly added or renamed LoRA from showing up as
@@ -366,9 +371,14 @@ class GalleryService:
         page_rows = rows[offset : offset + limit]
 
         for row in page_rows:
-            # The cache hands back paths; a ranking row needs URLs.
+            # The cache hands back paths; a ranking row needs URLs. The grid-sized
+            # thumbnail is what the cards actually draw.
             row["images"] = [
-                {**image, "image_url": self.image_url(image["image_path"])}
+                {
+                    **image,
+                    "image_url": self.image_url(image["image_path"]),
+                    "thumb_url": self.thumbnail_url(image["image_path"]),
+                }
                 for image in row.get("images", [])
             ]
 
@@ -478,6 +488,7 @@ class GalleryService:
         )
         for item in items:
             item["image_url"] = self.image_url(item["image_path"])
+            item["thumb_url"] = self.thumbnail_url(item["image_path"])
         total_pages = (total + page_size - 1) // page_size if page_size else 1
         return {
             "items": items,
@@ -517,6 +528,15 @@ class GalleryService:
     def image_url(image_path: str) -> str:
         normalized = os.path.normpath(image_path).replace(os.sep, "/")
         return f"/api/lm/gallery/image?path={urllib.parse.quote(normalized, safe='')}"
+
+    @staticmethod
+    def thumbnail_url(image_path: str, size: int = THUMBNAIL_SIZE) -> str:
+        """Grid-sized preview URL for one image."""
+        normalized = os.path.normpath(image_path).replace(os.sep, "/")
+        return (
+            "/api/lm/gallery/thumbnail"
+            f"?path={urllib.parse.quote(normalized, safe='')}&size={int(size)}"
+        )
 
     def resolve_servable_image(self, image_path: str) -> Optional[str]:
         """Return the absolute path to stream, or ``None`` when not allowed.

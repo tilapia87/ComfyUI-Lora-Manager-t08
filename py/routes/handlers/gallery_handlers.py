@@ -7,6 +7,7 @@ errors into the project's ``{"success": false, "error": ...}`` contract.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass
@@ -15,6 +16,12 @@ from typing import Any, Awaitable, Callable, Dict, Mapping, Optional
 from aiohttp import web
 
 from ...services.gallery.gallery_service import GalleryService
+from ...services.gallery.thumbnails import (
+    DEFAULT_THUMBNAIL_SIZE,
+    MAX_THUMBNAIL_SIZE,
+    MIN_THUMBNAIL_SIZE,
+    thumbnail_for,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +54,7 @@ class GalleryHandlerSet:
             "start_gallery_index": self.start_index,
             "get_gallery_index_status": self.get_index_status,
             "serve_gallery_image": self.serve_image,
+            "serve_gallery_thumbnail": self.serve_thumbnail,
             "get_gallery_config": self.get_config,
         }
 
@@ -201,6 +209,36 @@ class GalleryHandlerSet:
             path=resolved,
             chunk_size=1024 * 1024,
             headers={"Cache-Control": _CACHE_CONTROL},
+        )
+
+    async def serve_thumbnail(self, request: web.Request) -> web.StreamResponse:
+        """Grid-sized preview of one gallery image.
+
+        Falls back to the original bytes when a thumbnail cannot be produced, so
+        a missing Pillow or an exotic format never breaks the grid.
+        """
+        raw_path = request.query.get("path") or ""
+        size = _parse_int(
+            request.query.get("size"),
+            DEFAULT_THUMBNAIL_SIZE,
+            minimum=MIN_THUMBNAIL_SIZE,
+            maximum=MAX_THUMBNAIL_SIZE,
+        )
+        service = await self._service()
+        resolved = service.resolve_servable_image(raw_path)
+        if not resolved:
+            raise web.HTTPForbidden(text="Gallery image is not within the scanned output directory")
+        thumbnail_path = await asyncio.to_thread(thumbnail_for, resolved, size)
+        if not thumbnail_path:
+            return web.FileResponse(
+                path=resolved,
+                chunk_size=1024 * 1024,
+                headers={"Cache-Control": _CACHE_CONTROL},
+            )
+        return web.FileResponse(
+            path=thumbnail_path,
+            chunk_size=256 * 1024,
+            headers={"Cache-Control": _CACHE_CONTROL, "Content-Type": "image/webp"},
         )
 
     async def get_config(self, request: web.Request) -> web.Response:

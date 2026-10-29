@@ -450,7 +450,33 @@ export class GalleryPage {
 
         this._hide(this.el.emptyState);
         this.el.grid.innerHTML = this.items.map((item, index) => this._renderCard(item, index)).join('');
+        this._wireCardImages();
         this._applyDensity();
+    }
+
+    /**
+     * Fade each card in once its thumbnail arrives.
+     *
+     * The grid is rendered as markup in one go, so the loading/loaded state is
+     * attached afterwards instead of per card.
+     */
+    _wireCardImages() {
+        const grid = this.el.grid;
+        if (!grid) return;
+        for (const image of grid.querySelectorAll('img.gallery-card-image')) {
+            const media = image.closest('.gallery-card-media');
+            const settle = (ok) => {
+                if (!media) return;
+                media.classList.remove('is-loading');
+                media.classList.add(ok ? 'is-loaded' : 'is-failed');
+            };
+            if (image.complete && image.naturalWidth > 0) {
+                settle(true);
+                continue;
+            }
+            image.addEventListener('load', () => settle(true), { once: true });
+            image.addEventListener('error', () => settle(false), { once: true });
+        }
     }
 
     _renderCard(item, index) {
@@ -469,8 +495,8 @@ export class GalleryPage {
 
         return `
             <article class="gallery-card" data-index="${index}" data-path="${escapeHtml(item.image_path)}" tabindex="0">
-                <div class="gallery-card-media">
-                    <img class="gallery-card-image" src="${escapeHtml(item.image_url)}"
+                <div class="gallery-card-media is-loading">
+                    <img class="gallery-card-image" src="${escapeHtml(item.thumb_url || item.image_url)}"
                         alt="${escapeHtml(fileName)}" loading="lazy" decoding="async"${promptTitle}>
                     ${this._renderRatingBadge(item.rating)}
                     <div class="gallery-card-overlay">
@@ -621,6 +647,24 @@ export class GalleryPage {
         if (!item) return;
 
         const key = event.key;
+
+        // Roving focus: Left/Right/Home/End move between the cards without
+        // leaving the grid, so rating a run of images is a keyboard-only task.
+        if (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'Home' || key === 'End') {
+            const cards = Array.from(this.el.grid.querySelectorAll('.gallery-card'));
+            const position = cards.indexOf(card);
+            let next = position;
+            if (key === 'ArrowLeft') next = position - 1;
+            else if (key === 'ArrowRight') next = position + 1;
+            else if (key === 'Home') next = 0;
+            else next = cards.length - 1;
+            if (next >= 0 && next < cards.length && next !== position) {
+                event.preventDefault();
+                cards[next].focus();
+            }
+            return;
+        }
+
         if (key === 'ArrowUp' || key === 'u' || key === 'U') {
             event.preventDefault();
             this.toggleRating(item, 1);
@@ -997,7 +1041,7 @@ export class GalleryPage {
      * @returns {string} Cell markup.
      */
     _statsThumbMarkup(row) {
-        const galleryThumb = row?.images?.[0]?.image_url || '';
+        const galleryThumb = row?.images?.[0]?.thumb_url || row?.images?.[0]?.image_url || '';
         const rawPreview = typeof row?.preview_url === 'string' ? row.preview_url : '';
         const isVideo = /\.(mp4|webm)(\?|$)/i.test(rawPreview);
         const src = (isVideo ? '' : rawPreview) || galleryThumb;

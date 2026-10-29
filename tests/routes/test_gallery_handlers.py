@@ -391,6 +391,54 @@ def test_artist_preview_route_is_registered():
     assert "get_gallery_artist_preview" in GalleryHandlerSet().to_route_mapping()
 
 
+async def test_thumbnail_endpoint_serves_a_webp(service, tmp_path, monkeypatch):
+    from PIL import Image
+
+    from py.services.gallery.thumbnails import ThumbnailService
+
+    ThumbnailService.reset_instance()
+    monkeypatch.setenv("LORA_MANAGER_THUMBNAIL_DIR", str(tmp_path / "thumbs"))
+    try:
+        output = tmp_path / "output"
+        output.mkdir(exist_ok=True)
+        image_path = output / "shot.png"
+        Image.new("RGB", (600, 900), (12, 120, 200)).save(image_path)
+        get_settings_manager().set("gallery_output_path", str(output))
+
+        response = await GalleryHandlerSet().serve_thumbnail(
+            FakeRequest(query={"path": str(image_path), "size": "128"})
+        )
+
+        assert response.headers.get("Content-Type") == "image/webp"
+        assert response.headers.get("Cache-Control")
+    finally:
+        ThumbnailService.reset_instance()
+
+
+async def test_thumbnail_endpoint_rejects_paths_outside_the_output_directory(service, tmp_path):
+    get_settings_manager().set("gallery_output_path", str(tmp_path / "output"))
+
+    with pytest.raises(web.HTTPForbidden):
+        await GalleryHandlerSet().serve_thumbnail(
+            FakeRequest(query={"path": r"C:\Windows\win.ini"})
+        )
+    with pytest.raises(web.HTTPForbidden):
+        await GalleryHandlerSet().serve_thumbnail(FakeRequest(query={"path": ""}))
+
+
+def test_thumbnail_route_is_registered():
+    paths = {(definition.method, definition.path) for definition in ROUTE_DEFINITIONS}
+    assert ("GET", "/api/lm/gallery/thumbnail") in paths
+    assert "serve_gallery_thumbnail" in GalleryHandlerSet().to_route_mapping()
+
+
+async def test_list_images_carries_a_thumbnail_url(service):
+    data = _payload(await GalleryHandlerSet().list_images(FakeRequest(query={})))["data"]
+
+    assert data["items"][0]["thumb_url"].startswith("/api/lm/gallery/thumbnail?path=")
+    assert "size=" in data["items"][0]["thumb_url"]
+
+
 def test_gallery_handler_set_is_a_frozen_dataclass():
     import dataclasses
 

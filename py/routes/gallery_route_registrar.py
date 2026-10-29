@@ -31,6 +31,8 @@ ROUTE_DEFINITIONS: tuple[RouteDefinition, ...] = (
     RouteDefinition("GET", "/api/lm/gallery/index", "start_gallery_index"),
     RouteDefinition("GET", "/api/lm/gallery/index/status", "get_gallery_index_status"),
     RouteDefinition("GET", "/api/lm/gallery/image", "serve_gallery_image"),
+    # Downscaled, disk-cached preview so the grid does not download originals.
+    RouteDefinition("GET", "/api/lm/gallery/thumbnail", "serve_gallery_thumbnail"),
     RouteDefinition("GET", "/api/lm/gallery/config", "get_gallery_config"),
 )
 
