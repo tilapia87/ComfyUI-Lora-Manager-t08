@@ -142,6 +142,7 @@ class GalleryHandlerSet:
                 by=by,
                 sort=query.get("sort") or "net",
                 limit=_parse_int(query.get("limit"), 200, minimum=1, maximum=1000),
+                offset=_parse_int(query.get("offset"), 0, minimum=0, maximum=10_000_000),
                 min_total=_parse_int(query.get("min_total"), 1, minimum=1, maximum=1000),
             )
             return web.json_response({"success": True, "data": data})

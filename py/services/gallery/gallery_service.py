@@ -332,6 +332,7 @@ class GalleryService:
         by: str = "artist",
         sort: str = "net",
         limit: int = 200,
+        offset: int = 0,
         min_total: int = 1,
     ) -> Dict[str, Any]:
         rows = self.cache.stats_by_lora() if by == "lora" else self.cache.stats_by_artist()
@@ -339,7 +340,15 @@ class GalleryService:
         key = _STATS_SORT_KEYS.get(sort, _STATS_SORT_KEYS["net"])
         # Secondary key keeps equal scores in a stable, human-sensible order.
         rows.sort(key=lambda item: (key(item), item["total"], item["key"]), reverse=True)
-        for row in rows:
+
+        # The ranking can be thousands of rows long, so the caller pages through
+        # it: ``total`` is the number of ranked rows, not of images.
+        total = len(rows)
+        offset = max(0, offset)
+        limit = max(1, limit)
+        page_rows = rows[offset : offset + limit]
+
+        for row in page_rows:
             # The cache hands back paths; a ranking row needs URLs.
             row["images"] = [
                 {**image, "image_url": self.image_url(image["image_path"])}
@@ -348,7 +357,10 @@ class GalleryService:
         return {
             "by": "lora" if by == "lora" else "artist",
             "totals": self.cache.rating_totals(),
-            "items": rows[: max(1, limit)],
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "items": page_rows,
         }
 
     async def list_images_for_lora(

@@ -463,6 +463,60 @@ describe('GalleryPage', () => {
     expect(document.getElementById('galleryImagesPanel').classList.contains('hidden')).toBe(true);
   });
 
+  it('pages through a statistics ranking that is longer than one page', async () => {
+    const TOTAL_ROWS = 250;
+    const statRow = (rank) => ({
+      key: `lora_${rank}`,
+      label: `lora_${rank}`,
+      known: false,
+      likes: 0,
+      dislikes: 0,
+      unrated: 1,
+      total: 1,
+      net: 0,
+      like_ratio: null,
+    });
+
+    fetchStub.setRoute('/api/lm/gallery/stats', (url) => {
+      const offset = Number(new URL(url, 'http://localhost').searchParams.get('offset') || 0);
+      return jsonResponse({
+        success: true,
+        data: {
+          by: 'artist',
+          totals: { images: 0, rated: 0, liked: 0, disliked: 0 },
+          total: TOTAL_ROWS,
+          offset,
+          items: Array.from({ length: 100 }, (_, i) => statRow(offset + i + 1)),
+        },
+      });
+    });
+
+    await boot();
+
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody tr').length).toBe(100));
+
+    const statsCalls = () => fetchStub.calls.filter((call) => call.url.startsWith('/api/lm/gallery/stats'));
+    expect(statsCalls()[0].url).toContain('limit=100');
+    expect(statsCalls()[0].url).toContain('offset=0');
+
+    // The pager appears because the ranking spans three pages.
+    const pagination = document.getElementById('galleryStatsPagination');
+    expect(pagination.classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('galleryStatsPageInfo').textContent).toContain('1,3');
+    expect(document.querySelector('#galleryStatsBody tr td').textContent.trim()).toBe('1');
+
+    document.getElementById('galleryStatsNextPage').click();
+
+    await vi.waitFor(() => expect(statsCalls().length).toBe(2));
+    expect(statsCalls()[1].url).toContain('offset=100');
+
+    // Ranks keep counting instead of restarting at 1 on every page.
+    await vi.waitFor(() =>
+      expect(document.querySelector('#galleryStatsBody tr td').textContent.trim()).toBe('101')
+    );
+  });
+
   it('filters the grid by an artist when a statistics row is clicked', async () => {
     await boot();
 

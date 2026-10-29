@@ -221,25 +221,30 @@ export async function setGalleryImageRating(imagePath, rating) {
  * @param {string} [params.by='artist'] - artist|lora.
  * @param {string} [params.sort='net'] - net|likes|dislikes|total|ratio.
  * @param {number} [params.limit=200] - Maximum number of rows.
+ * @param {number} [params.offset=0] - Number of ranked rows to skip (paging).
  * @param {number} [params.minTotal=1] - Minimum rated+unrated total per row.
- * @returns {Promise<{by: string, totals: Object, items: Array}>}
+ * @returns {Promise<{by: string, totals: Object, total: number, offset: number, items: Array}>}
  */
 export async function fetchGalleryStats(params = {}) {
-    const { by = 'artist', sort = 'net', limit = 200, minTotal = 1 } = params;
+    const { by = 'artist', sort = 'net', limit = 200, offset = 0, minTotal = 1 } = params;
 
     const query = new URLSearchParams({
         by,
         sort,
         limit: String(limit),
+        offset: String(offset),
         min_total: String(minTotal),
     });
 
     try {
         const data = await requestJson(`${GALLERY_ENDPOINTS.stats}?${query.toString()}`);
+        const items = Array.isArray(data?.items) ? data.items : [];
         return {
             by: data?.by || by,
             totals: data?.totals || { images: 0, rated: 0, liked: 0, disliked: 0 },
-            items: Array.isArray(data?.items) ? data.items : [],
+            total: Number.isFinite(Number(data?.total)) ? Number(data.total) : items.length,
+            offset: Number.isFinite(Number(data?.offset)) ? Number(data.offset) : offset,
+            items,
         };
     } catch (error) {
         console.error('Error fetching gallery statistics:', error);

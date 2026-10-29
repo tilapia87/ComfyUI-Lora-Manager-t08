@@ -575,6 +575,39 @@ async def test_statistics_previews_are_capped_and_carry_urls(service):
             assert image["image_path"]
 
 
+async def test_statistics_report_the_full_ranking_and_page_through_it(service):
+    await _scan(service)
+
+    full = await service.stats(by="artist", sort="total")
+    ranked = [row["key"] for row in full["items"]]
+    assert len(ranked) >= 2, "the fixture indexes several artists"
+    # ``total`` is the ranking size, so the UI can build a pager for it.
+    assert full["total"] == len(ranked)
+    assert full["offset"] == 0
+
+    first = await service.stats(by="artist", sort="total", limit=1, offset=0)
+    assert [row["key"] for row in first["items"]] == [ranked[0]]
+    assert first["total"] == len(ranked)
+
+    second = await service.stats(by="artist", sort="total", limit=1, offset=1)
+    assert [row["key"] for row in second["items"]] == [ranked[1]]
+
+    # Past the end the page is simply empty; the ranking size is still known.
+    beyond = await service.stats(by="artist", sort="total", limit=5, offset=len(ranked))
+    assert beyond["items"] == []
+    assert beyond["total"] == len(ranked)
+
+
+async def test_statistics_pages_keep_the_same_order(service):
+    await _scan(service)
+    paged = []
+    for offset in range(3):
+        page = await service.stats(by="artist", sort="total", limit=1, offset=offset)
+        paged.extend(row["key"] for row in page["items"])
+    full = await service.stats(by="artist", sort="total")
+    assert paged == [row["key"] for row in full["items"]][:3]
+
+
 # -------------------------------------------------------------- containment
 
 

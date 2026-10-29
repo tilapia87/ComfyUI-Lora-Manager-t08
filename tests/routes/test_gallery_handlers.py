@@ -294,6 +294,32 @@ async def test_stats_endpoint_accepts_by_lora(service):
     assert _payload(response)["data"]["by"] == "lora"
 
 
+async def test_stats_endpoint_forwards_paging_parameters(service):
+    response = await GalleryHandlerSet().get_stats(
+        FakeRequest(query={"by": "artist", "limit": "1", "offset": "1"})
+    )
+    data = _payload(response)["data"]
+    assert data["limit"] == 1
+    assert data["offset"] == 1
+    assert data["total"] == len(data["items"]) + 1
+
+
+async def test_stats_endpoint_defaults_and_clamps_the_offset(service):
+    default = _payload(await GalleryHandlerSet().get_stats(FakeRequest(query={"by": "artist"})))["data"]
+    assert default["offset"] == 0
+    assert default["limit"] == 200
+
+    negative = _payload(
+        await GalleryHandlerSet().get_stats(FakeRequest(query={"by": "artist", "offset": "-5"}))
+    )["data"]
+    assert negative["offset"] == 0
+
+    garbage = _payload(
+        await GalleryHandlerSet().get_stats(FakeRequest(query={"by": "artist", "offset": "abc"}))
+    )["data"]
+    assert garbage["offset"] == 0
+
+
 async def test_serve_image_forbids_paths_outside_the_output_directory(service, tmp_path):
     get_settings_manager().set("gallery_output_path", str(tmp_path / "output"))
     handler = GalleryHandlerSet()

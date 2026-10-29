@@ -250,6 +250,18 @@
                 </table>
             </div>
 
+            <div class="gallery-pagination hidden" id="galleryStatsPagination">
+                <button type="button" class="gallery-btn gallery-btn-small" id="galleryStatsPrevPage"
+                    title="{{ t('gallery.actions.previous') }}">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="gallery-pagination-info" id="galleryStatsPageInfo"></span>
+                <button type="button" class="gallery-btn gallery-btn-small" id="galleryStatsNextPage"
+                    title="{{ t('gallery.actions.next') }}">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+
             <div class="gallery-status hidden" id="galleryStatsStatus">
                 <i class="fas fa-spinner fa-spin"></i>
                 <span>{{ t('common.status.loading') }}</span>

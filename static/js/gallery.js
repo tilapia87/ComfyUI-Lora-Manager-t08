@@ -22,6 +22,9 @@ import {
 } from './api/galleryApi.js';
 
 const GALLERY_PAGE_SIZE = 40;
+// The statistics ranking can be far longer than one screen (a large library has
+// thousands of LoRAs), so it is paged independently of the image grid.
+const STATS_PAGE_SIZE = 100;
 const SCAN_POLL_INTERVAL_MS = 800;
 const PROGRESS_HIDE_DELAY_MS = 8000;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -116,6 +119,8 @@ export class GalleryPage {
         this.statsBy = 'artist';
         this.statsSort = 'net';
         this.statsLoaded = false;
+        this.statsPage = 1;
+        this.statsTotalPages = 0;
 
         this.scanTimer = null;
         this.searchTimer = null;
@@ -194,6 +199,10 @@ export class GalleryPage {
             statsBody: byId('galleryStatsBody'),
             statsStatus: byId('galleryStatsStatus'),
             statsEmpty: byId('galleryStatsEmpty'),
+            statsPagination: byId('galleryStatsPagination'),
+            statsPageInfo: byId('galleryStatsPageInfo'),
+            statsPrevPage: byId('galleryStatsPrevPage'),
+            statsNextPage: byId('galleryStatsNextPage'),
         };
     }
 
@@ -258,14 +267,19 @@ export class GalleryPage {
             if (!button) return;
             this.statsBy = button.dataset.by;
             this.statsLoaded = false;
+            this.statsPage = 1;
             this._syncStatsBySwitch();
             this.loadStats();
         });
 
         el.statsSortSelect?.addEventListener('change', () => {
             this.statsSort = el.statsSortSelect.value;
+            this.statsPage = 1;
             this.loadStats();
         });
+
+        el.statsPrevPage?.addEventListener('click', () => this.goToStatsPage(this.statsPage - 1));
+        el.statsNextPage?.addEventListener('click', () => this.goToStatsPage(this.statsPage + 1));
 
         el.statsBody?.addEventListener('click', (event) => {
             const jumpButton = event.target.closest('.gallery-open-lora');
@@ -730,12 +744,34 @@ export class GalleryPage {
         this._hide(this.el.statsEmpty);
 
         try {
-            const data = await fetchGalleryStats({ by: this.statsBy, sort: this.statsSort });
+            const offset = Math.max(0, (this.statsPage - 1) * STATS_PAGE_SIZE);
+            const data = await fetchGalleryStats({
+                by: this.statsBy,
+                sort: this.statsSort,
+                limit: STATS_PAGE_SIZE,
+                offset,
+            });
             this.statsLoaded = true;
+
+            // ``total`` is the number of ranked rows, so a library with more
+            // than one page of LoRAs can be browsed end to end.
+            const totalRows = Math.max(0, Number(data.total) || 0);
+            this.statsTotalPages = Math.max(1, Math.ceil(totalRows / STATS_PAGE_SIZE));
+
+            // A rescan can shrink the ranking under the current page; land on
+            // the last page rather than showing an empty table.
+            if (this.statsPage > this.statsTotalPages) {
+                this.statsPage = this.statsTotalPages;
+                await this.loadStats();
+                return;
+            }
+
             this.renderStats(data);
+            this.renderStatsPagination();
         } catch (error) {
             this.el.statsBody.innerHTML = '';
             this._hide(this.el.statsTableWrap);
+            this._hide(this.el.statsPagination);
             this._show(this.el.statsEmpty);
         } finally {
             this._hide(this.el.statsStatus);
@@ -770,12 +806,16 @@ export class GalleryPage {
         if (!items.length) {
             this.el.statsBody.innerHTML = '';
             this._hide(this.el.statsTableWrap);
+            this._hide(this.el.statsPagination);
             this._show(this.el.statsEmpty);
             return;
         }
 
         this._show(this.el.statsTableWrap);
         this._hide(this.el.statsEmpty);
+
+        // Ranks are global, so page 2 starts at 101 instead of restarting at 1.
+        const rankOffset = Math.max(0, (this.statsPage - 1) * STATS_PAGE_SIZE);
 
         this.el.statsBody.innerHTML = items
             .map((row, index) => {
@@ -790,7 +830,7 @@ export class GalleryPage {
                 return `
                     <tr class="gallery-stats-row${unknownClass}" data-key="${escapeHtml(row.key || label)}"
                         tabindex="0" title="${escapeHtml(translate('gallery.stats.rowHint'))}">
-                        <td class="gallery-col-rank">${index + 1}</td>
+                        <td class="gallery-col-rank">${rankOffset + index + 1}</td>
                         <td class="gallery-col-name">${escapeHtml(label)}</td>
                         <td class="gallery-col-num">${Number(row.likes) || 0}</td>
                         <td class="gallery-col-num">${Number(row.dislikes) || 0}</td>
@@ -803,6 +843,42 @@ export class GalleryPage {
                 `;
             })
             .join('');
+    }
+
+    /**
+     * Show the statistics pager, mirroring the image grid's pager.
+     */
+    renderStatsPagination() {
+        const el = this.el;
+        if (!el.statsPagination) return;
+
+        if (this.statsTotalPages <= 1) {
+            this._hide(el.statsPagination);
+            return;
+        }
+
+        this._show(el.statsPagination);
+        if (el.statsPageInfo) {
+            el.statsPageInfo.textContent = translate('gallery.pagination.page', {
+                page: this.statsPage,
+                total: this.statsTotalPages,
+            });
+        }
+        if (el.statsPrevPage) el.statsPrevPage.disabled = this.statsPage <= 1;
+        if (el.statsNextPage) el.statsNextPage.disabled = this.statsPage >= this.statsTotalPages;
+    }
+
+    /**
+     * Move the statistics table to another page.
+     * @param {number} page - Target page (1-based).
+     * @returns {Promise<void>}
+     */
+    async goToStatsPage(page) {
+        if (!Number.isFinite(page) || page < 1) return;
+        if (this.statsTotalPages && page > this.statsTotalPages) return;
+        if (page === this.statsPage) return;
+        this.statsPage = page;
+        await this.loadStats();
     }
 
     /**
