@@ -4,6 +4,7 @@ import json
 import logging
 import random
 from typing import Optional, Dict, Tuple, Any, List, Sequence
+from ..utils.constants import is_empty_placeholder_hash
 from .downloader import get_downloader
 from .errors import RateLimitError, ResourceNotFoundError
 
@@ -260,6 +261,10 @@ class CivArchiveModelMetadataProvider(ModelMetadataProvider):
         """Not supported by CivArchive provider"""
         return None
 
+    def pop_foreign_source_ref(self, model_hash: str) -> Any:
+        """Foreign source ref (e.g. ModelScope) recorded during the hash lookup"""
+        return self.client.pop_foreign_source_ref(model_hash)
+
 class SQLiteModelMetadataProvider(ModelMetadataProvider):
     """Provider that uses SQLite database for metadata"""
     
@@ -269,6 +274,11 @@ class SQLiteModelMetadataProvider(ModelMetadataProvider):
         
     async def get_model_by_hash(self, model_hash: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         """Find model by hash value from SQLite database"""
+        if is_empty_placeholder_hash(model_hash):
+            # The archive database is built from remote metadata and may carry
+            # entries keyed by the zero-byte digest; that value identifies no
+            # local file, so it is never resolved (issue #1162).
+            return None, "Model not found"
         async with self._aiosqlite.connect(self.db_path) as db:
             # Look up in model_files table to get model_id and version_id
             query = """

@@ -361,6 +361,29 @@ class CLIPTextEncodeExtractor(NodeMetadataExtractor):
                 metadata[PROMPTS][node_id]["conditioning"] = conditioning
 
 
+class PromptLMExtractor(CLIPTextEncodeExtractor):
+    """Extractor for PromptLM (Prompt (LoraManager)).
+
+    The node expands wildcards and prepends trigger words at runtime, and
+    returns the expanded prompt as its second output. Capture that output in
+    place of the raw widget text so saved metadata and recipes record the
+    prompt actually used for the generation.
+    """
+
+    @staticmethod
+    def update(node_id, outputs, metadata):
+        CLIPTextEncodeExtractor.update(node_id, outputs, metadata)
+
+        output_tuple = _first_output_tuple(outputs)
+        if not output_tuple or len(output_tuple) < 2:
+            return
+        expanded_text = output_tuple[1]
+        if not isinstance(expanded_text, str):
+            return
+        if node_id in metadata.get(PROMPTS, {}):
+            metadata[PROMPTS][node_id]["text"] = expanded_text
+
+
 class MyOriginalWaifuTextExtractor(NodeMetadataExtractor):
     """Extractor for ComfyUI-MyOriginalWaifu TextProvider nodes."""
 
@@ -1211,6 +1234,12 @@ class UNETLoaderExtractor(NodeMetadataExtractor):
                 "node_id": node_id
             }
 
+# Nodes that turn latents into images and therefore provide the preview image
+# for recipe saving. Both native decoders return ``(images,)`` and share the
+# same "first decode wins" capture semantics.
+IMAGE_DECODE_NODE_CLASSES = frozenset({"VAEDecode", "VAEDecodeTiled"})
+
+
 class VAEDecodeExtractor(NodeMetadataExtractor):
     @staticmethod
     def extract(node_id, inputs, outputs, metadata):
@@ -1458,7 +1487,7 @@ NODE_EXTRACTORS = {
     # Conditioning
     "CLIPTextEncode": CLIPTextEncodeExtractor,
     "CLIPTextEncodeAttentionBias": CLIPTextEncodeExtractor,  # From https://github.com/silveroxides/ComfyUI_PromptAttention
-    "PromptLM": CLIPTextEncodeExtractor,
+    "PromptLM": PromptLMExtractor,
     "CLIPTextEncodeFlux": CLIPTextEncodeFluxExtractor,  # Add CLIPTextEncodeFlux
     "WAS_Text_to_Conditioning": CLIPTextEncodeExtractor,
     "AdvancedCLIPTextEncode": CLIPTextEncodeExtractor,  # From https://github.com/BlenderNeko/ComfyUI_ADV_CLIP_emb
@@ -1479,6 +1508,7 @@ NODE_EXTRACTORS = {
     "CFGGuider": CFGGuiderExtractor,            # Add CFGGuider
     # Image
     "VAEDecode": VAEDecodeExtractor,  # Added VAEDecode extractor
+    "VAEDecodeTiled": VAEDecodeExtractor,  # Native tiled decoder, same output
     # Metadata overwrite
     "MetadataOverwriteLM": MetadataOverwriteExtractor,
     # Add other nodes as needed

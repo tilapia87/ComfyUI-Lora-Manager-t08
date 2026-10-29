@@ -6,6 +6,7 @@ import pytest
 
 from py.services.connectivity_guard import OFFLINE_COOLDOWN_ERROR, OFFLINE_FRIENDLY_MESSAGE
 from py.services.errors import MetadataPersistError, RateLimitError
+from py.utils.constants import EMPTY_HASH_SHA256
 from py.services.metadata_sync_service import MetadataSyncService, _merge_ordered_unique
 
 
@@ -476,6 +477,151 @@ async def test_fetch_and_update_model_returns_friendly_offline_message(tmp_path)
     assert error is not None
     assert OFFLINE_FRIENDLY_MESSAGE in error
     update_cache.assert_not_awaited()
+
+
+def _foreign_ref():
+    from py.services.model_sources import SourceRef
+
+    return SourceRef(
+        platform="modelscope-ai",
+        source_id="arbinshado/Kiara-Krea",
+        url="https://www.modelscope.ai/models/arbinshado/Kiara-Krea",
+    )
+
+
+def _wire_foreign_source(monkeypatch, *, context, hydrate_result=None):
+    """Patch the source-registry pieces _try_link_foreign_source consumes."""
+    from unittest.mock import Mock
+
+    fake_source = SimpleNamespace(
+        fetch_card_context_by_hash=AsyncMock(return_value=context),
+    )
+    hydrate = AsyncMock(return_value=hydrate_result or [])
+    monkeypatch.setattr(
+        "py.services.metadata_sync_service.get_source", lambda _platform: fake_source
+    )
+    monkeypatch.setattr(
+        "py.services.metadata_sync_service.hydrate_from_source", hydrate
+    )
+    monkeypatch.setattr(
+        "py.services.metadata_sync_service.shared_source_cache", lambda *_args: None
+    )
+    return SimpleNamespace(source=fake_source, hydrate=hydrate, Mock=Mock)
+
+
+@pytest.mark.asyncio
+async def test_fetch_and_update_model_links_foreign_source_when_not_found(tmp_path, monkeypatch):
+    """CivArchive knows the file only as a foreign-ecosystem entry: the model
+    gets linked to its real source and hydrated instead of flagged deleted."""
+    ref = _foreign_ref()
+    provider = SimpleNamespace(
+        get_model_by_hash=AsyncMock(return_value=(None, "Model not found")),
+        get_model_version=AsyncMock(),
+        pop_foreign_source_ref=lambda _hash: ref,
+    )
+    helpers = build_service(
+        default_provider=provider,
+        provider_selector=AsyncMock(return_value=provider),
+    )
+    wired = _wire_foreign_source(monkeypatch, context=SimpleNamespace(model_name="Kiara-Krea"), hydrate_result=["model_name"])
+
+    model_path = tmp_path / "Kiara-Krea_c1-st4000.safetensors"
+    model_data: Dict[str, Any] = {
+        "model_name": "Kiara-Krea_c1-st4000",
+        "folder": "root",
+        "file_path": str(model_path),
+    }
+    update_cache = AsyncMock(return_value=True)
+
+    ok, error = await helpers.service.fetch_and_update_model(
+        sha256="f3a5370b",
+        file_path=str(model_path),
+        model_data=model_data,
+        update_cache_func=update_cache,
+    )
+
+    assert ok is True and error is None
+    assert model_data["source_url"] == ref.url
+    assert model_data["source_platform"] == "modelscope-ai"
+    assert model_data["from_civitai"] is False
+    assert "civitai_deleted" not in model_data
+    helpers.metadata_manager.save_metadata.assert_awaited()
+    update_cache.assert_awaited()
+    wired.hydrate.assert_awaited_once()
+    assert wired.hydrate.await_args.kwargs["ref"] is ref
+
+
+@pytest.mark.asyncio
+async def test_fetch_and_update_model_skips_foreign_link_when_hash_not_published(tmp_path, monkeypatch):
+    """The strict hash gate rejects the link: the repository does not publish
+    this exact file, so normal not-found handling takes over."""
+    provider = SimpleNamespace(
+        get_model_by_hash=AsyncMock(return_value=(None, "Model not found")),
+        get_model_version=AsyncMock(),
+        pop_foreign_source_ref=lambda _hash: _foreign_ref(),
+    )
+    helpers = build_service(
+        default_provider=provider,
+        provider_selector=AsyncMock(return_value=provider),
+    )
+    wired = _wire_foreign_source(monkeypatch, context=None)
+
+    model_path = tmp_path / "model.safetensors"
+    model_data: Dict[str, Any] = {
+        "model_name": "Local",
+        "folder": "root",
+        "file_path": str(model_path),
+    }
+
+    ok, error = await helpers.service.fetch_and_update_model(
+        sha256="deadbeef",
+        file_path=str(model_path),
+        model_data=model_data,
+        update_cache_func=AsyncMock(return_value=True),
+    )
+
+    assert ok is False
+    assert "source_url" not in model_data
+    assert model_data["from_civitai"] is False
+    assert model_data["civitai_deleted"] is True
+    wired.hydrate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_fetch_and_update_model_never_relinks_a_model_with_external_source(tmp_path, monkeypatch):
+    """A model already linked to an external source keeps that link."""
+    from unittest.mock import Mock
+
+    pop_ref = Mock(return_value=_foreign_ref())
+    provider = SimpleNamespace(
+        get_model_by_hash=AsyncMock(return_value=(None, "Model not found")),
+        get_model_version=AsyncMock(),
+        pop_foreign_source_ref=pop_ref,
+    )
+    helpers = build_service(
+        default_provider=provider,
+        provider_selector=AsyncMock(return_value=provider),
+    )
+
+    model_path = tmp_path / "model.safetensors"
+    model_data: Dict[str, Any] = {
+        "model_name": "Local",
+        "folder": "root",
+        "file_path": str(model_path),
+        "source_url": "https://huggingface.co/some/user",
+        "source_platform": "huggingface",
+    }
+
+    ok, error = await helpers.service.fetch_and_update_model(
+        sha256="deadbeef",
+        file_path=str(model_path),
+        model_data=model_data,
+        update_cache_func=AsyncMock(return_value=True),
+    )
+
+    assert ok is False
+    assert model_data["source_url"] == "https://huggingface.co/some/user"
+    pop_ref.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -1009,3 +1155,178 @@ async def test_fetch_and_update_model_keeps_sqlite_last_resort_after_civarchive_
     civarchive_provider.get_model_by_hash.assert_awaited_once()
     sqlite_provider.get_model_by_hash.assert_awaited_once()
     assert model_data["metadata_source"] == "archive_db"
+
+
+# ---------------------------------------------------------------------------
+# Empty-file SHA256 placeholder (issue #1162)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_rehashes_the_empty_file_placeholder_before_lookup(tmp_path):
+    """A stored hash of zero bytes must be replaced before any provider runs."""
+    import hashlib
+
+    helpers = build_service()
+    helpers.default_provider.get_model_by_hash.return_value = (None, "Model not found")
+
+    model_path = tmp_path / "Emilia(RE0).safetensors"
+    model_path.write_bytes(b"real model bytes")
+    expected = hashlib.sha256(b"real model bytes").hexdigest()
+    model_data: Dict[str, Any] = {
+        "model_name": "Emilia",
+        "folder": "root",
+        "file_path": str(model_path),
+        "sha256": EMPTY_HASH_SHA256,
+    }
+    update_cache = AsyncMock(return_value=True)
+
+    ok, error = await helpers.service.fetch_and_update_model(
+        sha256=EMPTY_HASH_SHA256,
+        file_path=str(model_path),
+        model_data=model_data,
+        update_cache_func=update_cache,
+    )
+
+    assert ok is False and error is not None  # not found, but the hash was repaired
+    assert model_data["sha256"] == expected
+    assert model_data["hash_status"] == "completed"
+    helpers.default_provider.get_model_by_hash.assert_awaited_once_with(expected)
+    saved_payload = helpers.metadata_manager.save_metadata.await_args.args[1]
+    assert saved_payload["sha256"] == expected
+    assert "folder" not in saved_payload
+    # Once for the repaired hash, once for the not-found bookkeeping.
+    assert update_cache.await_count == 2
+    assert update_cache.await_args_list[0].args[2]["sha256"] == expected
+
+
+@pytest.mark.asyncio
+async def test_fetch_refuses_to_look_up_an_empty_file(tmp_path):
+    """Zero-byte models cannot be identified: no provider request is made."""
+    helpers = build_service()
+    model_path = tmp_path / "broken.safetensors"
+    model_path.write_bytes(b"")
+    model_data: Dict[str, Any] = {"file_path": str(model_path), "sha256": EMPTY_HASH_SHA256}
+    update_cache = AsyncMock(return_value=True)
+
+    ok, error = await helpers.service.fetch_and_update_model(
+        sha256=EMPTY_HASH_SHA256,
+        file_path=str(model_path),
+        model_data=model_data,
+        update_cache_func=update_cache,
+    )
+
+    assert ok is False
+    assert "empty" in (error or "").lower()
+    helpers.default_provider.get_model_by_hash.assert_not_awaited()
+    update_cache.assert_not_awaited()
+    assert "civitai_deleted" not in model_data
+
+
+@pytest.mark.asyncio
+async def test_fetch_reports_a_missing_model_file_for_the_placeholder(tmp_path):
+    helpers = build_service()
+    model_data: Dict[str, Any] = {"file_path": str(tmp_path / "gone.safetensors")}
+
+    ok, error = await helpers.service.fetch_and_update_model(
+        sha256=EMPTY_HASH_SHA256,
+        file_path=str(tmp_path / "gone.safetensors"),
+        model_data=model_data,
+        update_cache_func=AsyncMock(return_value=True),
+    )
+
+    assert ok is False
+    assert "not found" in (error or "").lower()
+    helpers.default_provider.get_model_by_hash.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_foreign_source_link_skipped_for_the_empty_hash_placeholder():
+    """No repository gets linked for a hash that identifies no file (#1162)."""
+    helpers = build_service()
+
+    linked = await helpers.service._try_link_foreign_source(
+        sha256=EMPTY_HASH_SHA256,
+        file_path="/tmp/Emilia(RE0).safetensors",
+        model_data={"file_path": "/tmp/Emilia(RE0).safetensors"},
+        update_cache_func=AsyncMock(return_value=True),
+    )
+
+    assert linked is False
+    helpers.provider_selector.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_relink_without_a_sidecar_rebuilds_the_required_local_fields(tmp_path):
+    """Relinking after a manual sidecar deletion must write a parseable sidecar.
+
+    Regression test for issue #1162: relinking from ``{}`` used to persist only
+    the remote fields, so the next startup logged
+    ``LoraMetadata.__init__() missing N required positional arguments`` and the
+    scanner skipped the model forever.
+    """
+    import hashlib
+
+    from py.utils.models import LoraMetadata
+
+    provider = SimpleNamespace(
+        get_model_by_hash=AsyncMock(),
+        get_model_version=AsyncMock(
+            return_value={
+                "files": [
+                    {"primary": True, "type": "Model", "hashes": {"SHA256": "ABCDEF"}}
+                ],
+                "model": {"name": "Remote"},
+                "images": [],
+            }
+        ),
+    )
+    helpers = build_service(default_provider=provider)
+    model_path = tmp_path / "Emilia(RE0).safetensors"
+    content = b"real model bytes"
+    model_path.write_bytes(content)
+
+    result = await helpers.service.relink_metadata(
+        file_path=str(model_path),
+        metadata={},
+        model_id=1,
+        model_version_id=2,
+    )
+
+    parsed = LoraMetadata.from_dict(result)  # raises when a field is missing
+    assert parsed.file_name == "Emilia(RE0)"
+    assert parsed.file_path.endswith("Emilia(RE0).safetensors")
+    assert parsed.size == len(content)
+    assert parsed.sha256 == hashlib.sha256(content).hexdigest()
+    assert parsed.model_name == "Remote"
+    assert parsed.preview_url == ""
+
+
+@pytest.mark.asyncio
+async def test_relink_keeps_the_existing_payload_values(tmp_path):
+    """A healthy sidecar is not rewritten from disk facts alone."""
+    provider = SimpleNamespace(
+        get_model_by_hash=AsyncMock(),
+        get_model_version=AsyncMock(
+            return_value={
+                "files": [
+                    {"primary": True, "type": "Model", "hashes": {"SHA256": "ABCDEF"}}
+                ],
+                "model": {"name": "Remote"},
+                "images": [],
+            }
+        ),
+    )
+    helpers = build_service(default_provider=provider)
+    model_path = tmp_path / "model.safetensors"
+    model_path.write_bytes(b"real model bytes")
+
+    result = await helpers.service.relink_metadata(
+        file_path=str(model_path),
+        metadata={"file_path": str(model_path), "model_name": "Local", "sha256": "original"},
+        model_id=1,
+        model_version_id=2,
+    )
+
+    assert result["sha256"] == "original"
+    assert result["model_name"] == "Remote"

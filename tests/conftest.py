@@ -99,6 +99,26 @@ setattr(nodes_mock, "SaveImage", mock.MagicMock())
 setattr(nodes_mock, "NODE_CLASS_MAPPINGS", {})
 sys.modules['nodes'] = nodes_mock
 
+# Import-time isolation: importing py.config runs the module-level
+# ``config = Config()``, which scans roots and writes the symlink cache. At
+# collection time no fixture is active yet, so without a pinned settings dir
+# that write lands in the real user config
+# (~/.config/ComfyUI-LoRA-Manager/cache/symlink/symlink_map.json), clobbering
+# its fingerprint with the mocked (empty) root set and forcing a symlink
+# rescan at the next real ComfyUI startup. Force the import here, under a
+# throwaway settings dir, so the real cache is never touched. The per-test
+# _isolate_settings_dir fixture below keeps its own finer-grained isolation.
+import os
+import tempfile
+
+os.environ["LORA_MANAGER_SETTINGS_DIR"] = tempfile.mkdtemp(
+    prefix="lm-pytest-import-"
+)
+try:
+    import py.config  # noqa: F401
+finally:
+    os.environ.pop("LORA_MANAGER_SETTINGS_DIR", None)
+
 
 @pytest.fixture(autouse=True)
 def _isolate_settings_dir(tmp_path_factory, monkeypatch, request):
@@ -361,6 +381,7 @@ def reset_singletons():
     from py.services.service_registry import ServiceRegistry
     from py.services.model_scanner import ModelScanner
     from py.services.settings_manager import get_settings_manager
+    from py.services.first_run_manager import reset_first_run_manager
 
     # Reset DownloadManager singleton
     DownloadManager._instance = None
@@ -372,6 +393,9 @@ def reset_singletons():
     # Reset ModelScanner instances
     if hasattr(ModelScanner, '_instances'):
         ModelScanner._instances.clear()
+
+    # Reset FirstRunManager singleton
+    reset_first_run_manager()
 
     # Reset SettingsManager
     settings_manager = get_settings_manager()
@@ -386,4 +410,5 @@ def reset_singletons():
     ServiceRegistry._initialized = False  # pyright: ignore[reportAttributeAccessIssue]
     if hasattr(ModelScanner, '_instances'):
         ModelScanner._instances.clear()
+    reset_first_run_manager()
 

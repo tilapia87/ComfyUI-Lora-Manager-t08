@@ -1,4 +1,5 @@
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -12,6 +13,7 @@ from .constants import (
     INVALID_AUTOV3_EMPTY_HASH,
     MAX_SAFETENSORS_HEADER_BYTES,
     PREVIEW_EXTENSIONS,
+    SUPPORTED_MEDIA_EXTENSIONS,
 )
 from .exif_utils import ExifUtils
 from ..services.settings_manager import get_settings_manager
@@ -38,24 +40,47 @@ def _get_hash_chunk_size_bytes() -> int:
 async def calculate_sha256(file_path: str) -> str:
     """Calculate SHA256 hash of a file (full file content).
 
+    The blocking read+hash loop runs in a thread executor so callers awaiting
+    this coroutine never stall the aiohttp event loop — a multi-GB checkpoint
+    hash would otherwise freeze every HTTP endpoint and websocket for the
+    duration of the hash.
+
     Uses ``posix_fadvise`` with ``POSIX_FADV_DONTNEED`` to avoid polluting the OS page
     cache — critical on WSL where cached file pages live inside the VM and are not
     accounted for in guest ``used`` memory, causing VmmemWSL to balloon.
 
     On Windows/macOS where ``posix_fadvise`` is not available the hint is silently
     skipped.
+
+    Returns ``""`` when the file contains no bytes at all: the SHA256 of an
+    empty byte string is not a model identity, and persisting it would fold
+    every unreadable/unfinished file into one bogus identity (issue #1162).
     """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _calculate_sha256_sync, file_path)
+
+
+def _calculate_sha256_sync(file_path: str) -> str:
     sha256_hash = hashlib.sha256()
     chunk_size = _get_hash_chunk_size_bytes()
+    read_any = False
     with open(file_path, "rb") as f:
         fd = f.fileno()
         for byte_block in iter(lambda: f.read(chunk_size), b""):
+            read_any = True
             sha256_hash.update(byte_block)
         # Evict pages after reading so the data doesn't linger in the kernel page
         # cache — on WSL this otherwise appears as unreclaimable VmmemWSL growth.
         # Guard against platforms (Windows, macOS) that lack posix_fadvise.
         if hasattr(os, "posix_fadvise") and hasattr(os, "POSIX_FADV_DONTNEED"):
             os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
+    if not read_any:
+        # A zero-byte file (or a file that was still being created/truncated
+        # when the scan reached it) hashes to the empty-string digest. That
+        # value is shared by every such file, so it can never identify a
+        # model; report "no hash" instead of a poisonous identity.
+        logger.debug("No bytes read; skipping SHA256 for empty file %s", file_path)
+        return ""
     return sha256_hash.hexdigest()
 
 
@@ -139,6 +164,109 @@ def calculate_autov3(file_path: str) -> str | None:
                 return autov3
 
     return None
+
+
+def detect_media_extension(
+    content: bytes | None,
+    headers: dict | None = None,
+    fallback_url: str | None = None,
+    media_type_hint: str | None = None,
+    default: str = ".jpg",
+) -> str:
+    """Determine a file extension from content magic bytes or headers.
+
+    CDNs (Civitai's ``optimized=true`` renditions in particular) re-encode
+    media regardless of the extension in the URL path, so the URL extension
+    must only be used as a fallback after content and headers.
+
+    Args:
+        content: File content bytes (only the first bytes are inspected).
+        headers: HTTP response headers.
+        fallback_url: Original URL for extension extraction.
+        media_type_hint: Optional media type hint from metadata (e.g. "video" or "image").
+        default: Extension returned when nothing else matches. Pass ``""`` to
+            treat unrecognized content as a detection failure.
+    """
+    # Check magic bytes for common formats
+    if content:
+        if content.startswith(b'\xFF\xD8\xFF'):
+            return '.jpg'
+        elif content.startswith(b'\x89PNG\r\n\x1A\n'):
+            return '.png'
+        elif content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
+            return '.gif'
+        elif content.startswith(b'RIFF') and b'WEBP' in content[:12]:
+            return '.webp'
+        elif len(content) >= 12 and content[4:8] == b'ftyp' and b'avif' in content[8:24]:
+            return '.avif'
+        elif content.startswith(b'\x00\x00\x00\x0cJXL \x0d\x0a\x87\x0a'):
+            return '.jxl'
+        elif content.startswith(b'\x00\x00\x00\x18ftypmp4') or content.startswith(b'\x00\x00\x00\x20ftypmp4'):
+            return '.mp4'
+        elif content.startswith(b'\x1A\x45\xDF\xA3'):
+            return '.webm'
+
+    # Check Content-Type header
+    if headers:
+        content_type = headers.get('content-type', '').lower()
+        type_map = {
+            'image/jpeg': '.jpg',
+            'image/png': '.png',
+            'image/gif': '.gif',
+            'image/webp': '.webp',
+            'image/avif': '.avif',
+            'image/jxl': '.jxl',
+            'video/mp4': '.mp4',
+            'video/webm': '.webm',
+            'video/quicktime': '.mov'
+        }
+        if content_type in type_map:
+            return type_map[content_type]
+
+    # Fallback to URL extension if available
+    if fallback_url:
+        filename = os.path.basename(fallback_url.split('?')[0])
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in SUPPORTED_MEDIA_EXTENSIONS['images'] or ext in SUPPORTED_MEDIA_EXTENSIONS['videos']:
+            return ext
+
+    # Use media type hint from metadata if available
+    if media_type_hint == "video":
+        return '.mp4'
+
+    # Default fallback
+    return default
+
+
+def reconcile_media_extension(file_path: str) -> str:
+    """Rename *file_path* when its bytes indicate a different media format.
+
+    Returns the final path: the renamed path when the sniffed extension is a
+    supported media extension that differs from the current one, otherwise
+    *file_path* unchanged.
+    """
+    current_ext = os.path.splitext(file_path)[1].lower()
+    try:
+        with open(file_path, "rb") as f:
+            head = f.read(64)
+    except OSError:
+        return file_path
+    detected = detect_media_extension(head, default="")
+    if not detected or detected == current_ext:
+        return file_path
+    if {detected, current_ext} <= {".jpg", ".jpeg"}:
+        return file_path
+    supported = (
+        SUPPORTED_MEDIA_EXTENSIONS["images"] + SUPPORTED_MEDIA_EXTENSIONS["videos"]
+    )
+    if detected not in supported:
+        return file_path
+    new_path = os.path.splitext(file_path)[0] + detected
+    try:
+        os.replace(file_path, new_path)
+    except OSError:
+        return file_path
+    return new_path
 
 
 def find_preview_file(base_name: str, dir_path: str) -> str:

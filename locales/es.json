@@ -266,6 +266,7 @@
         },
         "filter": {
             "title": "Filtrar modelos",
+            "countTitle": "{name} — {count} modelos",
             "presets": "Preajustes",
             "savePreset": "Guardar filtros activos como nuevo preajuste.",
             "savePresetDisabledActive": "No se puede guardar: Ya hay un preajuste activo. Modifique los filtros para guardar un nuevo preajuste",
@@ -401,7 +402,8 @@
             "autoOrganize": "Organización automática",
             "metadata": "Metadatos",
             "sidecarStorage": "Almacenamiento de archivos sidecar",
-            "proxySettings": "Configuración de proxy"
+            "proxySettings": "Configuración de proxy",
+            "sendToWorkflow": "Enviar al workflow"
         },
         "nav": {
             "general": "General",
@@ -453,6 +455,18 @@
             "validation": {
                 "noPaths": "Ingrese al menos una ruta separada por comas.",
                 "saveFailed": "No se pudieron guardar las rutas a omitir: {message}"
+            }
+        },
+        "sendToWorkflowExclusions": {
+            "nodeClasses": {
+                "label": "Tipos de nodos excluidos",
+                "placeholder": "Ejemplo: CheckpointLoaderSimple, MyCustomNode",
+                "help": "Nombres de clase de nodos de ComfyUI que nunca aparecen como destinos de envío al workflow. Separa varias entradas con comas o puntos y comas. Los nodos marcados explícitamente en ComfyUI (clic derecho → Mark as) quedan exentos."
+            },
+            "titlePatterns": {
+                "label": "Patrones de títulos de nodos excluidos",
+                "placeholder": "Ejemplo: negative, preview",
+                "help": "Los nodos cuyo título contenga alguno de estos fragmentos de texto (sin distinguir mayúsculas y minúsculas) se ocultan de los destinos de envío al workflow. Separa varias entradas con comas o puntos y comas. Los nodos marcados explícitamente en ComfyUI (clic derecho → Mark as) quedan exentos."
             }
         },
         "backup": {
@@ -579,6 +593,8 @@
             },
             "showVersionOnCard": "Mostrar versión en la tarjeta",
             "showVersionOnCardHelp": "Mostrar u ocultar el nombre de versión en las tarjetas de modelo",
+            "showQuantizationOnCard": "Mostrar cuantización en la tarjeta",
+            "showQuantizationOnCardHelp": "Mostrar el nivel de cuantización (p. ej. Q4_K_M, FP8) junto al nombre de versión en las tarjetas de modelo",
             "modelCardFooterAction": "Acción del botón de tarjeta de modelo",
             "modelCardFooterActionOptions": {
                 "exampleImages": "Abrir imágenes de ejemplo",
@@ -595,8 +611,8 @@
             "cardBlurAmountHelp": "Ajuste la intensidad de desenfoque de las superposiciones del encabezado y pie de página en las tarjetas de modelos y recetas (0 = sin desenfoque, 20 = desenfoque máximo)."
         },
         "folderSettings": {
-            "activeLibrary": "Biblioteca activa",
-            "activeLibraryHelp": "Alterna entre las bibliotecas configuradas para actualizar las carpetas predeterminadas. Cambiar la selección recarga la página.",
+            "activeLibrary": "Biblioteca activa (obsoleto)",
+            "activeLibraryHelp": "Alterna entre las bibliotecas configuradas para actualizar las carpetas predeterminadas. Cambiar la selección recarga la página. Obsoleto: la compatibilidad con varias bibliotecas se eliminará en una próxima versión. Varias raíces de carpeta dentro de una misma biblioteca siguen siendo totalmente compatibles.",
             "loadingLibraries": "Cargando bibliotecas...",
             "noLibraries": "No hay bibliotecas configuradas",
             "defaultLoraRoot": "Raíz de LoRA",
@@ -957,6 +973,11 @@
                 "random": "Aleatorio",
                 "randomAction": "Aleatorizar (barajar)"
             },
+            "modelType": {
+                "title": "Filtrar por tipo de modelo",
+                "all": "Todos los tipos",
+                "multiple": "{count} tipos"
+            },
             "refresh": {
                 "title": "Actualizar lista de modelos",
                 "full": "Reconstruir caché",
@@ -1079,6 +1100,9 @@
     },
     "recipes": {
         "title": "Recetas de LoRA",
+        "filter": {
+            "countTitle": "{name} — {count} recetas"
+        },
         "actions": {
             "sendCheckpoint": "Enviar a ComfyUI",
             "sendRecipe": "Enviar a ComfyUI",
@@ -1456,8 +1480,8 @@
             "notEmptyMessageCount": "Esta carpeta aún contiene {count} archivo(s) de modelo. Elimínalos o muévelos primero — eliminar una carpeta nunca elimina los archivos de modelo en cascada.",
             "notEmptyMessageExcluded": "Esta carpeta aún contiene {count} archivo(s) de modelo, de los cuales {excluded} están excluidos de la biblioteca. Anula su exclusión en «Gestionar modelos excluidos» y elimínalos primero — eliminar una carpeta nunca elimina los archivos de modelo en cascada.",
             "missingTitle": "Carpeta no encontrada",
-            "missingMessage": "[TODO: Translate] This folder no longer exists on disk. You can remove it from the list.",
-            "removeFromList": "[TODO: Translate] Remove from list",
+            "missingMessage": "Esta carpeta ya no existe en el disco. Puedes quitarla de la lista.",
+            "removeFromList": "Quitar de la lista",
             "symlinkTitle": "La carpeta es un enlace simbólico",
             "symlinkMessage": "Todas las copias de esta carpeta son enlaces simbólicos; elimina el enlace o su destino fuera de LoRA Manager.",
             "protectedTitle": "Carpeta protegida",
@@ -1479,8 +1503,8 @@
             "busy": "Todavía hay una eliminación pendiente dentro de esta carpeta. Espera a que caduque la ventana de deshacer.",
             "unsupported": "La eliminación de carpetas no es compatible con esta página",
             "missing": "Esta carpeta ya no existe en el disco. Actualiza la barra lateral e inténtalo de nuevo.",
-            "forgotten": "[TODO: Translate] Folder \"{name}\" removed from the list",
-            "exists": "[TODO: Translate] The folder is back on disk. Delete it instead.",
+            "forgotten": "Carpeta \"{name}\" quitada de la lista",
+            "exists": "La carpeta ha vuelto al disco. Elimínala en su lugar.",
             "symlink": "Esta carpeta es un enlace simbólico; no se puede eliminar desde la barra lateral.",
             "successMulti": "Carpeta \"{name}\" eliminada de {count} raíces de modelo",
             "partial": "Se eliminaron {count} de {total} copias — {failed} no se pudieron eliminar. Actualiza la barra lateral e inténtalo de nuevo."
@@ -1700,6 +1724,8 @@
             "errors": {
                 "invalidUrl": "Formato de URL de modelo inválido",
                 "noVersions": "No hay versiones disponibles para este modelo",
+                "linkedFileNotFound": "No se encontró el archivo {fileId} en la versión de modelo solicitada.",
+                "linkedFileNotWeightFile": "El archivo {fileId} no es un archivo de modelo descargable.",
                 "mixedSources": "No se pueden mezclar URL de CivitAI y Hugging Face / ModelScope en el mismo lote.",
                 "noModelFiles": "No se encontraron archivos de modelo en este repositorio."
             },
@@ -2197,7 +2223,8 @@
             "copyReport": "Copiar informe",
             "downloadCsv": "Descargar CSV",
             "columnModelName": "Nombre del modelo",
-            "columnError": "Error"
+            "columnError": "Error",
+            "rateLimitedNotice": "Obtención cancelada: se alcanzó el límite de solicitudes del proveedor de metadatos. Vuelve a ejecutar «Obtener metadatos de CivitAI» más tarde para reintentar los modelos restantes."
         },
         "downloadBatchSummary": {
             "title": "Resumen de descarga por lotes",
@@ -2282,6 +2309,52 @@
                 "description": "Presiona Ctrl+F (Cmd+F en Mac) para buscar rápidamente dentro de tu vista actual.",
                 "alt": "Búsqueda rápida"
             }
+        },
+        "error": {
+            "title": "Error de inicialización",
+            "message": "Se produjo un error al escanear tu biblioteca de modelos.",
+            "retry": "Reintentar"
+        }
+    },
+    "firstRun": {
+        "title": "Bienvenido a LoRA Manager",
+        "description": "Antes de empezar, LoRA Manager necesita escanear tu biblioteca de modelos y generar los archivos sidecar de metadatos. Es un paso único; su duración depende del tamaño de la biblioteca y de la velocidad del disco.",
+        "libraries": {
+            "loras": "LoRAs",
+            "checkpoints": "Checkpoints",
+            "embeddings": "Embeddings",
+            "other": "Otros modelos"
+        },
+        "language": {
+            "label": "Idioma"
+        },
+        "libraryStats": "{count} modelos · {size}",
+        "rootMissing": "Directorio no encontrado",
+        "estimate": "Aproximadamente {count} modelos ({size}) — tiempo de escaneo estimado: ~{minutes} min, según el tamaño de la biblioteca y la velocidad del disco.",
+        "noRoots": {
+            "plugin": "No se encontró ninguna carpeta de modelos accesible. Abre Configuración para configurar los directorios de modelos y recarga esta página.",
+            "standalone": "No se encontró ninguna carpeta de modelos accesible. Edita folder_paths en settings.json y reinicia el servidor."
+        },
+        "sidecar": {
+            "title": "Almacenamiento de metadatos",
+            "alongside": {
+                "label": "Junto a los archivos de modelo (recomendado)",
+                "description": "Los archivos .json de metadatos se guardan junto a cada archivo de modelo, por lo que se mueven junto con el modelo."
+            },
+            "centralized": {
+                "label": "Directorio centralizado",
+                "description": "Los metadatos se guardan en un directorio aparte, manteniendo limpias tus carpetas de modelos.",
+                "pathPlaceholder": "Directorio para el almacenamiento centralizado de metadatos"
+            }
+        },
+        "actions": {
+            "start": "Iniciar escaneo",
+            "defer": "Más tarde"
+        },
+        "errors": {
+            "loadFailed": "Error al cargar la información de la biblioteca.",
+            "pathRequired": "Introduce un directorio de almacenamiento para los metadatos centralizados.",
+            "startFailed": "No se pudo iniciar el escaneo."
         }
     },
     "duplicates": {
@@ -2322,7 +2395,8 @@
             "embeddingAdded": "Embedding añadido al workflow",
             "embeddingFailed": "Error al añadir el embedding",
             "promptSent": "Prompt enviado al workflow",
-            "promptFailed": "Error al enviar el prompt"
+            "promptFailed": "Error al enviar el prompt",
+            "nodeTypeExcluded": "Tipo de nodo \"{type}\" excluido de los destinos de envío"
         },
         "nodeSelector": {
             "recipe": "Receta",
@@ -2332,7 +2406,8 @@
             "replace": "Reemplazar",
             "append": "Añadir",
             "selectTargetNode": "Seleccionar nodo de destino",
-            "sendToAll": "Enviar a todos"
+            "sendToAll": "Enviar a todos",
+            "excludeNodeType": "No volver a sugerir este tipo de nodo"
         },
         "exampleImages": {
             "opened": "Carpeta de imágenes de ejemplo abierta",
@@ -2796,7 +2871,9 @@
             "noItemsSelected": "No hay {type} seleccionados para eliminar",
             "deleteError": "Error: {message}",
             "deleteSuccess": "{count} {type} eliminados exitosamente",
-            "deleteFailed": "Error al eliminar {type}: {message}"
+            "deleteFailed": "Error al eliminar {type}: {message}",
+            "deletePartialFailed": "Error al eliminar {failed} {type} seleccionados: {message}",
+            "cacheUpdateFailed": "Los archivos se eliminaron, pero no se pudo actualizar la caché de la biblioteca. Ejecuta «Reconstruir caché» para actualizar la lista."
         },
         "controls": {
             "reloadFailed": "Error al recargar {pageType}: {message}",
@@ -2809,7 +2886,7 @@
             "contentRatingFailed": "Error al establecer clasificación de contenido: {message}",
             "relinkSuccess": "Modelo re-vinculado exitosamente a CivitAI",
             "relinkFailed": "Error: {message}",
-            "linkHfSuccess": "Modelo vinculado a HuggingFace exitosamente",
+            "linkHfSuccess": "Modelo vinculado exitosamente a su fuente de modelo",
             "linkHfFailed": "Error: {message}",
             "linkCivArchSuccess": "Modelo re-vinculado exitosamente mediante CivitArchive",
             "fetchMetadataFirst": "Por favor obtén metadatos de CivitAI primero",
@@ -2856,6 +2933,7 @@
             "metadataUpdateComplete": "Actualización de metadatos completada",
             "operationCancelled": "Operación cancelada por el usuario",
             "operationCancelledPartial": "Operación cancelada. {success} elementos procesados.",
+            "metadataFetchRateLimited": "Obtención de metadatos cancelada por límite de solicitudes — {success} de {total} actualizados, {failed} fallidos, {skipped} omitidos. Vuelve a obtenerlos desde CivitAI más tarde para reintentar el resto.",
             "metadataFetchFailed": "Error al obtener metadatos: {message}",
             "bulkMetadataCompleteAll": "Actualizados exitosamente todos los {count} {type}s",
             "bulkMetadataCompletePartial": "Actualizados {success} de {total} {type}s",
@@ -3000,6 +3078,12 @@
             "content": "Escanea y gestiona archivos VAE, Upscaler, Text Encoder, CLIP Vision y ControlNet, y descárgalos desde CivitAI, todo desde una página dedicada.",
             "enable": "Activar otros modelos",
             "openSettings": "Abrir configuración"
+        },
+        "bulkFetchPrompt": {
+            "title": "Dale vida a tu biblioteca",
+            "content": "Tu primer escaneo encontró {count} modelos sin metadatos. Obtén su información desde CivitAI para conseguir imágenes de vista previa, descripciones y palabras de activación.",
+            "fetch": "Obtener metadatos",
+            "later": "Quizás más tarde"
         },
         "pager": {
             "previous": "Notificación anterior",

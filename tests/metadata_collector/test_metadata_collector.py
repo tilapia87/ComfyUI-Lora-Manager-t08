@@ -179,6 +179,100 @@ def test_attention_bias_clip_text_encode_prompts_are_collected(metadata_registry
     assert prompt_results["negative_prompt"] == "low quality"
 
 
+def test_prompt_lm_records_expanded_wildcard_prompt(metadata_registry, monkeypatch):
+    """PromptLM expands wildcards at runtime; the expanded prompt (second
+    output) must replace the raw widget text in the collected metadata so
+    saved images and recipes record what was actually generated."""
+    prompt_graph = {
+        "encode_pos": {
+            "class_type": "PromptLM",
+            "inputs": {"text": "a photo of __flower__", "clip": ["clip", 0]},
+        },
+        "encode_neg": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "low quality", "clip": ["clip", 0]},
+        },
+        "sampler": {
+            "class_type": "KSampler",
+            "inputs": {
+                "seed": 123,
+                "steps": 20,
+                "cfg": 7.0,
+                "sampler_name": "Euler",
+                "scheduler": "karras",
+                "denoise": 1.0,
+                "positive": ["encode_pos", 0],
+                "negative": ["encode_neg", 0],
+                "latent_image": {"samples": types.SimpleNamespace(shape=(1, 4, 16, 16))},
+            },
+        },
+    }
+    prompt = SimpleNamespace(original_prompt=prompt_graph)
+
+    pos_conditioning = object()
+    neg_conditioning = object()
+
+    monkeypatch.setattr(metadata_processor, "standalone_mode", False)
+
+    metadata_registry.start_collection("prompt-wildcard")
+    metadata_registry.set_current_prompt(prompt)
+
+    metadata_registry.record_node_execution(
+        "encode_pos", "PromptLM", {"text": "a photo of __flower__"}, None
+    )
+    metadata_registry.update_node_execution(
+        "encode_pos", "PromptLM", [(pos_conditioning, "a photo of rose")]
+    )
+    metadata_registry.record_node_execution(
+        "encode_neg", "CLIPTextEncode", {"text": "low quality"}, None
+    )
+    metadata_registry.update_node_execution(
+        "encode_neg", "CLIPTextEncode", [(neg_conditioning,)]
+    )
+    metadata_registry.record_node_execution(
+        "sampler",
+        "KSampler",
+        {
+            "seed": 123,
+            "positive": pos_conditioning,
+            "negative": neg_conditioning,
+            "latent_image": {"samples": types.SimpleNamespace(shape=(1, 4, 16, 16))},
+        },
+        None,
+    )
+
+    metadata = metadata_registry.get_metadata("prompt-wildcard")
+    params = MetadataProcessor.extract_generation_params(metadata)
+
+    assert metadata[PROMPTS]["encode_pos"]["text"] == "a photo of rose"
+    assert params["prompt"] == "a photo of rose"
+    assert params["negative_prompt"] == "low quality"
+
+
+def test_prompt_lm_keeps_raw_text_when_prompt_output_missing(
+    metadata_registry, monkeypatch
+):
+    """If the node output tuple lacks the expanded prompt slot, the raw
+    widget text recorded during extract must be preserved."""
+    monkeypatch.setattr(metadata_processor, "standalone_mode", False)
+
+    metadata_registry.start_collection("prompt-wildcard-fallback")
+    metadata_registry.set_current_prompt(SimpleNamespace(original_prompt={}))
+
+    conditioning = object()
+    metadata_registry.record_node_execution(
+        "encode_pos", "PromptLM", {"text": "a photo of __flower__"}, None
+    )
+    metadata_registry.update_node_execution(
+        "encode_pos", "PromptLM", [(conditioning,)]
+    )
+
+    metadata = metadata_registry.get_metadata("prompt-wildcard-fallback")
+
+    assert metadata[PROMPTS]["encode_pos"]["text"] == "a photo of __flower__"
+    assert metadata[PROMPTS]["encode_pos"]["conditioning"] is conditioning
+
+
 def test_myoriginalwaifu_text_provider_uses_processed_prompt_outputs(
     metadata_registry, monkeypatch
 ):
@@ -1507,6 +1601,83 @@ def test_extract_generation_params_applies_overwrite(metadata_registry, populate
     assert params["checkpoint"] == "model.safetensors"
 
     registry_obj.clear_metadata()
+
+
+def test_extract_generation_params_skips_wired_overwrite(metadata_registry, populated_registry, monkeypatch):
+    """An overwrite node wired into a Save Image node is scoped to that
+    connection and must not leak into the global overwrite merge."""
+    import py.metadata_collector.metadata_processor as mp
+
+    monkeypatch.setattr(mp, "standalone_mode", False)
+
+    metadata = populated_registry["metadata"]
+    registry_obj = populated_registry["registry"]
+
+    # Prompt graph: a Save node whose metadata input is wired to ow-wired,
+    # plus a second, unconnected overwrite node.
+    prompt_graph = dict(populated_registry["prompt"].original_prompt)
+    prompt_graph["ow-wired"] = {
+        "class_type": "Metadata Overwrite (LoraManager)",
+        "inputs": {},
+    }
+    prompt_graph["ow-global"] = {
+        "class_type": "Metadata Overwrite (LoraManager)",
+        "inputs": {},
+    }
+    prompt_graph["save"] = {
+        "class_type": "Save Image (LoraManager)",
+        "inputs": {"images": ["vae", 0], "metadata": ["ow-wired", 0]},
+    }
+
+    registry_obj.start_collection("promptA")
+    registry_obj.set_current_prompt(SimpleNamespace(original_prompt=prompt_graph))
+    metadata2 = registry_obj.prompt_metadata["promptA"]
+
+    metadata2[OVERWRITE] = {
+        "ow-wired": {
+            "parameters": {"prompt": "stage two prompt"},
+            "node_id": "ow-wired",
+        },
+        "ow-global": {
+            "parameters": {"seed": 777},
+            "node_id": "ow-global",
+        },
+    }
+    for cat in ("models", "prompts", "sampling", "loras", "size", "images"):
+        if cat in metadata:
+            metadata2[cat] = metadata[cat]
+    metadata2["execution_order"] = metadata["execution_order"]
+
+    params = MetadataProcessor.extract_generation_params(metadata2, id="vae")
+
+    # Unwired overwrite still applies globally
+    assert params["seed"] == 777
+    # Wired overwrite must NOT leak into the global merge
+    assert params["prompt"] == "A castle on a hill"
+
+    registry_obj.clear_metadata()
+
+
+def test_apply_overwrite_params_bridges_model_to_checkpoint():
+    """The shared merge helper applies truthy values, keeps wired clip_skip=0,
+    and bridges the overwrite node's "model" field to "checkpoint"."""
+    params = {"prompt": "auto", "checkpoint": "auto.safetensors", "clip_skip": "1"}
+
+    result = MetadataProcessor.apply_overwrite_params(
+        params,
+        {
+            "prompt": "manual prompt",
+            "model": "wired_model.safetensors",
+            "seed": 0,  # falsy — must not overwrite
+            "clip_skip": 0,  # valid wired value — must overwrite
+        },
+    )
+
+    assert result["prompt"] == "manual prompt"
+    assert result["checkpoint"] == "wired_model.safetensors"
+    assert "model" not in result
+    assert result["clip_skip"] == 0
+    assert "seed" not in result
 
 
 def test_extract_generation_params_overwrite_falsy_skipped(metadata_registry, populated_registry, monkeypatch):

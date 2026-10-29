@@ -730,6 +730,37 @@ async def test_extract_model_files_from_archive_uses_executor(monkeypatch, tmp_p
 
 
 @pytest.mark.asyncio
+async def test_extract_model_files_from_archive_fits_member_names_to_path_budget(
+    tmp_path,
+):
+    """Archive member names carry no length cap: a CJK-heavy member whose
+    stem passes every character cap still overflows NAME_MAX in bytes and
+    must be truncated, or the create fails with ENAMETOOLONG."""
+    from py.utils.constants import (
+        MAX_FILENAME_COMPONENT_BYTES,
+        PATH_BUDGET_SUFFIX_ALLOWANCE,
+    )
+
+    manager = DownloadManager()
+    archive_path = tmp_path / "bundle.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("界" * 100 + ".safetensors", b"model")
+
+    extracted = await manager._extract_model_files_from_archive(
+        str(archive_path),
+        {".safetensors"},
+    )
+
+    assert len(extracted) == 1
+    member_stem = os.path.splitext(os.path.basename(extracted[0]))[0]
+    assert (
+        len(member_stem.encode("utf-8")) + PATH_BUDGET_SUFFIX_ALLOWANCE
+        <= MAX_FILENAME_COMPONENT_BYTES
+    )
+    assert os.path.exists(extracted[0])
+
+
+@pytest.mark.asyncio
 async def test_pause_download_updates_state():
     """Test that pause_download updates download state correctly."""
     manager = DownloadManager()
@@ -2089,10 +2120,13 @@ async def test_preflight_gate_ignores_civarchive_cooldown_for_civitai_downloads(
 
 
 @pytest.mark.asyncio
-async def test_preflight_gate_blocks_civarchive_source_during_civarchive_cooldown(
+async def test_preflight_gate_ignores_civarchive_cooldown_for_civarchive_source(
     monkeypatch, tmp_path, queue_service, reset_rate_limit_coordinator
 ):
-    """Downloads explicitly sourced from CivArchive still gate on its cooldown."""
+    """A civarchive.com cooldown must not hard-block CivArchive-sourced
+    downloads either: they can still resolve metadata and file bytes from
+    CivitAI. The CivArchive legs are gated separately (metadata via
+    wait_for_slot, mirrors via _deprioritize_cooled_down_urls)."""
     manager = DownloadManager()
     monkeypatch.setattr(manager, "_cleanup_download_record", AsyncMock())
 
@@ -2103,17 +2137,71 @@ async def test_preflight_gate_blocks_civarchive_source_during_civarchive_cooldow
     await queue_service.add_to_queue(download_id=download_id, model_id=1)
     _prepare_tracked_download(manager, download_id, status="waiting")
 
-    execute = AsyncMock(
-        side_effect=AssertionError("download must not start during cooldown")
-    )
+    execute = AsyncMock(return_value={"success": True})
     monkeypatch.setattr(manager, "_execute_original_download", execute)
 
     result = await _run_download(manager, download_id, tmp_path, source="civarchive")
 
-    assert execute.await_count == 0
-    assert result["success"] is False
-    assert result["reason"] == "rate_limited"
-    assert "civarchive.com" in result["error"]
+    assert execute.await_count == 1
+    assert result["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_deprioritize_cooled_down_urls_moves_cooled_hosts_last(
+    reset_rate_limit_coordinator,
+):
+    """Mirrors on a cooled-down host yield to mirrors that can serve now."""
+    manager = DownloadManager()
+    coordinator = await RateLimitCoordinator.get_instance()
+    coordinator.register_rate_limit("civarchive.com", 1800)
+
+    urls = [
+        "https://civarchive.com/api/download/models/1",
+        "https://civitai.com/api/download/models/1",
+        "https://civarchive.com/mirror/file.safetensors",
+    ]
+
+    reordered = await manager._deprioritize_cooled_down_urls(urls)
+
+    assert reordered == [
+        "https://civitai.com/api/download/models/1",
+        "https://civarchive.com/api/download/models/1",
+        "https://civarchive.com/mirror/file.safetensors",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_deprioritize_cooled_down_urls_keeps_order_when_all_cooled(
+    reset_rate_limit_coordinator,
+):
+    """When every mirror is cooling down, order stays unchanged so the
+    transfer's own rate-limit handling (wait within cap, else re-queue)
+    applies to the same first choice as before."""
+    manager = DownloadManager()
+    coordinator = await RateLimitCoordinator.get_instance()
+    coordinator.register_rate_limit("civarchive.com", 1800)
+    coordinator.register_rate_limit("civitai.com", 300)
+
+    urls = [
+        "https://civarchive.com/api/download/models/1",
+        "https://civitai.com/api/download/models/1",
+    ]
+
+    assert await manager._deprioritize_cooled_down_urls(urls) == urls
+
+
+@pytest.mark.asyncio
+async def test_deprioritize_cooled_down_urls_noop_without_cooldown(
+    reset_rate_limit_coordinator,
+):
+    manager = DownloadManager()
+
+    urls = [
+        "https://civarchive.com/api/download/models/1",
+        "https://civitai.com/api/download/models/1",
+    ]
+
+    assert await manager._deprioritize_cooled_down_urls(urls) == urls
 
 
 @pytest.mark.asyncio

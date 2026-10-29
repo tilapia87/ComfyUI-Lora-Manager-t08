@@ -99,6 +99,7 @@ export function getApiEndpoints(modelType) {
         fetchCivitai: `/api/lm/${modelType}/fetch-civitai`,
         fetchAllCivitai: `/api/lm/${modelType}/fetch-all-civitai`,
         relinkCivitai: `/api/lm/${modelType}/relink-civitai`,
+        civitaiModelByVersion: `/api/lm/${modelType}/civitai/model/version`,
         civitaiVersions: `/api/lm/${modelType}/civitai/versions`,
         refreshUpdates: `/api/lm/${modelType}/updates/refresh`,
         fetchMissingLicenses: `/api/lm/${modelType}/updates/fetch-missing-license`,
@@ -153,7 +154,6 @@ export const MODEL_SPECIFIC_ENDPOINTS = {
         civitaiUrl: `/api/lm/${MODEL_TYPES.LORA}/civitai-url`,
         metadata: `/api/lm/${MODEL_TYPES.LORA}/metadata`,
         getTriggerWordsPost: `/api/lm/${MODEL_TYPES.LORA}/get_trigger_words`,
-        civitaiModelByVersion: `/api/lm/${MODEL_TYPES.LORA}/civitai/model/version`,
         civitaiModelByHash: `/api/lm/${MODEL_TYPES.LORA}/civitai/model/hash`,
     },
     [MODEL_TYPES.CHECKPOINT]: {

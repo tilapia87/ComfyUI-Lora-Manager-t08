@@ -266,6 +266,7 @@
         },
         "filter": {
             "title": "Modelle filtern",
+            "countTitle": "{name} — {count} Modelle",
             "presets": "Voreinstellungen",
             "savePreset": "Aktive Filter als neue Voreinstellung speichern.",
             "savePresetDisabledActive": "Speichern nicht möglich: Eine Voreinstellung ist bereits aktiv. Ändern Sie die Filter, um eine neue Voreinstellung zu speichern",
@@ -401,7 +402,8 @@
             "autoOrganize": "Auto-Organisierung",
             "metadata": "Metadaten",
             "sidecarStorage": "Sidecar-Speicherung",
-            "proxySettings": "Proxy-Einstellungen"
+            "proxySettings": "Proxy-Einstellungen",
+            "sendToWorkflow": "An Workflow senden"
         },
         "nav": {
             "general": "Allgemein",
@@ -453,6 +455,18 @@
             "validation": {
                 "noPaths": "Geben Sie mindestens einen durch Kommas getrennten Pfad ein.",
                 "saveFailed": "Übersprungene Pfade konnten nicht gespeichert werden: {message}"
+            }
+        },
+        "sendToWorkflowExclusions": {
+            "nodeClasses": {
+                "label": "Ausgeschlossene Knotentypen",
+                "placeholder": "Beispiel: CheckpointLoaderSimple, MyCustomNode",
+                "help": "ComfyUI-Knotenklassennamen, die nie als Ziele beim Senden an den Workflow erscheinen. Mehrere Einträge mit Kommas oder Semikolons trennen. Knoten, die in ComfyUI explizit markiert wurden (Rechtsklick → Mark as), sind ausgenommen."
+            },
+            "titlePatterns": {
+                "label": "Ausgeschlossene Knotentitel-Muster",
+                "placeholder": "Beispiel: negative, preview",
+                "help": "Knoten, deren Titel einen dieser Textausschnitte enthält (Groß-/Kleinschreibung wird ignoriert), werden als Ziele beim Senden an den Workflow ausgeblendet. Mehrere Einträge mit Kommas oder Semikolons trennen. Knoten, die in ComfyUI explizit markiert wurden (Rechtsklick → Mark as), sind ausgenommen."
             }
         },
         "backup": {
@@ -579,6 +593,8 @@
             },
             "showVersionOnCard": "Version auf Karte anzeigen",
             "showVersionOnCardHelp": "Den Versionsnamen auf Modellkarten ein- oder ausblenden",
+            "showQuantizationOnCard": "Quantisierung auf Karte anzeigen",
+            "showQuantizationOnCardHelp": "Die Quantisierungsstufe (z. B. Q4_K_M, FP8) neben dem Versionsnamen auf Modellkarten anzeigen",
             "modelCardFooterAction": "Aktion der Modellkarten-Schaltfläche",
             "modelCardFooterActionOptions": {
                 "exampleImages": "Beispielbilder öffnen",
@@ -595,8 +611,8 @@
             "cardBlurAmountHelp": "Passen Sie die Unschärfeintensität der Kopf- und Fußzeilen-Overlays auf Modell- und Rezeptkarten an (0 = keine Unschärfe, 20 = maximale Unschärfe)."
         },
         "folderSettings": {
-            "activeLibrary": "Aktive Bibliothek",
-            "activeLibraryHelp": "Zwischen den konfigurierten Bibliotheken wechseln, um die Standardordner zu aktualisieren. Eine Änderung der Auswahl lädt die Seite neu.",
+            "activeLibrary": "Aktive Bibliothek (veraltet)",
+            "activeLibraryHelp": "Zwischen den konfigurierten Bibliotheken wechseln, um die Standardordner zu aktualisieren. Eine Änderung der Auswahl lädt die Seite neu. Veraltet: Die Unterstützung mehrerer Bibliotheken wird in einem kommenden Release entfernt. Mehrere Stammordner innerhalb einer Bibliothek werden weiterhin vollständig unterstützt.",
             "loadingLibraries": "Bibliotheken werden geladen...",
             "noLibraries": "Keine Bibliotheken konfiguriert",
             "defaultLoraRoot": "LoRA-Stammordner",
@@ -957,6 +973,11 @@
                 "random": "Zufällig",
                 "randomAction": "Zufällig mischen"
             },
+            "modelType": {
+                "title": "Nach Modelltyp filtern",
+                "all": "Alle Typen",
+                "multiple": "{count} Typen"
+            },
             "refresh": {
                 "title": "Modelliste aktualisieren",
                 "full": "Cache neu aufbauen",
@@ -1079,6 +1100,9 @@
     },
     "recipes": {
         "title": "LoRA-Rezepte",
+        "filter": {
+            "countTitle": "{name} — {count} Rezepte"
+        },
         "actions": {
             "sendCheckpoint": "Send to ComfyUI",
             "sendRecipe": "Send to ComfyUI",
@@ -1456,8 +1480,8 @@
             "notEmptyMessageCount": "Dieser Ordner enthält noch {count} Modelldatei(en). Löschen oder verschieben Sie diese zuerst — beim Löschen eines Ordners werden Modelldateien niemals mitgelöscht.",
             "notEmptyMessageExcluded": "Dieser Ordner enthält noch {count} Modelldatei(en), davon {excluded} von der Bibliothek ausgeschlossen. Heben Sie den Ausschluss unter „Ausgeschlossene Modelle verwalten“ auf und löschen Sie sie zuerst — beim Löschen eines Ordners werden Modelldateien niemals mitgelöscht.",
             "missingTitle": "Ordner nicht gefunden",
-            "missingMessage": "[TODO: Translate] This folder no longer exists on disk. You can remove it from the list.",
-            "removeFromList": "[TODO: Translate] Remove from list",
+            "missingMessage": "Dieser Ordner existiert nicht mehr auf dem Datenträger. Sie können ihn aus der Liste entfernen.",
+            "removeFromList": "Aus der Liste entfernen",
             "symlinkTitle": "Ordner ist ein symbolischer Link",
             "symlinkMessage": "Alle Kopien dieses Ordners sind symbolische Links; entfernen Sie den Link oder sein Ziel außerhalb von LoRA Manager.",
             "protectedTitle": "Ordner ist geschützt",
@@ -1479,8 +1503,8 @@
             "busy": "In diesem Ordner steht noch eine Löschung aus. Warten Sie, bis das Zeitfenster für das Rückgängigmachen abgelaufen ist.",
             "unsupported": "Das Löschen von Ordnern wird auf dieser Seite nicht unterstützt",
             "missing": "Dieser Ordner existiert nicht mehr auf dem Datenträger. Aktualisieren Sie die Seitenleiste und versuchen Sie es erneut.",
-            "forgotten": "[TODO: Translate] Folder \"{name}\" removed from the list",
-            "exists": "[TODO: Translate] The folder is back on disk. Delete it instead.",
+            "forgotten": "Ordner \"{name}\" aus der Liste entfernt",
+            "exists": "Der Ordner ist wieder auf dem Datenträger. Löschen Sie ihn stattdessen.",
             "symlink": "Dieser Ordner ist ein symbolischer Link; er kann nicht über die Seitenleiste gelöscht werden.",
             "successMulti": "Ordner \"{name}\" aus {count} Modell-Stammverzeichnissen gelöscht",
             "partial": "{count} von {total} Kopien gelöscht — {failed} konnten nicht gelöscht werden. Aktualisieren Sie die Seitenleiste und versuchen Sie es erneut."
@@ -1700,6 +1724,8 @@
             "errors": {
                 "invalidUrl": "Ungültiges Modell-URL-Format",
                 "noVersions": "Keine Versionen für dieses Modell verfügbar",
+                "linkedFileNotFound": "Die Datei {fileId} wurde in der angeforderten Modellversion nicht gefunden.",
+                "linkedFileNotWeightFile": "Die Datei {fileId} ist keine herunterladbare Modelldatei.",
                 "mixedSources": "CivitAI- und Hugging Face-/ModelScope-URLs können nicht in derselben Charge gemischt werden.",
                 "noModelFiles": "In diesem Repository wurden keine Modelldateien gefunden."
             },
@@ -2197,7 +2223,8 @@
             "copyReport": "Bericht kopieren",
             "downloadCsv": "CSV herunterladen",
             "columnModelName": "Modellname",
-            "columnError": "Fehler"
+            "columnError": "Fehler",
+            "rateLimitedNotice": "Abruf abgebrochen: Das Ratenlimit des Metadaten-Anbieters wurde erreicht. Führen Sie „Metadaten von CivitAI abrufen“ später erneut aus, um die verbleibenden Modelle zu wiederholen."
         },
         "downloadBatchSummary": {
             "title": "Zusammenfassung des Batch-Downloads",
@@ -2282,6 +2309,52 @@
                 "description": "Drücken Sie Strg+F (Cmd+F auf Mac), um schnell in Ihrer aktuellen Ansicht zu suchen.",
                 "alt": "Schnellsuche"
             }
+        },
+        "error": {
+            "title": "Initialisierung fehlgeschlagen",
+            "message": "Beim Scannen Ihrer Modellbibliothek ist ein Fehler aufgetreten.",
+            "retry": "Wiederholen"
+        }
+    },
+    "firstRun": {
+        "title": "Willkommen beim LoRA Manager",
+        "description": "Bevor Sie beginnen, muss LoRA Manager Ihre Modellbibliothek scannen und Metadaten-Sidecar-Dateien erstellen. Dies ist ein einmaliger Schritt; die Dauer hängt von der Größe der Bibliothek und der Geschwindigkeit Ihrer Festplatte ab.",
+        "libraries": {
+            "loras": "LoRAs",
+            "checkpoints": "Checkpoints",
+            "embeddings": "Embeddings",
+            "other": "Weitere Modelle"
+        },
+        "language": {
+            "label": "Sprache"
+        },
+        "libraryStats": "{count} Modelle · {size}",
+        "rootMissing": "Verzeichnis nicht gefunden",
+        "estimate": "Etwa {count} Modelle ({size}) — geschätzte Scanzeit ~{minutes} Min., abhängig von Bibliotheksgröße und Festplattengeschwindigkeit.",
+        "noRoots": {
+            "plugin": "Es wurden keine zugänglichen Modellordner gefunden. Öffnen Sie die Einstellungen, um Ihre Modellverzeichnisse zu konfigurieren, und laden Sie die Seite anschließend neu.",
+            "standalone": "Es wurden keine zugänglichen Modellordner gefunden. Bearbeiten Sie folder_paths in settings.json und starten Sie den Server anschließend neu."
+        },
+        "sidecar": {
+            "title": "Metadaten-Speicherung",
+            "alongside": {
+                "label": "Neben den Modelldateien (empfohlen)",
+                "description": "Metadaten-.json-Dateien werden neben jeder Modelldatei gespeichert und wandern daher mit dem Modell mit."
+            },
+            "centralized": {
+                "label": "Zentrales Verzeichnis",
+                "description": "Die Metadaten werden in einem separaten Verzeichnis gespeichert, sodass Ihre Modellordner sauber bleiben.",
+                "pathPlaceholder": "Verzeichnis für die zentrale Metadaten-Speicherung"
+            }
+        },
+        "actions": {
+            "start": "Scan starten",
+            "defer": "Später"
+        },
+        "errors": {
+            "loadFailed": "Bibliotheksinformationen konnten nicht geladen werden.",
+            "pathRequired": "Bitte geben Sie ein Speicherverzeichnis für zentralisierte Metadaten ein.",
+            "startFailed": "Der Scan konnte nicht gestartet werden."
         }
     },
     "duplicates": {
@@ -2322,7 +2395,8 @@
             "embeddingAdded": "Embedding zum Workflow hinzugefügt",
             "embeddingFailed": "Fehler beim Hinzufügen des Embeddings",
             "promptSent": "Prompt an Workflow gesendet",
-            "promptFailed": "Fehler beim Senden des Prompts"
+            "promptFailed": "Fehler beim Senden des Prompts",
+            "nodeTypeExcluded": "Knotentyp \"{type}\" von den Sendezielen ausgeschlossen"
         },
         "nodeSelector": {
             "recipe": "Rezept",
@@ -2332,7 +2406,8 @@
             "replace": "Ersetzen",
             "append": "Anhängen",
             "selectTargetNode": "Zielknoten auswählen",
-            "sendToAll": "An alle senden"
+            "sendToAll": "An alle senden",
+            "excludeNodeType": "Diesen Knotentyp nie vorschlagen"
         },
         "exampleImages": {
             "opened": "Beispielbilder-Ordner geöffnet",
@@ -2796,7 +2871,9 @@
             "noItemsSelected": "Keine {type} zum Löschen ausgewählt",
             "deleteError": "Fehler: {message}",
             "deleteSuccess": "{count} {type} erfolgreich gelöscht",
-            "deleteFailed": "Fehler beim Löschen von {type}: {message}"
+            "deleteFailed": "Fehler beim Löschen von {type}: {message}",
+            "deletePartialFailed": "Fehler beim Löschen von {failed} ausgewählten {type}: {message}",
+            "cacheUpdateFailed": "Die Dateien wurden gelöscht, aber der Bibliotheks-Cache konnte nicht aktualisiert werden. Führen Sie „Cache neu aufbauen“ aus, um die Liste zu aktualisieren."
         },
         "controls": {
             "reloadFailed": "Fehler beim Neuladen von {pageType}: {message}",
@@ -2809,7 +2886,7 @@
             "contentRatingFailed": "Fehler beim Setzen der Inhaltsbewertung: {message}",
             "relinkSuccess": "Modell erfolgreich mit CivitAI neu verknüpft",
             "relinkFailed": "Fehler: {message}",
-            "linkHfSuccess": "Modell erfolgreich mit HuggingFace verknüpft",
+            "linkHfSuccess": "Modell erfolgreich mit seiner Modellquelle verknüpft",
             "linkHfFailed": "Fehler: {message}",
             "linkCivArchSuccess": "Modell erfolgreich über CivitArchive neu verknüpft",
             "fetchMetadataFirst": "Bitte rufen Sie zuerst Metadaten von CivitAI ab",
@@ -2856,6 +2933,7 @@
             "metadataUpdateComplete": "Metadaten-Update abgeschlossen",
             "operationCancelled": "Vorgang vom Benutzer abgebrochen",
             "operationCancelledPartial": "Vorgang abgebrochen. {success} Elemente verarbeitet.",
+            "metadataFetchRateLimited": "Metadaten-Abruf wegen Ratenlimit abgebrochen — {success} von {total} aktualisiert, {failed} fehlgeschlagen, {skipped} übersprungen. Führen Sie den Abruf von CivitAI später erneut aus, um den Rest zu wiederholen.",
             "metadataFetchFailed": "Fehler beim Abrufen der Metadaten: {message}",
             "bulkMetadataCompleteAll": "Alle {count} {type}s erfolgreich aktualisiert",
             "bulkMetadataCompletePartial": "{success} von {total} {type}s aktualisiert",
@@ -3000,6 +3078,12 @@
             "content": "Scannen und verwalten Sie VAE-, Upscaler-, Text-Encoder-, CLIP-Vision- und ControlNet-Dateien und laden Sie sie von CivitAI herunter, alles auf einer eigenen Seite.",
             "enable": "Weitere Modelle aktivieren",
             "openSettings": "Einstellungen öffnen"
+        },
+        "bulkFetchPrompt": {
+            "title": "Erwecken Sie Ihre Bibliothek zum Leben",
+            "content": "Ihr erster Scan hat {count} Modelle ohne Metadaten gefunden. Rufen Sie ihre Informationen von CivitAI ab, um Vorschaubilder, Beschreibungen und Trigger Words zu erhalten.",
+            "fetch": "Metadaten abrufen",
+            "later": "Vielleicht später"
         },
         "pager": {
             "previous": "Vorherige Mitteilung",

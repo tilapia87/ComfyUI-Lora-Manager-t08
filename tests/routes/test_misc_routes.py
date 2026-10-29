@@ -1222,6 +1222,47 @@ async def test_register_nodes_defaults_graph_name_to_none():
 
 
 @pytest.mark.asyncio
+async def test_register_nodes_passes_through_exclude_send():
+    node_registry = NodeRegistry()
+    handler = NodeRegistryHandler(
+        node_registry=node_registry,
+        prompt_server=FakePromptServer,  # pyright: ignore[reportArgumentType]
+        standalone_mode=False,
+    )
+
+    request = FakeRequest(
+        json_data={
+            "nodes": [
+                {
+                    "node_id": 10,
+                    "graph_id": "root",
+                    "type": "CLIPTextEncode",
+                    "title": "Excluded Encoder",
+                    "exclude_send": True,
+                },
+                {
+                    "node_id": 11,
+                    "graph_id": "root",
+                    "type": "CLIPTextEncode",
+                    "title": "Normal Encoder",
+                },
+            ],
+            "client_id": "test-client-1",
+        }
+    )
+
+    response = await handler.register_nodes(request)  # pyright: ignore[reportArgumentType]
+    payload = _json_payload(response)
+
+    assert payload["success"] is True
+
+    registry = await node_registry.get_merged_registry()
+    nodes = registry["nodes"]
+    assert nodes["root:10"]["exclude_send"] is True
+    assert nodes["root:11"]["exclude_send"] is False
+
+
+@pytest.mark.asyncio
 async def test_register_nodes_includes_capabilities():
     node_registry = NodeRegistry()
     handler = NodeRegistryHandler(
@@ -2886,6 +2927,119 @@ async def test_get_init_status_reports_pending_scanners():
     assert "lora" not in payload["details"]
 
 
+async def test_get_init_status_scopes_to_requesting_page():
+    """?page= mirrors the WebSocket per-pageType completion semantics."""
+
+    async def ready_scanner():
+        return SimpleNamespace(_cache=object(), is_initializing=lambda: False)
+
+    async def initializing_scanner():
+        return SimpleNamespace(_cache=object(), is_initializing=lambda: True)
+
+    handler = HealthCheckHandler(
+        scanner_getters={
+            "lora": ready_scanner,
+            "checkpoint": initializing_scanner,
+        }
+    )
+
+    # The loras page only waits for the lora scanner, even while the
+    # checkpoint scan is still running.
+    response = await handler.get_init_status(FakeRequest(method="GET", query={"page": "loras"}))  # pyright: ignore[reportArgumentType]
+    payload = _json_payload(response)
+    assert payload["status"] == "complete"
+
+    # The checkpoints page keeps waiting for its own scanner.
+    response = await handler.get_init_status(FakeRequest(method="GET", query={"page": "checkpoints"}))  # pyright: ignore[reportArgumentType]
+    payload = _json_payload(response)
+    assert payload["status"] == "initializing"
+    assert "checkpoint" in payload["details"]
+
+    # No page parameter: aggregate behaviour (every scanner must be done).
+    response = await handler.get_init_status(FakeRequest(method="GET"))  # pyright: ignore[reportArgumentType]
+    payload = _json_payload(response)
+    assert payload["status"] == "initializing"
+
+
+async def test_get_init_status_reports_scanner_errors():
+    """A failed initial scan must not masquerade as 'complete'."""
+
+    async def failed_scanner():
+        return SimpleNamespace(
+            _cache=object(),
+            is_initializing=lambda: False,
+            _init_error="disk unreadable",
+        )
+
+    async def ready_scanner():
+        return SimpleNamespace(_cache=object(), is_initializing=lambda: False)
+
+    handler = HealthCheckHandler(
+        scanner_getters={
+            "lora": failed_scanner,
+            "checkpoint": ready_scanner,
+        }
+    )
+
+    response = await handler.get_init_status(FakeRequest(method="GET"))  # pyright: ignore[reportArgumentType]
+    payload = _json_payload(response)
+    assert payload["status"] == "error"
+    assert "disk unreadable" in payload["details"]
+
+    # Scoped to a healthy page, the failure of another scanner is irrelevant.
+    response = await handler.get_init_status(FakeRequest(method="GET", query={"page": "checkpoints"}))  # pyright: ignore[reportArgumentType]
+    payload = _json_payload(response)
+    assert payload["status"] == "complete"
+
+    # A busy scanner takes precedence over a stale error record.
+    async def busy_scanner():
+        return SimpleNamespace(
+            _cache=object(),
+            is_initializing=lambda: True,
+            _init_error="stale",
+        )
+
+    handler = HealthCheckHandler(scanner_getters={"lora": busy_scanner})
+    response = await handler.get_init_status(FakeRequest(method="GET"))  # pyright: ignore[reportArgumentType]
+    payload = _json_payload(response)
+    assert payload["status"] == "initializing"
+
+
+async def test_get_metadata_fetch_candidates_counts_eligible_models():
+    async def lora_scanner():
+        return SimpleNamespace(
+            _cache=SimpleNamespace(
+                raw_data=[
+                    {"folder": ""},  # candidate: no metadata yet
+                    {"folder": "", "civitai": {"id": 1}},  # already fetched
+                    {"folder": "", "skip_metadata_refresh": True},  # opted out
+                ]
+            ),
+        )
+
+    async def no_cache_scanner():
+        return SimpleNamespace(_cache=None)
+
+    async def recipe_scanner():
+        return SimpleNamespace(_cache=SimpleNamespace(raw_data=[{"folder": ""}]))
+
+    handler = HealthCheckHandler(
+        scanner_getters={
+            "lora": lora_scanner,
+            "checkpoint": no_cache_scanner,
+            "recipe": recipe_scanner,
+        }
+    )
+
+    response = await handler.get_metadata_fetch_candidates(FakeRequest(method="GET"))  # pyright: ignore[reportArgumentType]
+    payload = _json_payload(response)
+
+    assert payload["success"] is True
+    assert payload["counts"] == {"loras": 1, "checkpoints": 0}
+    # Recipes have no bulk metadata fetch, so they are never reported.
+    assert "recipes" not in payload["counts"]
+
+
 class StaticMetadataProvider:
     """Metadata provider returning one fixed CivitAI model payload."""
 
@@ -3201,6 +3355,7 @@ def _stub_misc_handler_set(**overrides) -> MiscHandlerSet:
         "agent_handler",
         "download_routing",
         "sidecar_migration",
+        "first_run",
     )
     handlers = {name: _AnyHandler() for name in names}
     handlers.update(overrides)

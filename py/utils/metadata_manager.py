@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Type, Union, cast
 
 from .models import BaseModelMetadata, CheckpointMetadata, EmbeddingMetadata, LoraMetadata
 from .file_utils import normalize_path, find_preview_file, calculate_sha256, calculate_autov3
+from .gguf_utils import detect_quantization
 from .lora_metadata import extract_lora_metadata, extract_checkpoint_metadata
 from .sidecar_paths import get_metadata_path, get_preview_dir, resolve_metadata_path
 
@@ -263,6 +264,15 @@ class MetadataManager:
             start_hash_time = time.perf_counter()
             logger.debug(f"Calculating SHA256 hash for {real_path}...")
             sha256 = await calculate_sha256(real_path)
+            if not sha256:
+                # An empty file has no model identity: writing a sidecar for it
+                # would persist the empty-string SHA256 placeholder and pull the
+                # file into the library as a bogus duplicate of every other
+                # unread file (issue #1162). Leave it unmanaged instead.
+                logger.warning(
+                    f"Skipping metadata creation for empty model file: {file_path}"
+                )
+                return None
             hash_duration = time.perf_counter() - start_hash_time
             logger.info(f"SHA256 hash calculated for {real_path} in {hash_duration:.3f}s")
             
@@ -270,6 +280,10 @@ class MetadataManager:
             # large files. At creation time we always know the checked state:
             # store "" when no recognized hash is embedded (checked-unavailable).
             autov3 = calculate_autov3(real_path)
+
+            # Quantization detection is likewise header-only (GGUF file_type /
+            # safetensors dtypes). "" = checked, no quantization detected.
+            quantization = detect_quantization(real_path)
             
             # Create instance based on model type
             if model_class.__name__ == "CheckpointMetadata":
@@ -320,6 +334,7 @@ class MetadataManager:
             
             # Record the AutoV3 state explicitly ("" = checked, no value).
             metadata.autov3 = autov3 or ""
+            metadata.quantization = quantization or ""
 
             # Try to extract model-specific metadata
             # await MetadataManager._enrich_metadata(metadata, real_path)

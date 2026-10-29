@@ -58,6 +58,19 @@ def get_lora_syntax_format():
         return "legacy"
 
 
+def get_anima_lora_remap_enabled() -> bool:
+    """Return whether legacy Anima LoRA block remapping is enabled."""
+    try:
+        from ..services.settings_manager import get_settings_manager
+        value = get_settings_manager().get("anima_lora_block_remap", True)
+    except Exception:
+        return True
+
+    if isinstance(value, str):
+        return value.strip().lower() not in ("0", "false", "off", "no", "disabled")
+    return bool(value)
+
+
 def apply_lora_syntax_format(name):
     fmt = get_lora_syntax_format()
     if fmt == "legacy":
@@ -261,6 +274,36 @@ def validate_lora_entries(kwargs):
     if not missing:
         return None
     return "Missing LoRA(s) in local library: " + ", ".join(missing)
+
+
+def validate_loader_model_name(model_name):
+    """Validate a checkpoint/unet loader node's model name against the cache.
+
+    Used by the loader nodes' ``VALIDATE_INPUTS`` so ComfyUI skips its strict
+    "value not in list" check for the model combo (declared inputs bypass it)
+    and this helper decides instead. The combo list is forward-slashed on
+    every platform, but Windows workflows saved before the forward-slash
+    paths fix carry backslash-spelled names ("dir\\model.safetensors"), so
+    the name is separator-normalized before the cache lookup.
+
+    Returns:
+        None when the name resolves to an indexed model, the input is wired
+        (non-string), or validation cannot run (scanner not ready); otherwise
+        a descriptive error string. Verification failures are treated as
+        valid so queueing is never blocked by validation machinery itself.
+    """
+    if not isinstance(model_name, str) or not model_name:
+        return None
+    try:
+        from ..utils.utils import get_checkpoint_info_absolute
+
+        _, metadata = get_checkpoint_info_absolute(model_name.replace("\\", "/"))
+    except Exception:
+        logger.exception("Failed to validate loader model name")
+        return None
+    if metadata is None:
+        return f"Model '{model_name}' not found in LoRA Manager cache."
+    return None
 
 
 def load_state_dict_in_safetensors(path, device="cpu", filter_prefix=""):

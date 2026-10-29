@@ -266,6 +266,7 @@
         },
         "filter": {
             "title": "篩選模型",
+            "countTitle": "{name} —— {count} 個模型",
             "presets": "預設",
             "savePreset": "將目前啟用的篩選器儲存為新預設。",
             "savePresetDisabledActive": "無法儲存：已有預設處於啟用狀態。修改篩選器後可儲存新預設",
@@ -401,7 +402,8 @@
             "autoOrganize": "自動整理",
             "metadata": "中繼資料",
             "sidecarStorage": "附屬檔案儲存",
-            "proxySettings": "代理設定"
+            "proxySettings": "代理設定",
+            "sendToWorkflow": "傳送到工作流"
         },
         "nav": {
             "general": "通用",
@@ -453,6 +455,18 @@
             "validation": {
                 "noPaths": "請輸入至少一個路徑，以逗號分隔。",
                 "saveFailed": "無法儲存跳過路徑：{message}"
+            }
+        },
+        "sendToWorkflowExclusions": {
+            "nodeClasses": {
+                "label": "排除的節點類型",
+                "placeholder": "範例: CheckpointLoaderSimple, MyCustomNode",
+                "help": "這些 ComfyUI 節點類名永遠不會作為傳送到工作流的目標出現。多個項目請用逗號或分號分隔。在 ComfyUI 中明確標記的節點（右鍵 → Mark as）不受此限制。"
+            },
+            "titlePatterns": {
+                "label": "排除的節點標題模式",
+                "placeholder": "範例: negative, preview",
+                "help": "標題包含這些文字片段（不分大小寫）的節點不會出現在傳送到工作流的目標中。多個項目請用逗號或分號分隔。在 ComfyUI 中明確標記的節點（右鍵 → Mark as）不受此限制。"
             }
         },
         "backup": {
@@ -579,6 +593,8 @@
             },
             "showVersionOnCard": "在卡片上顯示版本",
             "showVersionOnCardHelp": "在模型卡片上顯示或隱藏版本名稱",
+            "showQuantizationOnCard": "在卡片上顯示量化",
+            "showQuantizationOnCardHelp": "在模型卡片上的版本名稱旁顯示量化級別（如 Q4_K_M, FP8）",
             "modelCardFooterAction": "模型卡片按鈕操作",
             "modelCardFooterActionOptions": {
                 "exampleImages": "開啟範例圖片",
@@ -595,8 +611,8 @@
             "cardBlurAmountHelp": "調整模型和配方卡片上頁首和頁尾疊加層的模糊強度（0 = 無模糊，20 = 最大模糊）。"
         },
         "folderSettings": {
-            "activeLibrary": "使用中的資料庫",
-            "activeLibraryHelp": "在已設定的資料庫之間切換以更新預設資料夾。變更選項會重新載入頁面。",
+            "activeLibrary": "使用中的資料庫（已棄用）",
+            "activeLibraryHelp": "在已設定的資料庫之間切換以更新預設資料夾。變更選項將重新載入頁面。已棄用：多資料庫支援將在即將推出的版本中移除。單一資料庫內的多個資料夾根目錄仍完全受支援。",
             "loadingLibraries": "正在載入資料庫...",
             "noLibraries": "尚未設定任何資料庫",
             "defaultLoraRoot": "LoRA 根目錄",
@@ -957,6 +973,11 @@
                 "random": "隨機",
                 "randomAction": "隨機排序（洗牌）"
             },
+            "modelType": {
+                "title": "依模型類型篩選",
+                "all": "全部類型",
+                "multiple": "{count} 種類型"
+            },
             "refresh": {
                 "title": "重新整理模型列表",
                 "full": "重建快取",
@@ -1079,6 +1100,9 @@
     },
     "recipes": {
         "title": "LoRA 配方",
+        "filter": {
+            "countTitle": "{name} —— {count} 個配方"
+        },
         "actions": {
             "sendCheckpoint": "傳送到 ComfyUI",
             "sendRecipe": "傳送到 ComfyUI",
@@ -1456,8 +1480,8 @@
             "notEmptyMessageCount": "該資料夾中仍有 {count} 個模型檔案，請先刪除或移出這些模型 —— 刪除資料夾不會串聯刪除模型檔案。",
             "notEmptyMessageExcluded": "該資料夾中仍有 {count} 個模型檔案，其中 {excluded} 個已從模型庫中排除。請先在「管理已排除的模型」中取消排除並刪除它們 —— 刪除資料夾不會串聯刪除模型檔案。",
             "missingTitle": "未找到資料夾",
-            "missingMessage": "[TODO: Translate] This folder no longer exists on disk. You can remove it from the list.",
-            "removeFromList": "[TODO: Translate] Remove from list",
+            "missingMessage": "該資料夾在磁碟上已不存在，您可以將其從清單中移除。",
+            "removeFromList": "從清單中移除",
             "symlinkTitle": "資料夾是符號連結",
             "symlinkMessage": "該資料夾的每一份副本都是符號連結；請在 LoRA Manager 之外刪除該連結或其指向的目標。",
             "protectedTitle": "資料夾受保護",
@@ -1479,8 +1503,8 @@
             "busy": "該資料夾內仍有待處理的刪除操作，請等待復原時間結束。",
             "unsupported": "此頁面不支援刪除資料夾",
             "missing": "該資料夾在磁碟上已不存在，請重新整理側邊欄後再試。",
-            "forgotten": "[TODO: Translate] Folder \"{name}\" removed from the list",
-            "exists": "[TODO: Translate] The folder is back on disk. Delete it instead.",
+            "forgotten": "已將資料夾 \"{name}\" 從清單中移除",
+            "exists": "該資料夾已重新出現在磁碟上，請改為刪除它。",
             "symlink": "該資料夾是符號連結，無法從側邊欄中刪除。",
             "successMulti": "已從 {count} 個模型根目錄中刪除資料夾 \"{name}\"",
             "partial": "已刪除 {total} 份副本中的 {count} 份 —— {failed} 份無法刪除。請重新整理側邊欄後再試。"
@@ -1700,6 +1724,8 @@
             "errors": {
                 "invalidUrl": "模型網址格式無效",
                 "noVersions": "此模型無可用版本",
+                "linkedFileNotFound": "未在所要求的模型版本中找到檔案 {fileId}。",
+                "linkedFileNotWeightFile": "檔案 {fileId} 不是可下載的模型檔案。",
                 "mixedSources": "無法在同一批次中混合使用 CivitAI 和 Hugging Face / ModelScope URL。",
                 "noModelFiles": "在此倉庫中未找到模型檔案。"
             },
@@ -2197,7 +2223,8 @@
             "copyReport": "複製報告",
             "downloadCsv": "下載 CSV",
             "columnModelName": "模型名稱",
-            "columnError": "錯誤"
+            "columnError": "錯誤",
+            "rateLimitedNotice": "取得已中止：已達到中繼資料提供者的速率限制。請稍後重新執行「從 CivitAI 取得 metadata」，以重試剩餘的模型。"
         },
         "downloadBatchSummary": {
             "title": "批次下載摘要",
@@ -2282,6 +2309,52 @@
                 "description": "按 Ctrl+F（Mac 為 Cmd+F）可在目前檢視中快速搜尋。",
                 "alt": "快速搜尋"
             }
+        },
+        "error": {
+            "title": "初始化失敗",
+            "message": "掃描您的模型庫時發生錯誤。",
+            "retry": "重試"
+        }
+    },
+    "firstRun": {
+        "title": "歡迎使用 LoRA 管理器",
+        "description": "開始之前，LoRA Manager 需要掃描您的模型庫並產生中繼資料附屬檔案。這是單次步驟；所需時間取決於模型庫的大小與磁碟速度。",
+        "libraries": {
+            "loras": "LoRA",
+            "checkpoints": "Checkpoint",
+            "embeddings": "Embedding",
+            "other": "其他模型"
+        },
+        "language": {
+            "label": "語言"
+        },
+        "libraryStats": "{count} 個模型 · {size}",
+        "rootMissing": "找不到目錄",
+        "estimate": "約 {count} 個模型（{size}），預計掃描時間約 {minutes} 分鐘，視模型庫大小與磁碟速度而定。",
+        "noRoots": {
+            "plugin": "找不到可存取的模型資料夾。開啟設定以設定模型目錄，然後重新載入此頁面。",
+            "standalone": "找不到可存取的模型資料夾。請編輯 settings.json 中的 folder_paths，然後重新啟動伺服器。"
+        },
+        "sidecar": {
+            "title": "中繼資料儲存",
+            "alongside": {
+                "label": "與模型檔案放在一起（建議）",
+                "description": "中繼資料 .json 檔案與每個模型檔案存放在一起，因此會隨模型一起移動。"
+            },
+            "centralized": {
+                "label": "集中目錄",
+                "description": "中繼資料儲存在獨立的目錄中，讓模型資料夾保持整潔。",
+                "pathPlaceholder": "集中中繼資料儲存目錄"
+            }
+        },
+        "actions": {
+            "start": "開始掃描",
+            "defer": "稍後"
+        },
+        "errors": {
+            "loadFailed": "載入模型庫資訊失敗。",
+            "pathRequired": "請輸入集中儲存中繼資料的目錄。",
+            "startFailed": "無法開始掃描。"
         }
     },
     "duplicates": {
@@ -2322,7 +2395,8 @@
             "embeddingAdded": "Embedding 已附加到工作流",
             "embeddingFailed": "傳送 Embedding 到工作流失敗",
             "promptSent": "提示詞已發送到工作流",
-            "promptFailed": "提示詞發送失敗"
+            "promptFailed": "提示詞發送失敗",
+            "nodeTypeExcluded": "節點類型 \"{type}\" 已從傳送目標中排除"
         },
         "nodeSelector": {
             "recipe": "配方",
@@ -2332,7 +2406,8 @@
             "replace": "取代",
             "append": "附加",
             "selectTargetNode": "選擇目標節點",
-            "sendToAll": "全部傳送"
+            "sendToAll": "全部傳送",
+            "excludeNodeType": "不再建議此節點類型"
         },
         "exampleImages": {
             "opened": "範例圖片資料夾已開啟",
@@ -2796,7 +2871,9 @@
             "noItemsSelected": "未選擇要刪除的 {type}",
             "deleteError": "錯誤：{message}",
             "deleteSuccess": "成功刪除 {count} 個 {type}",
-            "deleteFailed": "刪除 {type} 失敗：{message}"
+            "deleteFailed": "刪除 {type} 失敗：{message}",
+            "deletePartialFailed": "刪除 {failed} 個已選取的 {type} 失敗：{message}",
+            "cacheUpdateFailed": "檔案已刪除，但無法更新模型庫快取。請執行「重建快取」以重新整理清單。"
         },
         "controls": {
             "reloadFailed": "重新載入 {pageType} 失敗：{message}",
@@ -2809,7 +2886,7 @@
             "contentRatingFailed": "設定內容分級失敗：{message}",
             "relinkSuccess": "模型已成功重新連結至 CivitAI",
             "relinkFailed": "錯誤：{message}",
-            "linkHfSuccess": "模型已成功連結到 HuggingFace",
+            "linkHfSuccess": "模型已成功連結至其模型來源",
             "linkHfFailed": "錯誤：{message}",
             "linkCivArchSuccess": "模型已成功透過 CivitArchive 重新連結",
             "fetchMetadataFirst": "請先從 CivitAI 取得 metadata",
@@ -2856,6 +2933,7 @@
             "metadataUpdateComplete": "metadata 更新完成",
             "operationCancelled": "操作已由用戶取消",
             "operationCancelledPartial": "操作已取消。已處理 {success} 個項目。",
+            "metadataFetchRateLimited": "因速率限制，中繼資料取得已中止——已更新 {total} 個中的 {success} 個，失敗 {failed} 個，跳過 {skipped} 個。請稍後重新從 CivitAI 取得中繼資料，以重試其餘模型。",
             "metadataFetchFailed": "取得 metadata 失敗：{message}",
             "bulkMetadataCompleteAll": "已成功刷新全部 {count} 個 {type}",
             "bulkMetadataCompletePartial": "已刷新 {success} / {total} 個 {type}",
@@ -3000,6 +3078,12 @@
             "content": "在專屬頁面中掃描和管理 VAE、Upscaler、Text Encoder、CLIP Vision 和 ControlNet 檔案，並從 CivitAI 下載。",
             "enable": "啟用其他模型",
             "openSettings": "開啟設定"
+        },
+        "bulkFetchPrompt": {
+            "title": "讓您的模型庫煥發生機",
+            "content": "首次掃描發現 {count} 個模型缺少中繼資料。從 CivitAI 取得這些模型的資訊，即可獲得預覽圖片、描述與觸發詞。",
+            "fetch": "取得中繼資料",
+            "later": "稍後再說"
         },
         "pager": {
             "previous": "上一則通知",

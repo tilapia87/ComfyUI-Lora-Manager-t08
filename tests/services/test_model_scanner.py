@@ -33,7 +33,8 @@ from py.services.pending_delete_service import (
 )
 from py.services.persistent_model_cache import PersistentModelCache, DEFAULT_LICENSE_FLAGS
 from py.utils.civitai_utils import build_license_flags
-from py.utils.models import BaseModelMetadata
+from py.utils.models import BaseModelMetadata, LoraMetadata
+from py.utils.sidecar_paths import get_metadata_path
 
 
 class RecordingWebSocketManager:
@@ -190,6 +191,61 @@ def _create_files(root: Path) -> tuple[Path, Path, Path]:
 
 
 @pytest.mark.asyncio
+async def test_calculate_folder_preserves_case_with_drive_letter_paths(tmp_path: Path):
+    scanner = DummyScanner(tmp_path)
+    # The host may spell the root in a different case than the file path.
+    scanner._root = "c:/models/loras"
+    folder = scanner._calculate_folder("C:/Models/Loras/Krea 2/Kroma/Merges/model.safetensors")
+    assert folder == "Krea 2/Kroma/Merges"
+
+
+@pytest.mark.asyncio
+async def test_calculate_folder_preserves_case_with_backslash_paths(tmp_path: Path):
+    scanner = DummyScanner(tmp_path)
+    scanner._root = "C:\\Models\\Loras"
+    folder = scanner._calculate_folder("C:\\Models\\Loras\\Krea 2\\model.safetensors")
+    assert folder == "Krea 2"
+
+
+@pytest.mark.asyncio
+async def test_calculate_folder_returns_empty_for_root_and_unknown_paths(tmp_path: Path):
+    scanner = DummyScanner(tmp_path)
+    scanner._root = "C:/Models/Loras"
+    assert scanner._calculate_folder("C:/Models/Loras/model.safetensors") == ""
+    assert scanner._calculate_folder("D:/Elsewhere/model.safetensors") == ""
+
+
+@pytest.mark.asyncio
+async def test_reconcile_cache_heals_folder_drift(tmp_path: Path):
+    """An incremental refresh repairs entries whose folder no longer matches
+    where the file actually sits (issue #1148): older versions could record a
+    wrong folder, and the sidebar drag-and-drop strips the folder off the file
+    path to find the library root, so the stale value made the next move nest
+    the target under the source directory."""
+    nested = tmp_path / "anima" / "character"
+    nested.mkdir(parents=True)
+    model = nested / "x.txt"
+    model.write_text("x", encoding="utf-8")
+
+    scanner = DummyScanner(tmp_path)
+    await scanner._initialize_cache()
+
+    item = next(i for i in scanner._cache.raw_data if i["file_path"].endswith("/x.txt"))
+    assert item["folder"] == "anima/character"
+    item["folder"] = ""  # pollution as written by the buggy versions
+
+    summary = await scanner._reconcile_cache()
+
+    assert item["folder"] == "anima/character"
+    assert summary["folder_repaired"] == 1
+    assert "anima/character" in scanner._cache.folders
+
+    # A second reconcile over the healed cache finds nothing left to repair.
+    summary = await scanner._reconcile_cache()
+    assert summary["folder_repaired"] == 0
+
+
+@pytest.mark.asyncio
 async def test_initialize_cache_populates_cache(tmp_path: Path):
     _create_files(tmp_path)
     scanner = DummyScanner(tmp_path)
@@ -223,7 +279,8 @@ async def test_initialize_cache_sync_returns_result_without_mutating_state(tmp_p
     scanner._cache = ModelCache(raw_data=[{"file_path": "sentinel", "folder": ""}], folders=["existing"])
 
     loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(None, scanner._initialize_cache_sync, 2, "dummy")
+    collected = scanner._collect_model_files()
+    result = await loop.run_in_executor(None, scanner._initialize_cache_sync, collected, "dummy")
 
     assert isinstance(result, CacheBuildResult)
     assert {item["file_path"] for item in result.raw_data} == {
@@ -235,6 +292,80 @@ async def test_initialize_cache_sync_returns_result_without_mutating_state(tmp_p
 
     assert scanner._cache.raw_data == [{"file_path": "sentinel", "folder": ""}]
     assert scanner._hash_index.get_path("hash-one") is None
+
+
+@pytest.mark.asyncio
+async def test_collect_model_files_records_files_folders_and_bytes(tmp_path: Path):
+    _create_files(tmp_path)
+    scanner = DummyScanner(tmp_path)
+
+    collected = scanner._collect_model_files()
+
+    assert {Path(item.file_path).name for item in collected.files} == {
+        "one.txt",
+        "two.txt",
+        "skip-file.txt",
+    }
+    assert collected.folders == ["nested"]
+    expected_bytes = sum(
+        (tmp_path / name).stat().st_size
+        for name in ("one.txt", "skip-file.txt")
+    ) + (tmp_path / "nested" / "two.txt").stat().st_size
+    assert collected.total_bytes == expected_bytes
+    assert scanner._count_model_files() == len(collected.files)
+
+
+@pytest.mark.asyncio
+async def test_gather_model_data_consumes_collected_without_rewalking(tmp_path: Path, monkeypatch):
+    """The processing phase must not walk the tree a second time."""
+    _create_files(tmp_path)
+    scanner = DummyScanner(tmp_path)
+    collected = scanner._collect_model_files()
+
+    def fail_collect(*_args, **_kwargs):
+        pytest.fail("_gather_model_data re-walked the tree instead of reusing the collected scan")
+
+    monkeypatch.setattr(scanner, "_collect_model_files", fail_collect)
+
+    result = await scanner._gather_model_data(collected=collected)
+
+    assert {item["file_path"] for item in result.raw_data} == {
+        _normalize_path(tmp_path / "one.txt"),
+        _normalize_path(tmp_path / "nested" / "two.txt"),
+    }
+    assert result.all_folders == ["nested"]
+
+
+@pytest.mark.asyncio
+async def test_initialize_cache_sync_broadcasts_structured_progress(tmp_path: Path, monkeypatch):
+    """Progress broadcasts carry processed/total/bytes fields for the UI."""
+    _create_files(tmp_path)
+    scanner = DummyScanner(tmp_path)
+
+    ws_stub = RecordingWebSocketManager()
+    monkeypatch.setattr(model_scanner, "ws_manager", ws_stub)
+
+    collected = scanner._collect_model_files()
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(
+        None, scanner._initialize_cache_sync, collected, "dummy"
+    )
+
+    assert isinstance(result, CacheBuildResult)
+    progress_payloads = [
+        payload
+        for payload in ws_stub.payloads
+        if payload.get("stage") == "process_models"
+    ]
+    assert progress_payloads, "expected process_models progress broadcasts"
+    for payload in progress_payloads:
+        assert {"processed", "total", "bytes_done", "bytes_total"} <= payload.keys()
+
+    # The throttling always lets the final update through.
+    final = progress_payloads[-1]
+    assert final["processed"] == final["total"] == len(collected.files)
+    assert final["bytes_done"] == collected.total_bytes
+    assert final["bytes_total"] == collected.total_bytes
 
 
 @pytest.mark.asyncio
@@ -1463,6 +1594,202 @@ async def test_bulk_delete_cancelled_after_one_staged_batch_present(
     assert not first.exists()
     # The second file was never touched.
     assert second.exists()
+
+
+# ── cache staleness after delete (issue #1154) ──────────────────────────────
+
+
+def _make_duplicate_scanner(
+    root: Path, file_paths: List[Path], sha: str = "hash-dup"
+) -> DummyScanner:
+    """Cache two files as hash duplicates, matching what a scan produces."""
+    scanner = DummyScanner(root)
+    raw_data = []
+    for path in file_paths:
+        name = os.path.splitext(os.path.basename(path))[0]
+        raw_data.append(
+            {
+                "file_path": _normalize_path(path),
+                "folder": "",
+                "sha256": sha,
+                "tags": [],
+                "model_name": name,
+                "file_name": name,
+                "size": 1,
+                "modified": 1.0,
+            }
+        )
+    scanner._cache = ModelCache(
+        raw_data=raw_data, folders=[], name_display_mode="model_name"
+    )
+    for entry in raw_data:
+        scanner._hash_index.add_entry(entry["sha256"], entry["file_path"])
+    return scanner
+
+
+@pytest.mark.asyncio
+async def test_bulk_delete_cleans_cache_row_when_file_is_already_gone(
+    tmp_path: Path,
+):
+    """A stale row whose file vanished must be removed, not reported as failure.
+
+    This is the state a user lands in when a previous delete removed the file
+    but the cache update did not run: the duplicate keeps showing and every
+    retry used to fail with "No files deleted".
+    """
+    root = tmp_path / "loras"
+    root.mkdir()
+    main = root / "model.safetensors"
+    main.write_text("same", encoding="utf-8")
+    missing = root / "model-copy.safetensors"  # never written to disk
+
+    scanner = _make_duplicate_scanner(root, [main, missing])
+    assert scanner._hash_index.get_duplicate_hashes()
+
+    result = await scanner.bulk_delete_models([_normalize_path(missing)])
+
+    assert result["success"] is True
+    assert result["total_deleted"] == 1
+    assert result["cache_updated"] is True
+    assert result["results"][0]["already_missing"] is True
+    assert result["results"][0]["success"] is True
+    assert _normalize_path(missing) not in {
+        entry["file_path"] for entry in scanner._cache.raw_data
+    }
+    assert scanner._hash_index.get_duplicate_hashes() == {}
+
+
+@pytest.mark.asyncio
+async def test_bulk_delete_keeps_entry_when_folder_is_unreachable(tmp_path: Path):
+    """A missing folder is an offline root, not a completed deletion."""
+    root = tmp_path / "loras"
+    root.mkdir()
+    offline_dir = root / "external"
+    missing = offline_dir / "model.safetensors"
+
+    scanner = _make_duplicate_scanner(root, [missing])
+    result = await scanner.bulk_delete_models([_normalize_path(missing)])
+
+    assert result["success"] is False
+    assert result["total_deleted"] == 0
+    assert result["results"][0]["success"] is False
+    assert _normalize_path(missing) in {
+        entry["file_path"] for entry in scanner._cache.raw_data
+    }
+
+
+@pytest.mark.asyncio
+async def test_bulk_delete_all_failures_reports_error(tmp_path: Path, monkeypatch):
+    """Nothing removed -> success is False (the UI must not show a success)."""
+    root = tmp_path / "loras"
+    root.mkdir()
+    first = root / "one.txt"
+    first.write_text("one", encoding="utf-8")
+    scanner = _make_bulk_scanner(root, [first])
+
+    class FailingPendingDelete:
+        async def stage_model_delete(self, **_kwargs):
+            return None
+
+    async def fake_get_pending_delete():
+        return FailingPendingDelete()
+
+    async def nothing_deleted(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(
+        model_scanner, "get_pending_delete_service", fake_get_pending_delete
+    )
+    monkeypatch.setattr(model_scanner, "delete_model_artifacts", nothing_deleted)
+
+    result = await scanner.bulk_delete_models([str(first)])
+
+    assert result["success"] is False
+    assert result["total_deleted"] == 0
+    assert result["error"] == "No files deleted"
+    assert first.exists()
+    assert str(first) in {entry["file_path"] for entry in scanner._cache.raw_data}
+
+
+@pytest.mark.asyncio
+async def test_bulk_delete_cache_update_survives_hash_index_drift(tmp_path: Path):
+    """A cache row whose sha256 is not in the index must still be cleaned.
+
+    The delete used to raise KeyError inside the hash index update, silently
+    aborting the whole cache update while the file was already gone (issue
+    #1154).
+    """
+    root = tmp_path / "loras"
+    root.mkdir()
+    model = root / "model.safetensors"
+    model.write_text("data", encoding="utf-8")
+    path = _normalize_path(model)
+
+    scanner = DummyScanner(root)
+    scanner._cache = ModelCache(
+        raw_data=[
+            {
+                "file_path": path,
+                "folder": "",
+                "sha256": "newhash",  # cache row drifted from the index
+                "tags": [],
+                "model_name": "model",
+                "file_name": "model",
+                "size": 1,
+                "modified": 1.0,
+            }
+        ],
+        folders=[],
+        name_display_mode="model_name",
+    )
+    scanner._hash_index.add_entry("oldhash", path)
+
+    result = await scanner.bulk_delete_models([path])
+
+    assert result["success"] is True
+    assert result["total_deleted"] == 1
+    assert result["cache_updated"] is True
+    assert model.exists() is False
+    assert scanner._cache.raw_data == []
+    assert scanner._hash_index.get_duplicate_hashes() == {}
+
+
+@pytest.mark.asyncio
+async def test_bulk_delete_updates_cache_when_cancelled_mid_way(
+    tmp_path: Path, monkeypatch
+):
+    """Files staged before a cancellation must not become ghost cache rows."""
+    root = tmp_path / "loras"
+    root.mkdir()
+    first = root / "one.txt"
+    first.write_text("one", encoding="utf-8")
+    second = root / "two.txt"
+    second.write_text("two", encoding="utf-8")
+    scanner = _make_bulk_scanner(root, [first, second])
+
+    real_rename = os.rename
+    rename_count = {"n": 0}
+
+    def cancelling_rename(src: str, dst: str) -> None:
+        rename_count["n"] += 1
+        result = real_rename(src, dst)
+        if rename_count["n"] == 1:
+            scanner.cancel_task()
+        return result
+
+    monkeypatch.setattr(
+        "py.services.pending_delete_service.os.rename", cancelling_rename
+    )
+
+    result = await scanner.bulk_delete_models([str(first), str(second)])
+    scanner.reset_cancellation()
+
+    assert result["status"] == "cancelled"
+    assert result["total_deleted"] == 1
+    assert result["cache_updated"] is True
+    cached_paths = {entry["file_path"] for entry in scanner._cache.raw_data}
+    assert str(first) not in cached_paths
+    assert str(second) in cached_paths
 
 
 @pytest.mark.asyncio
@@ -2967,6 +3294,7 @@ def test_reconcile_walk_skips_the_recipes_dir(tmp_path: Path, monkeypatch):
         excluded_models=set(),
         is_cancelled=lambda: False,
         report_progress=lambda _files_seen: None,
+        expected_folder_of=lambda _path: "",
     )
 
     assert "keep" in result.discovered_folders
@@ -3277,3 +3605,209 @@ async def test_root_scoped_scan_of_every_root_still_cleans_folders(tmp_path: Pat
     assert "a_folder" not in folders
     assert "b_folder" in folders
 
+
+async def test_on_library_changed_schedules_refreeze_after_reinit(tmp_path: Path, monkeypatch):
+    """Re-init after a library change re-freezes the GC once it finishes (#1147)."""
+    scanner = DummyScanner(str(tmp_path))
+    calls: List[Any] = []
+
+    async def _noop_initialize(reconcile: bool = False) -> None:
+        calls.append(("init", reconcile))
+
+    monkeypatch.setattr(scanner, "initialize_in_background", _noop_initialize)
+    monkeypatch.setattr(
+        model_scanner,
+        "schedule_refreeze_after_rebuild",
+        lambda reason: calls.append(("freeze", reason)),
+    )
+
+    scanner.on_library_changed(reconcile=True)
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert calls == [("init", True), ("freeze", "dummy library change")]
+
+
+class PluginScanner(ModelScanner):
+    """Keeps the production ``_process_model_file`` (DummyScanner overrides it)."""
+
+    def __init__(self, root: Path):
+        self._root = str(root)
+        super().__init__(
+            model_type="dummy",
+            model_class=LoraMetadata,
+            file_extensions={".safetensors"},
+            hash_index=ModelHashIndex(),
+        )
+
+    def get_model_roots(self) -> List[str]:
+        return [self._root]
+
+
+@pytest.mark.asyncio
+async def test_process_model_file_skips_zero_byte_files(tmp_path: Path):
+    """An empty model file must stay unmanaged: no sidecar, no cache entry.
+
+    Regression test for issue #1162 — hashing it would store the empty-string
+    SHA256 placeholder, which every unread file shares.
+    """
+    scanner = PluginScanner(tmp_path)
+    empty_file = tmp_path / "Emilia(RE0).safetensors"
+    empty_file.write_bytes(b"")
+
+    assert await scanner._process_model_file(str(empty_file), str(tmp_path)) is None
+    assert not Path(get_metadata_path(str(empty_file))).exists()
+
+
+@pytest.mark.asyncio
+async def test_process_model_file_still_accepts_non_empty_files(tmp_path: Path):
+    """Guard against over-skipping: a file with content is processed normally."""
+    scanner = PluginScanner(tmp_path)
+    model_file = tmp_path / "model.safetensors"
+    model_file.write_bytes(b"x" * 64)
+
+    result = await scanner._process_model_file(str(model_file), str(tmp_path))
+
+    assert result is not None
+    assert len(result["sha256"]) == 64
+    assert Path(get_metadata_path(str(model_file))).exists()
+
+
+@pytest.mark.asyncio
+async def test_process_model_file_rehashes_the_empty_file_placeholder(tmp_path: Path):
+    """A sidecar poisoned with the empty-string hash heals during the scan.
+
+    Regression test for issue #1162: existing libraries must recover without
+    the user re-clicking "Verify Hashes" on every duplicate group.
+    """
+    import hashlib
+
+    from py.utils.constants import EMPTY_HASH_SHA256
+    from py.utils.metadata_manager import MetadataManager
+
+    scanner = PluginScanner(tmp_path)
+    model_file = tmp_path / "model.safetensors"
+    content = b"real model bytes"
+    model_file.write_bytes(content)
+    expected = hashlib.sha256(content).hexdigest()
+
+    metadata = await MetadataManager.create_default_metadata(str(model_file))
+    assert metadata is not None and metadata.sha256 == expected
+    sidecar = Path(get_metadata_path(str(model_file)))
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    payload["sha256"] = EMPTY_HASH_SHA256
+    sidecar.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = await scanner._process_model_file(str(model_file), str(tmp_path))
+
+    assert result is not None
+    assert result["sha256"] == expected
+    assert json.loads(sidecar.read_text(encoding="utf-8"))["sha256"] == expected
+
+
+@pytest.mark.asyncio
+async def test_process_model_file_keeps_a_zero_byte_placeholder_on_empty_files(
+    tmp_path: Path,
+):
+    """An empty file stays unmanaged instead of being "repaired" to the placeholder."""
+    from py.utils.constants import EMPTY_HASH_SHA256
+    from py.utils.metadata_manager import MetadataManager
+
+    scanner = PluginScanner(tmp_path)
+    model_file = tmp_path / "empty.safetensors"
+    model_file.write_bytes(b"")
+    sidecar = Path(get_metadata_path(str(model_file)))
+    sidecar.write_text(json.dumps({"sha256": EMPTY_HASH_SHA256}), encoding="utf-8")
+
+    assert await scanner._process_model_file(str(model_file), str(tmp_path)) is None
+    assert json.loads(sidecar.read_text(encoding="utf-8"))["sha256"] == EMPTY_HASH_SHA256
+
+
+async def test_add_model_to_cache_slims_civitai_payload(tmp_path: Path, monkeypatch):
+    """Downloaded/imported entries must match the slim scan-path shape.
+
+    The full source payload (images, files, description, ...) stays with the
+    caller; the cache keeps only the frequently used keys, and license flags
+    are derived before slimming drops the model-level license fields
+    (issue #1161).
+    """
+    scanner = DummyScanner(tmp_path)
+    scanner._cache = ModelCache(raw_data=[], folders=[])
+    scheduled: List[str] = []
+    monkeypatch.setattr(
+        model_scanner, "schedule_refreeze", lambda reason: scheduled.append(reason)
+    )
+
+    full_payload = {
+        "id": 123,
+        "modelId": 456,
+        "name": "v1",
+        "creator": {"username": "alice", "image": "avatar.png"},
+        "trainedWords": ["trigger"],
+        "model": {
+            "type": "LORA",
+            "allowNoCredit": True,
+            "allowCommercialUse": ["Image"],
+            "description": "long text",
+        },
+        "images": [{"url": "u", "meta": {"prompt": "p"}}],
+        "files": [{"name": "f"}],
+        "stats": {"downloadCount": 1},
+    }
+    metadata = {
+        "file_path": "x.txt",
+        "folder": "",
+        "sha256": "abc",
+        "tags": [],
+        "civitai": full_payload,
+    }
+
+    ok = await scanner.add_model_to_cache(metadata, "")
+
+    assert ok is True
+    entry = scanner._cache.raw_data[0]
+    assert entry["civitai"] == {
+        "id": 123,
+        "modelId": 456,
+        "name": "v1",
+        "creator": {"username": "alice"},
+        "trainedWords": ["trigger"],
+        "model": {"type": "LORA"},
+    }
+    assert entry["license_flags"] == build_license_flags(
+        {"allowNoCredit": True, "allowCommercialUse": ["Image"]}
+    )
+    # The caller's dict keeps the full payload for downstream use
+    # (e.g. the filename-template flow).
+    assert "images" in metadata["civitai"]
+    assert scheduled == ["dummy model added to cache"]
+
+
+async def test_update_single_model_cache_schedules_refreeze(tmp_path: Path, monkeypatch):
+    scanner = DummyScanner(tmp_path)
+    scanner._cache = ModelCache(
+        raw_data=[
+            {
+                "file_path": "old.txt",
+                "folder": "",
+                "sha256": "abc",
+                "tags": [],
+                "model_name": "m",
+                "file_name": "old",
+            }
+        ],
+        folders=[],
+    )
+    scheduled: List[str] = []
+    monkeypatch.setattr(
+        model_scanner, "schedule_refreeze", lambda reason: scheduled.append(reason)
+    )
+
+    result = await scanner.update_single_model_cache(
+        "old.txt",
+        "old.txt",
+        {"file_path": "old.txt", "sha256": "abc", "tags": [], "model_name": "m"},
+    )
+
+    assert result
+    assert "dummy cache update" in scheduled

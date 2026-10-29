@@ -7,12 +7,22 @@ import logging
 import asyncio
 from copy import deepcopy
 from typing import Any, Optional, Dict, Tuple, List, cast
+from ..utils.constants import is_empty_placeholder_hash
 from .connectivity_guard import is_expected_offline_error
 from .model_metadata_provider import CivArchiveModelMetadataProvider, ModelMetadataProviderManager
 from .downloader import get_downloader
 from .errors import RateLimitError
 
 logger = logging.getLogger(__name__)
+
+#: ``source`` values on CivArchive file entries that belong to a foreign
+#: ecosystem with its own model/version ID space (e.g. "civision" indexes
+#: ModelScope-hosted files). Feeding those IDs into the CivitAI-ID-based
+#: /models/{id} endpoint resolves to an unrelated CivitAI model, so entries
+#: carrying one of these sources are skipped before any lookup happens.
+#: Entries with no ``source`` stay eligible — the post-resolution hash check
+#: in ``_resolve_version_from_files`` is the real correctness guard.
+_FOREIGN_ECOSYSTEM_SOURCES = frozenset({"civision"})
 
 class CivArchiveClient:
     _instance = None
@@ -36,8 +46,47 @@ class CivArchiveClient:
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
-        
+
         self.base_url = "https://civarchive.com/api"
+        # hash (lowercased) -> SourceRef for foreign-ecosystem file entries seen
+        # during hash lookups (e.g. civision entries carrying a ModelScope URL).
+        # Recorded while resolving, consumed by the sync service to link the
+        # model to its real source instead of leaving it "not found".
+        self._foreign_source_refs: Dict[str, Any] = {}
+
+    def _remember_foreign_source_ref(
+        self,
+        expected_hash: Optional[str],
+        file_data: Dict[str, Any],
+    ) -> None:
+        """Record a resolvable source URL from a foreign-ecosystem file entry"""
+        if not expected_hash or is_empty_placeholder_hash(expected_hash):
+            # The placeholder identifies no file, so any repo "sharing" it
+            # (e.g. a repository that publishes a zero-byte upload) must not
+            # become the link target for a local model (issue #1162).
+            return
+        url = file_data.get("url")
+        if not isinstance(url, str) or not url.strip():
+            return
+        try:
+            from .model_sources.registry import detect_source
+        except Exception:  # pragma: no cover - defensive import guard
+            return
+        ref = detect_source(url.strip())
+        if ref is None:
+            return
+        key = expected_hash.strip().lower()
+        self._foreign_source_refs[key] = ref
+        # Bound the map; entries are consumed via pop_foreign_source_ref but a
+        # caller that never asks must not grow it without limit.
+        while len(self._foreign_source_refs) > 64:
+            self._foreign_source_refs.pop(next(iter(self._foreign_source_refs)))
+
+    def pop_foreign_source_ref(self, model_hash: str) -> Any:
+        """Return (and forget) the foreign source ref recorded for *model_hash*"""
+        if not model_hash:
+            return None
+        return self._foreign_source_refs.pop(model_hash.strip().lower(), None)
 
     async def _request_json(
         self,
@@ -301,9 +350,37 @@ class CivArchiveClient:
 
         return version_copy
 
-    async def _resolve_version_from_files(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    @staticmethod
+    def _version_contains_hash(version: Dict[str, Any], expected_hash: str) -> bool:
+        """Check whether any file of the resolved version matches the queried hash"""
+        expected = expected_hash.strip().upper()
+        if not expected:
+            return False
+        files = version.get("files")
+        if not isinstance(files, list):
+            return False
+        for file_data in files:
+            if not isinstance(file_data, dict):
+                continue
+            hashes = file_data.get("hashes")
+            if isinstance(hashes, dict):
+                sha256 = hashes.get("SHA256") or hashes.get("sha256")
+                if isinstance(sha256, str) and sha256.strip().upper() == expected:
+                    return True
+        return False
+
+    async def _resolve_version_from_files(
+        self,
+        payload: Dict[str, Any],
+        expected_hash: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Fallback to fetch version data when only file metadata is available"""
         if not isinstance(payload, dict):
+            return None
+        if expected_hash and is_empty_placeholder_hash(expected_hash):
+            # A file-entry list returned for the zero-byte digest describes no
+            # real file; resolving (or remembering) any of its entries would
+            # attribute an unrelated model to the caller (issue #1162).
             return None
         data = self._normalize_payload(payload)
         files = data.get("files") or payload.get("files") or []
@@ -311,6 +388,14 @@ class CivArchiveClient:
             files = [files]
         for file_data in files:
             if not isinstance(file_data, dict):
+                continue
+            source = file_data.get("source")
+            if isinstance(source, str) and source.strip().lower() in _FOREIGN_ECOSYSTEM_SOURCES:
+                self._remember_foreign_source_ref(expected_hash, file_data)
+                logger.debug(
+                    "Skipping CivArchive file entry from foreign ecosystem source=%s",
+                    source,
+                )
                 continue
             model_id = file_data.get("model_id") or file_data.get("modelId")
             version_id = file_data.get("model_version_id") or file_data.get("modelVersionId")
@@ -332,11 +417,30 @@ class CivArchiveClient:
                 continue
             resolved = await self.get_model_version(model_id, version_id)
             if resolved:
+                if expected_hash and not self._version_contains_hash(resolved, expected_hash):
+                    # The version endpoint resolves modelVersionId globally,
+                    # ignoring the model id in the path, so foreign-ecosystem
+                    # IDs can resolve to an unrelated CivitAI version. Only a
+                    # hash match proves the resolved version is the right one.
+                    logger.debug(
+                        "Discarding CivArchive version %s/%s: resolved files do not match hash %s",
+                        model_id,
+                        version_id,
+                        expected_hash[:10],
+                    )
+                    continue
                 return resolved
         return None
 
     async def get_model_by_hash(self, model_hash: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         """Find model by SHA256 hash value using CivArchive API"""
+        if is_empty_placeholder_hash(model_hash):
+            # CivArchive's by-hash index carries a large pile of unrelated
+            # foreign files under the zero-byte digest (and records one of them
+            # as a foreign source ref), so the placeholder must never be
+            # resolved — it once linked seven unrelated LoRAs to one ModelScope
+            # repository (issue #1162).
+            return None, "Model not found"
         try:
             payload, error = await self._request_json(f"/sha256/{model_hash.lower()}")
             # Treat a missing payload as an error even when the error string is
@@ -352,7 +456,10 @@ class CivArchiveClient:
             if transformed:
                 return transformed, None
 
-            resolved = await self._resolve_version_from_files(cast(Dict[str, Any], payload))
+            resolved = await self._resolve_version_from_files(
+                cast(Dict[str, Any], payload),
+                expected_hash=model_hash,
+            )
             if resolved:
                 return resolved, None
 

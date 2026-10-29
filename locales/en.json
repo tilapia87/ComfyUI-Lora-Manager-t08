@@ -266,6 +266,7 @@
     },
     "filter": {
       "title": "Filter Models",
+      "countTitle": "{name} — {count} models",
       "presets": "Presets",
       "savePreset": "Save current active filters as a new preset.",
       "savePresetDisabledActive": "Cannot save: A preset is already active. Modify filters to save new preset.",
@@ -401,7 +402,8 @@
       "autoOrganize": "Auto-organize",
       "metadata": "Metadata",
       "sidecarStorage": "Sidecar Storage",
-      "proxySettings": "Proxy Settings"
+      "proxySettings": "Proxy Settings",
+      "sendToWorkflow": "Send to Workflow"
     },
     "nav": {
       "general": "General",
@@ -453,6 +455,18 @@
       "validation": {
         "noPaths": "Enter at least one path separated by commas.",
         "saveFailed": "Unable to save skip paths: {message}"
+      }
+    },
+    "sendToWorkflowExclusions": {
+      "nodeClasses": {
+        "label": "Excluded node types",
+        "placeholder": "Example: CheckpointLoaderSimple, MyCustomNode",
+        "help": "ComfyUI node class names that never appear as send-to-workflow targets. Separate multiple entries with commas or semicolons. Nodes explicitly marked in ComfyUI (right-click → Mark as) are exempt."
+      },
+      "titlePatterns": {
+        "label": "Excluded node title patterns",
+        "placeholder": "Example: negative, preview",
+        "help": "Nodes whose title contains any of these text fragments (case-insensitive) are hidden from send-to-workflow targets. Separate multiple entries with commas or semicolons. Nodes explicitly marked in ComfyUI (right-click → Mark as) are exempt."
       }
     },
     "backup": {
@@ -579,6 +593,8 @@
       },
       "showVersionOnCard": "Show Version on Card",
       "showVersionOnCardHelp": "Show or hide the version name on model cards",
+      "showQuantizationOnCard": "Show Quantization on Card",
+      "showQuantizationOnCardHelp": "Display the quantization level (e.g. Q4_K_M, FP8) next to the version name on model cards",
       "modelCardFooterAction": "Model Card Button Action",
       "modelCardFooterActionOptions": {
         "exampleImages": "Open Example Images",
@@ -957,6 +973,11 @@
         "random": "Random",
         "randomAction": "Randomize (shuffle)"
       },
+      "modelType": {
+        "title": "Filter by model type",
+        "all": "All Types",
+        "multiple": "{count} types"
+      },
       "refresh": {
         "title": "Refresh model list",
         "full": "Rebuild Cache",
@@ -1079,6 +1100,9 @@
   },
   "recipes": {
     "title": "LoRA Recipes",
+    "filter": {
+      "countTitle": "{name} — {count} recipes"
+    },
     "actions": {
       "sendCheckpoint": "Send to ComfyUI",
       "sendRecipe": "Send to ComfyUI",
@@ -1700,6 +1724,8 @@
       "errors": {
         "invalidUrl": "Invalid model URL format",
         "noVersions": "No versions available for this model",
+        "linkedFileNotFound": "File {fileId} was not found in the requested model version.",
+        "linkedFileNotWeightFile": "File {fileId} is not a downloadable model file.",
         "mixedSources": "Cannot mix CivitAI and Hugging Face / ModelScope URLs in the same batch.",
         "noModelFiles": "No model files found in this repository."
       },
@@ -2197,7 +2223,8 @@
       "copyReport": "Copy Report",
       "downloadCsv": "Download CSV",
       "columnModelName": "Model Name",
-      "columnError": "Error"
+      "columnError": "Error",
+      "rateLimitedNotice": "Fetch aborted: the metadata provider rate limit was reached. Re-run \"Fetch from Civitai\" later to retry the remaining models."
     },
     "downloadBatchSummary": {
       "title": "Batch Download Summary",
@@ -2282,6 +2309,52 @@
         "description": "Press Ctrl+F (Cmd+F on Mac) to quickly search within your current view.",
         "alt": "Quick Search"
       }
+    },
+    "error": {
+      "title": "Initialization failed",
+      "message": "Something went wrong while scanning your model library.",
+      "retry": "Retry"
+    }
+  },
+  "firstRun": {
+    "title": "Welcome to LoRA Manager",
+    "description": "Before you start, LoRA Manager needs to scan your model libraries and generate metadata sidecar files. This is a one-time step; how long it takes depends on the size of your library and the speed of your disk.",
+    "libraries": {
+      "loras": "LoRAs",
+      "checkpoints": "Checkpoints",
+      "embeddings": "Embeddings",
+      "other": "Other Models"
+    },
+    "language": {
+      "label": "Language"
+    },
+    "libraryStats": "{count} models · {size}",
+    "rootMissing": "Directory not found",
+    "estimate": "About {count} models ({size}) — estimated scan time ~{minutes} min, depending on library size and disk speed.",
+    "noRoots": {
+      "plugin": "No accessible model folders were found. Open Settings to configure your model directories, then reload this page.",
+      "standalone": "No accessible model folders were found. Edit folder_paths in settings.json, then restart the server."
+    },
+    "sidecar": {
+      "title": "Metadata storage",
+      "alongside": {
+        "label": "Next to model files (recommended)",
+        "description": "Metadata .json files are stored next to each model file, so they move together with the model."
+      },
+      "centralized": {
+        "label": "Centralized directory",
+        "description": "Metadata is stored in a separate directory, keeping your model folders clean.",
+        "pathPlaceholder": "Directory for centralized metadata storage"
+      }
+    },
+    "actions": {
+      "start": "Start Scan",
+      "defer": "Later"
+    },
+    "errors": {
+      "loadFailed": "Failed to load library information.",
+      "pathRequired": "Please enter a storage directory for centralized metadata.",
+      "startFailed": "Failed to start the scan."
     }
   },
   "duplicates": {
@@ -2322,7 +2395,8 @@
       "embeddingAdded": "Embedding added to workflow",
       "embeddingFailed": "Failed to add embedding",
       "promptSent": "Prompt sent to workflow",
-      "promptFailed": "Failed to send prompt"
+      "promptFailed": "Failed to send prompt",
+      "nodeTypeExcluded": "Node type \"{type}\" excluded from send targets"
     },
     "nodeSelector": {
       "recipe": "Recipe",
@@ -2332,7 +2406,8 @@
       "replace": "Replace",
       "append": "Append",
       "selectTargetNode": "Select target node",
-      "sendToAll": "Send to All"
+      "sendToAll": "Send to All",
+      "excludeNodeType": "Never suggest this node type"
     },
     "exampleImages": {
       "opened": "Example images folder opened",
@@ -2796,7 +2871,9 @@
       "noItemsSelected": "No {type} selected for deletion",
       "deleteError": "Error: {message}",
       "deleteSuccess": "Successfully deleted {count} {type}",
-      "deleteFailed": "Failed to delete {type}: {message}"
+      "deleteFailed": "Failed to delete {type}: {message}",
+      "deletePartialFailed": "Failed to delete {failed} selected {type}: {message}",
+      "cacheUpdateFailed": "The files were deleted but the library cache could not be updated. Run Rebuild Cache to refresh the list."
     },
     "controls": {
       "reloadFailed": "Failed to reload {pageType}: {message}",
@@ -2856,6 +2933,7 @@
       "metadataUpdateComplete": "Metadata update complete",
       "operationCancelled": "Operation cancelled by user",
       "operationCancelledPartial": "Operation cancelled. {success} items processed.",
+      "metadataFetchRateLimited": "Metadata fetch aborted due to rate limiting — updated {success} of {total}, {failed} failed, {skipped} skipped. Re-run Fetch from Civitai later to retry the rest.",
       "metadataFetchFailed": "Failed to fetch metadata: {message}",
       "bulkMetadataCompleteAll": "Successfully refreshed all {count} {type}s",
       "bulkMetadataCompletePartial": "Refreshed {success} of {total} {type}s",
@@ -3000,6 +3078,12 @@
       "content": "Scan and manage VAE, upscaler, text encoder, CLIP vision and ControlNet files — and download them from CivitAI — from one dedicated page.",
       "enable": "Enable Other Models",
       "openSettings": "Open Settings"
+    },
+    "bulkFetchPrompt": {
+      "title": "Bring Your Library to Life",
+      "content": "Your first scan found {count} models without metadata. Fetch their info from CivitAI to get preview images, descriptions, and trigger words.",
+      "fetch": "Fetch Metadata",
+      "later": "Maybe Later"
     },
     "pager": {
       "previous": "Previous message",

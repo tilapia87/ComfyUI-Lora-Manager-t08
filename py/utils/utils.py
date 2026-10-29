@@ -1,16 +1,23 @@
 from difflib import SequenceMatcher
+import functools
 import logging
 import os
 import re
 from typing import Any, Dict, List, Optional
+from urllib.parse import unquote_to_bytes
 from ..services.service_registry import ServiceRegistry
 from ..config import config
 from ..services.settings_manager import get_settings_manager
 from .constants import (
+    MAX_FILENAME_COMPONENT_BYTES,
     MAX_FILENAME_STEM_LENGTH,
     MAX_FOLDER_NAME_LENGTH,
+    MAX_FULL_PATH_LENGTH,
     MAX_PATH_TAG_LENGTH,
+    MIN_VIABLE_STEM_LENGTH,
+    PATH_BUDGET_SUFFIX_ALLOWANCE,
 )
+from .sidecar_paths import get_sidecar_dir
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -228,8 +235,9 @@ def get_checkpoint_info_absolute(checkpoint_name):
         # Get model roots for matching
         model_roots = scanner.get_model_roots()
 
-        # Normalize the checkpoint name
-        normalized_name = checkpoint_name.replace(os.sep, "/")
+        # Normalize the checkpoint name; old Windows workflows spell model
+        # names with backslashes while the cache formats them forward-slashed.
+        normalized_name = checkpoint_name.replace("\\", "/")
 
         for item in cache.raw_data:
             file_path = item.get("file_path", "")
@@ -239,8 +247,8 @@ def get_checkpoint_info_absolute(checkpoint_name):
             # Format the stored path as ComfyUI-style name
             formatted_name = _format_model_name_for_comfyui(file_path, model_roots)
 
-            # Match by formatted name (normalize separators for robust comparison)
-            if formatted_name.replace(os.sep, "/") == normalized_name or formatted_name == checkpoint_name:
+            # Match by formatted name (normalized separators) or exact spelling
+            if formatted_name == normalized_name or formatted_name == checkpoint_name:
                 return file_path, item
 
             # Also try matching by basename only (for backward compatibility)
@@ -486,6 +494,133 @@ def sanitize_folder_name(
     return sanitized
 
 
+@functools.lru_cache(maxsize=256)
+def _probe_name_max_bytes(dir_path: str) -> int:
+    """Best-effort NAME_MAX (in bytes) for the filesystem hosting ``dir_path``.
+
+    Walks up to the nearest existing ancestor because the target directory
+    may not exist yet. Falls back to :data:`MAX_FILENAME_COMPONENT_BYTES`
+    when the platform cannot report a limit (``os.pathconf`` is Unix-only) or
+    reports an indeterminate one, and caps larger limits at that value so
+    libraries stay portable across filesystems.
+    """
+
+    path = dir_path or os.sep
+    while not os.path.isdir(path):
+        parent = os.path.dirname(path)
+        if parent == path:
+            break
+        path = parent
+    try:
+        value = os.pathconf(path, "PC_NAME_MAX")
+    except (AttributeError, ValueError, OSError):
+        return MAX_FILENAME_COMPONENT_BYTES
+    if value <= 0:
+        return MAX_FILENAME_COMPONENT_BYTES
+    return min(value, MAX_FILENAME_COMPONENT_BYTES)
+
+
+def _truncate_to_byte_budget(text: str, max_bytes: int) -> str:
+    """Truncate ``text`` to at most ``max_bytes`` UTF-8 bytes.
+
+    The cut always lands on a character boundary: a multibyte character
+    straddling the limit is dropped, never split.
+    """
+
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return text
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+
+def decode_percent_encoded_filename(name: str) -> str:
+    """Decode a percent-encoded stored filename back to the real name.
+
+    CivitAI's backend stores file names with non-ASCII characters
+    percent-encoded (URL-quoted): the mini endpoint's ``fileName`` is that
+    raw stored name (e.g. ``%E7%8A%AC...safetensors``), while the REST
+    ``files[].name`` is the decoded display name. Saving the raw string
+    literally would land ``%E7%8A%AC...`` on disk instead of the real
+    characters.
+
+    A literal ``%`` in an uploader's name is itself stored as ``%25``, so a
+    decoded result that stays pure ASCII (e.g. ``100%25cool`` ->
+    ``100%cool``) is treated as a real name and returned unchanged — only
+    decodes that yield valid UTF-8 with non-ASCII characters are applied.
+    """
+    if "%" not in name:
+        return name
+    try:
+        decoded = unquote_to_bytes(name).decode("utf-8", errors="strict")
+    except (UnicodeDecodeError, ValueError):
+        return name
+    if decoded == name or not any(ord(char) > 127 for char in decoded):
+        return name
+    return decoded
+
+
+def fit_stem_to_path_budget(dir_path: str, stem: str, extension: str = "") -> str:
+    """Truncate ``stem`` so the file and its companions fit the path budget.
+
+    The per-component caps (:data:`MAX_FILENAME_STEM_LENGTH` and friends) do
+    not add up to a guarantee: a deep model root plus template folders plus a
+    150-char stem still overflows the Windows MAX_PATH limit (issue #1142).
+    This measures the real destination instead: the model path
+    ``dir_path/stem+extension`` and the sidecar location resolved by
+    :func:`~py.utils.sidecar_paths.get_sidecar_dir` (the centralized mirror
+    tree when active, which is typically deeper than the model directory).
+    The stem is shared by the model file, the ``.metadata.json`` sidecar (and
+    its ``.bak``), preview files and aria2 control files, so
+    :data:`PATH_BUDGET_SUFFIX_ALLOWANCE` characters past the stem stay
+    reserved for the longest of those suffixes.
+
+    A second, independent limit is enforced on the name component itself:
+    POSIX filesystems bound a single path component in BYTES (NAME_MAX), so a
+    CJK-heavy stem passes every character cap above and still fails with
+    ENAMETOOLONG on disk. The limit is probed per directory via
+    ``os.pathconf`` because encrypted filesystems report less than the usual
+    255 (eCryptfs — Ubuntu encrypted home dirs, Synology encrypted shares —
+    allows only 143 bytes); both the model directory and the sidecar mirror
+    directory are probed and the stricter value wins.
+
+    Returns the (possibly truncated) stem, or "" when the directory alone
+    leaves no room for a viable name — callers must treat that as "skip with
+    an actionable error", never write a stub name.
+    """
+
+    if not stem:
+        return ""
+
+    budget = MAX_FULL_PATH_LENGTH - PATH_BUDGET_SUFFIX_ALLOWANCE
+    model_base = os.path.join(dir_path, stem)
+    sidecar_dir = get_sidecar_dir(model_base + extension)
+    used = max(len(model_base), len(os.path.join(sidecar_dir, stem)))
+    if used > budget:
+        allowed = len(stem) - (used - budget)
+        if allowed < MIN_VIABLE_STEM_LENGTH:
+            return ""
+        stem = stem[:allowed].strip("-_. ")
+
+    name_max = min(
+        (
+            _probe_name_max_bytes(path)
+            for path in (dir_path, sidecar_dir)
+            if path
+        ),
+        default=MAX_FILENAME_COMPONENT_BYTES,
+    )
+    # The component holds stem + the longest companion suffix: the model
+    # file's own extension or ".metadata.json.bak", whichever is longer.
+    suffix_bytes = max(len(extension.encode("utf-8")), PATH_BUDGET_SUFFIX_ALLOWANCE)
+    byte_budget = name_max - suffix_bytes
+    if len(stem.encode("utf-8")) > byte_budget:
+        stem = _truncate_to_byte_budget(stem, byte_budget).strip("-_. ")
+        if len(stem) < MIN_VIABLE_STEM_LENGTH:
+            return ""
+
+    return stem
+
+
 def calculate_recipe_fingerprint(loras):
     """
     Calculate a unique fingerprint for a recipe based on its LoRAs.
@@ -641,7 +776,7 @@ def calculate_relative_path_for_model(
 
 
 def calculate_filename_for_model(
-    model_data: Dict[str, Any], model_type: str = "lora"
+    model_data: Dict[str, Any], model_type: str = "lora", target_dir: Optional[str] = None
 ) -> str:
     """Calculate the filename stem for a model using the filename template.
 
@@ -653,6 +788,10 @@ def calculate_filename_for_model(
     Args:
         model_data: Model data from scanner cache
         model_type: Type of model ('lora', 'checkpoint', 'embedding')
+        target_dir: Optional destination directory. When given, the rendered
+            stem is additionally trimmed to the full-path budget for that
+            location (see :func:`fit_stem_to_path_budget`); "" is returned
+            when the directory leaves no room for a viable name.
 
     Returns:
         Sanitized filename stem without extension, or an empty string when no
@@ -744,6 +883,12 @@ def calculate_filename_for_model(
     # well and re-trim the cut.
     if len(result) > MAX_FILENAME_STEM_LENGTH:
         result = result[:MAX_FILENAME_STEM_LENGTH].strip("-_. ")
+
+    # The fixed cap above ignores how deep the destination actually is; when
+    # the caller knows it, trim further so the full path (including the
+    # sidecar mirror) stays within budget.
+    if result and target_dir:
+        result = fit_stem_to_path_budget(target_dir, result)
 
     return result
 

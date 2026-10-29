@@ -226,6 +226,10 @@ export class SettingsManager {
             backendSettings?.metadata_refresh_skip_paths ?? defaults.metadata_refresh_skip_paths
         );
 
+        merged.send_to_workflow_exclusions = this.normalizeSendToWorkflowExclusions(
+            backendSettings?.send_to_workflow_exclusions ?? defaults.send_to_workflow_exclusions
+        );
+
         merged.skip_previously_downloaded_model_versions =
             backendSettings?.skip_previously_downloaded_model_versions
             ?? defaults.skip_previously_downloaded_model_versions;
@@ -276,6 +280,14 @@ export class SettingsManager {
         }
 
         return [];
+    }
+
+    normalizeSendToWorkflowExclusions(value) {
+        const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+        return {
+            node_classes: this.normalizePatternList(source.node_classes),
+            title_patterns: this.normalizePatternList(source.title_patterns),
+        };
     }
 
     getAvailableDownloadSkipBaseModels() {
@@ -586,6 +598,18 @@ export class SettingsManager {
                     this.saveMetadataRefreshSkipPaths();
                 }
             });
+        }
+
+        for (const inputId of ['sendToWorkflowExcludedClasses', 'sendToWorkflowExcludedTitles']) {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        this.saveSendToWorkflowExclusions();
+                    }
+                });
+            }
         }
 
         const downloadSkipBaseModelsContainer = document.getElementById('downloadSkipBaseModelsContainer');
@@ -1175,6 +1199,27 @@ export class SettingsManager {
             metadataRefreshSkipPathsError.textContent = '';
         }
 
+        const sendToWorkflowExclusions = this.normalizeSendToWorkflowExclusions(
+            state.global.settings.send_to_workflow_exclusions
+        );
+        const sendToWorkflowExcludedClassesInput = document.getElementById('sendToWorkflowExcludedClasses');
+        if (sendToWorkflowExcludedClassesInput) {
+            sendToWorkflowExcludedClassesInput.value = sendToWorkflowExclusions.node_classes.join(', ');
+        }
+        const sendToWorkflowExcludedClassesError = document.getElementById('sendToWorkflowExcludedClassesError');
+        if (sendToWorkflowExcludedClassesError) {
+            sendToWorkflowExcludedClassesError.textContent = '';
+        }
+        const sendToWorkflowExcludedTitlesInput = document.getElementById('sendToWorkflowExcludedTitles');
+        if (sendToWorkflowExcludedTitlesInput) {
+            sendToWorkflowExcludedTitlesInput.value = sendToWorkflowExclusions.title_patterns.join(', ');
+        }
+        const sendToWorkflowExcludedTitlesError = document.getElementById('sendToWorkflowExcludedTitlesError');
+        if (sendToWorkflowExcludedTitlesError) {
+            sendToWorkflowExcludedTitlesError.textContent = '';
+        }
+        this.updateSendToWorkflowSectionVisibility();
+
         this.renderDownloadSkipBaseModels();
         const downloadSkipBaseModelsError = document.getElementById('downloadSkipBaseModelsError');
         if (downloadSkipBaseModelsError) {
@@ -1219,6 +1264,12 @@ export class SettingsManager {
         const showVersionOnCardCheckbox = document.getElementById('showVersionOnCard');
         if (showVersionOnCardCheckbox) {
             showVersionOnCardCheckbox.checked = state.global.settings.show_version_on_card !== false;
+        }
+
+        // Set show quantization on card
+        const showQuantizationOnCardCheckbox = document.getElementById('showQuantizationOnCard');
+        if (showQuantizationOnCardCheckbox) {
+            showQuantizationOnCardCheckbox.checked = state.global.settings.show_quantization_on_card !== false;
         }
 
         // Set group by model
@@ -4263,6 +4314,57 @@ export class SettingsManager {
         }
     }
 
+    /**
+     * Show or hide the Send to Workflow settings section. The feature targets a
+     * live ComfyUI workflow, so the section is hidden in standalone mode.
+     */
+    updateSendToWorkflowSectionVisibility() {
+        const subsection = document.getElementById('sendToWorkflowSubsection');
+        if (subsection) {
+            subsection.style.display = state.global.settings.standalone_mode ? 'none' : '';
+        }
+    }
+
+    async saveSendToWorkflowExclusions() {
+        const classesInput = document.getElementById('sendToWorkflowExcludedClasses');
+        const titlesInput = document.getElementById('sendToWorkflowExcludedTitles');
+        if (!classesInput && !titlesInput) return;
+
+        const normalized = {
+            node_classes: this.normalizePatternList(classesInput ? classesInput.value : ''),
+            title_patterns: this.normalizePatternList(titlesInput ? titlesInput.value : ''),
+        };
+
+        const current = this.normalizeSendToWorkflowExclusions(
+            state.global.settings.send_to_workflow_exclusions
+        );
+        const unchanged =
+            normalized.node_classes.join('|') === current.node_classes.join('|') &&
+            normalized.title_patterns.join('|') === current.title_patterns.join('|');
+        if (unchanged) {
+            return;
+        }
+
+        try {
+            await this.saveSetting('send_to_workflow_exclusions', normalized);
+            if (classesInput) {
+                classesInput.value = normalized.node_classes.join(', ');
+            }
+            if (titlesInput) {
+                titlesInput.value = normalized.title_patterns.join(', ');
+            }
+
+            showToast(
+                'toast.settings.settingsUpdated',
+                { setting: translate('settings.sections.sendToWorkflow') },
+                'success'
+            );
+        } catch (error) {
+            console.error('Failed to save send-to-workflow exclusions:', error);
+            showToast('toast.settings.settingSaveFailed', { message: error.message }, 'error');
+        }
+    }
+
     async saveAutoOrganizeExclusions() {
         const input = document.getElementById('autoOrganizeExclusions');
         const errorElement = document.getElementById('autoOrganizeExclusionsError');
@@ -5573,6 +5675,10 @@ export class SettingsManager {
         // Apply show version on card setting
         const showVersionOnCard = state.global.settings.show_version_on_card !== false;
         document.body.classList.toggle('hide-card-version', !showVersionOnCard);
+
+        // Apply show quantization on card setting
+        const showQuantizationOnCard = state.global.settings.show_quantization_on_card !== false;
+        document.body.classList.toggle('hide-card-quant', !showQuantizationOnCard);
 
         // Apply license icon style
         const useNewLicenseIcons = state.global.settings.use_new_license_icons !== false;

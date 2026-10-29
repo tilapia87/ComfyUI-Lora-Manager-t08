@@ -60,7 +60,57 @@ def test_save_image_defaults_to_writing_png_metadata(monkeypatch, tmp_path):
 
     image_path = tmp_path / "sample_00001_.png"
     with Image.open(image_path) as img:
-        assert img.info["parameters"] == "prompt text\nSeed: 123, Version: ComfyUI"
+        assert img.info["parameters"] == (
+            "prompt text\nSeed: 123, engine: ComfyUI, Version: ComfyUI"
+        )
+
+
+def test_save_image_tags_png_with_civitai_engine(monkeypatch, tmp_path):
+    """Civitai's upload path maps meta.engine to the image's Tools field, so the
+    saved parameters must carry it under the lowercase key its parser reads."""
+    _configure_save_paths(monkeypatch, tmp_path)
+    _configure_metadata(monkeypatch, {"prompt": "prompt text", "seed": 123})
+
+    node = SaveImageLM()
+    node.save_images([_make_image()], "ComfyUI", "png", id="node-1")
+
+    image_path = tmp_path / "sample_00001_.png"
+    with Image.open(image_path) as img:
+        parameters = img.info["parameters"]
+
+    assert "engine: ComfyUI" in parameters
+    # Civitai's A1111 parser only unifies a fixed set of labels, so an
+    # uppercase `Engine:` would be stored as an unrelated key.
+    assert "Engine:" not in parameters
+
+
+def test_save_image_writes_civitai_engine_into_jpeg_user_comment(
+    monkeypatch, tmp_path
+):
+    _configure_save_paths(monkeypatch, tmp_path)
+    _configure_metadata(monkeypatch, {"prompt": "prompt text", "seed": 123})
+
+    node = SaveImageLM()
+    node.save_images([_make_image()], "ComfyUI", "jpeg", id="node-1")
+
+    exif_dict = piexif.load(str(tmp_path / "sample_00001_.jpg"))
+    user_comment = exif_dict["Exif"][piexif.ExifIFD.UserComment]
+    # b"UNICODE\0" + UTF-16BE, as written by save_images
+    assert "engine: ComfyUI" in user_comment[8:].decode("utf-16be")
+
+
+def test_civitai_engine_can_be_overridden_by_additional_data(monkeypatch, tmp_path):
+    """The auto key is emitted before additional_data so a user-supplied
+    `engine:` still wins: duplicate detail keys resolve last-one-wins."""
+    _configure_save_paths(monkeypatch, tmp_path)
+    node = SaveImageLM()
+
+    parameters = node.format_metadata(
+        {"prompt": "prompt text", "seed": 123, "additional_data": "engine: A1111"}
+    )
+
+    assert parameters.count("engine:") == 2
+    assert parameters.index("engine: ComfyUI") < parameters.index("engine: A1111")
 
 
 def test_save_image_skips_png_parameters_when_metadata_disabled_and_keeps_workflow(
@@ -100,7 +150,9 @@ def test_save_image_does_not_append_loras_to_prompt_by_default(monkeypatch, tmp_
     image_path = tmp_path / "sample_00001_.png"
     with Image.open(image_path) as img:
         assert "<lora:" not in img.info["parameters"]
-        assert img.info["parameters"] == "prompt text\nSeed: 123, Version: ComfyUI"
+        assert img.info["parameters"] == (
+            "prompt text\nSeed: 123, engine: ComfyUI, Version: ComfyUI"
+        )
 
 
 def test_save_image_appends_loras_to_prompt_when_enabled(monkeypatch, tmp_path):
@@ -118,8 +170,31 @@ def test_save_image_appends_loras_to_prompt_when_enabled(monkeypatch, tmp_path):
     image_path = tmp_path / "sample_00001_.png"
     with Image.open(image_path) as img:
         assert img.info["parameters"] == (
-            "prompt text\n<lora:foo:0.7>\nSeed: 123, Version: ComfyUI"
+            "prompt text\n<lora:foo:0.7>\nSeed: 123, engine: ComfyUI, Version: ComfyUI"
         )
+
+
+def test_save_image_applies_wired_metadata_overwrite(monkeypatch, tmp_path):
+    """A metadata dict wired from a Metadata Overwrite node overrides the
+    collected metadata for this Save node only."""
+    _configure_save_paths(monkeypatch, tmp_path)
+    _configure_metadata(monkeypatch, {"prompt": "auto prompt", "seed": 123})
+
+    node = SaveImageLM()
+    node.save_images(
+        [_make_image()],
+        "ComfyUI",
+        "png",
+        id="node-1",
+        metadata={"prompt": "wired prompt", "model": "wired_model.safetensors"},
+    )
+
+    image_path = tmp_path / "sample_00001_.png"
+    with Image.open(image_path) as img:
+        parameters = img.info["parameters"]
+    assert parameters.startswith("wired prompt")
+    assert "Seed: 123" in parameters
+    assert "Model: wired_model" in parameters
 
 
 def test_save_image_skips_jpeg_metadata_when_disabled(monkeypatch, tmp_path):
@@ -403,6 +478,115 @@ def test_save_image_as_recipe_writes_recipe_without_async_scanner_calls(
     assert scanner.fts_updates == [(recipe["id"], "add")]
 
 
+def test_save_image_batch_without_counter_still_gets_unique_filenames(
+    monkeypatch, tmp_path
+):
+    _configure_save_paths(monkeypatch, tmp_path)
+    _configure_metadata(monkeypatch, {"prompt": "prompt text", "seed": 123})
+
+    node = SaveImageLM()
+    node.save_images(
+        [_make_image(), _make_image(), _make_image()],
+        "ComfyUI",
+        "png",
+        id="node-1",
+        add_counter_to_filename=False,
+    )
+
+    assert (tmp_path / "sample_00001_.png").exists()
+    assert (tmp_path / "sample_00002_.png").exists()
+    assert (tmp_path / "sample_00003_.png").exists()
+
+
+def test_save_image_batch_with_batch_num_pattern_needs_no_counter(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(
+        "folder_paths.get_output_directory", lambda: str(tmp_path), raising=False
+    )
+    monkeypatch.setattr(
+        "folder_paths.get_save_image_path",
+        lambda prefix, *_args, **_kwargs: (str(tmp_path), prefix, 1, "", prefix),
+        raising=False,
+    )
+    _configure_metadata(monkeypatch, {"prompt": "prompt text", "seed": 123})
+
+    node = SaveImageLM()
+    node.save_images(
+        [_make_image(), _make_image()],
+        "sample_%batch_num%",
+        "png",
+        id="node-1",
+        add_counter_to_filename=False,
+    )
+
+    assert (tmp_path / "sample_0.png").exists()
+    assert (tmp_path / "sample_1.png").exists()
+
+
+def test_save_image_single_image_without_counter_keeps_plain_filename(
+    monkeypatch, tmp_path
+):
+    _configure_save_paths(monkeypatch, tmp_path)
+    _configure_metadata(monkeypatch, {"prompt": "prompt text", "seed": 123})
+
+    node = SaveImageLM()
+    node.save_images(
+        [_make_image()],
+        "ComfyUI",
+        "png",
+        id="node-1",
+        add_counter_to_filename=False,
+    )
+
+    assert (tmp_path / "sample.png").exists()
+
+
+def test_save_image_without_counter_does_not_overwrite_existing_file(
+    monkeypatch, tmp_path
+):
+    _configure_save_paths(monkeypatch, tmp_path)
+    _configure_metadata(monkeypatch, {"prompt": "prompt text", "seed": 123})
+
+    existing = tmp_path / "sample.png"
+    existing.write_bytes(b"original")
+
+    node = SaveImageLM()
+    node.save_images(
+        [_make_image()],
+        "ComfyUI",
+        "png",
+        id="node-1",
+        add_counter_to_filename=False,
+    )
+
+    assert existing.read_bytes() == b"original"
+    assert (tmp_path / "sample_0001.png").exists()
+
+
+def test_save_image_without_counter_skips_past_existing_suffixes(
+    monkeypatch, tmp_path
+):
+    _configure_save_paths(monkeypatch, tmp_path)
+    _configure_metadata(monkeypatch, {"prompt": "prompt text", "seed": 123})
+
+    (tmp_path / "sample.png").write_bytes(b"original")
+    (tmp_path / "sample_0001.png").write_bytes(b"also original")
+
+    node = SaveImageLM()
+    node.save_images(
+        [_make_image()],
+        "ComfyUI",
+        "png",
+        id="node-1",
+        add_counter_to_filename=False,
+    )
+
+    assert (tmp_path / "sample.png").read_bytes() == b"original"
+    assert (tmp_path / "sample_0001.png").read_bytes() == b"also original"
+    assert (tmp_path / "sample_0002.png").exists()
+
+
 # ---------------------------------------------------------------------------
 # Tests for webp_method and jpeg_subsampling parameters
 # ---------------------------------------------------------------------------
@@ -481,8 +665,8 @@ class TestParameterDefaultConsistency:
         assert widget_spec[1]["default"] == 6
         save_defaults = cast(tuple[Any, ...], SaveImageLM.save_images.__defaults__ or ())
         process_defaults = cast(tuple[Any, ...], SaveImageLM.process_image.__defaults__ or ())
-        assert save_defaults[4] == 6  # positional: webp_method=6 is at index 4
-        assert process_defaults[6] == 6
+        assert save_defaults[5] == 6  # positional: webp_method=6 is at index 5
+        assert process_defaults[7] == 6
 
     def test_jpeg_subsampling_defaults_are_consistent(self):
         input_types = SaveImageLM.INPUT_TYPES()
@@ -492,8 +676,8 @@ class TestParameterDefaultConsistency:
         assert widget_spec[1]["default"] == 0
         save_defaults = cast(tuple[Any, ...], SaveImageLM.save_images.__defaults__ or ())
         process_defaults = cast(tuple[Any, ...], SaveImageLM.process_image.__defaults__ or ())
-        assert save_defaults[5] == 0
-        assert process_defaults[7] == 0
+        assert save_defaults[6] == 0
+        assert process_defaults[8] == 0
 
     def test_add_loras_to_prompt_defaults_are_consistent(self):
         input_types = SaveImageLM.INPUT_TYPES()

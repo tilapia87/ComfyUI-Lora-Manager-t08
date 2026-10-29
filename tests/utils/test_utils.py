@@ -1,16 +1,23 @@
+import os
+
 import pytest
 
 from py.services.settings_manager import SettingsManager, get_settings_manager
 from py.services.service_registry import ServiceRegistry
 from py.utils.constants import (
+    MAX_FILENAME_COMPONENT_BYTES,
     MAX_FILENAME_STEM_LENGTH,
     MAX_FOLDER_NAME_LENGTH,
+    MAX_FULL_PATH_LENGTH,
     MAX_PATH_TAG_LENGTH,
+    PATH_BUDGET_SUFFIX_ALLOWANCE,
 )
 from py.utils.utils import (
     calculate_filename_for_model,
     calculate_recipe_fingerprint,
     calculate_relative_path_for_model,
+    decode_percent_encoded_filename,
+    fit_stem_to_path_budget,
     get_lora_info,
     get_lora_info_absolute,
     sanitize_folder_name,
@@ -581,3 +588,208 @@ def test_get_lora_info_absolute_does_not_substitute_missing_absolute_path(mock_l
     assert get_lora_info_absolute("/models/missing/same.safetensors") == (
         "/models/missing/same.safetensors", []
     )
+
+
+# Budget available to "directory + stem"; suffixes (.safetensors,
+# .metadata.json, previews) are covered by PATH_BUDGET_SUFFIX_ALLOWANCE.
+PATH_BUDGET = MAX_FULL_PATH_LENGTH - PATH_BUDGET_SUFFIX_ALLOWANCE
+
+
+@pytest.fixture
+def alongside_sidecar_dir(monkeypatch):
+    """Pin sidecar resolution to alongside mode regardless of global settings.
+
+    Plain dirname, no abspath: abspath prepends the drive letter on Windows,
+    which would make the sidecar path two chars longer than the model path
+    and skew the budget math these tests assert on.
+    """
+
+    monkeypatch.setattr(
+        "py.utils.utils.get_sidecar_dir",
+        lambda path: os.path.dirname(path),
+    )
+
+
+def test_fit_stem_to_path_budget_returns_stem_within_budget(alongside_sidecar_dir):
+    assert fit_stem_to_path_budget("/models", "abc", ".safetensors") == "abc"
+
+
+def test_fit_stem_to_path_budget_empty_stem(alongside_sidecar_dir):
+    assert fit_stem_to_path_budget("/models", "") == ""
+
+
+def test_fit_stem_to_path_budget_truncates_overlong_stem(alongside_sidecar_dir):
+    dir_path = "/" + "d" * 200  # 201 chars
+    stem = "n" * 100
+
+    result = fit_stem_to_path_budget(dir_path, stem, ".safetensors")
+
+    assert len(os.path.join(dir_path, result)) == PATH_BUDGET
+    assert result == "n" * (len(stem) - (201 + 1 + len(stem) - PATH_BUDGET))
+
+
+def test_fit_stem_to_path_budget_retrims_separators_exposed_by_the_cut(
+    alongside_sidecar_dir,
+):
+    dir_path = "/" + "d" * 226  # 227 chars -> cut leaves "aaaaaaaa____"
+    stem = "aaaaaaaa______bbbb"
+
+    result = fit_stem_to_path_budget(dir_path, stem)
+
+    assert result == "aaaaaaaa"
+
+
+def test_fit_stem_to_path_budget_returns_empty_when_dir_leaves_no_room(
+    alongside_sidecar_dir,
+):
+    dir_path = "/" + "d" * 235  # 236 chars
+
+    assert fit_stem_to_path_budget(dir_path, "n" * 30) == ""
+
+
+def test_fit_stem_to_path_budget_counts_the_centralized_sidecar_mirror(
+    monkeypatch,
+):
+    """The mirror tree is typically deeper than the model dir (#1142)."""
+
+    mirror_dir = "/" + "m" * 225  # 226 chars
+    monkeypatch.setattr("py.utils.utils.get_sidecar_dir", lambda path: mirror_dir)
+
+    result = fit_stem_to_path_budget("/models", "n" * 100, ".safetensors")
+
+    assert len(os.path.join(mirror_dir, result)) == PATH_BUDGET
+
+
+def test_fit_stem_to_path_budget_enforces_component_byte_limit_for_cjk(
+    alongside_sidecar_dir,
+):
+    """POSIX NAME_MAX counts bytes: a 100-char CJK stem (300 bytes) passes
+    every character cap yet cannot be created on disk (ENAMETOOLONG)."""
+
+    result = fit_stem_to_path_budget("/models", "界" * 100, ".safetensors")
+
+    assert 0 < len(result) < 100
+    # stem + longest companion suffix (".metadata.json.bak") fits NAME_MAX.
+    assert (
+        len(result.encode("utf-8")) + PATH_BUDGET_SUFFIX_ALLOWANCE
+        <= MAX_FILENAME_COMPONENT_BYTES
+    )
+
+
+def test_fit_stem_to_path_budget_honors_probed_name_max(
+    monkeypatch, alongside_sidecar_dir
+):
+    """eCryptfs (Ubuntu encrypted home, Synology encrypted shares) allows
+    only 143 bytes per component; the probe must tighten the budget."""
+
+    monkeypatch.setattr("py.utils.utils._probe_name_max_bytes", lambda path: 143)
+
+    result = fit_stem_to_path_budget("/models", "か" * 60, ".safetensors")
+
+    assert 0 < len(result) < 60
+    assert len(result.encode("utf-8")) + PATH_BUDGET_SUFFIX_ALLOWANCE <= 143
+
+
+def test_fit_stem_to_path_budget_byte_cut_never_splits_a_multibyte_character(
+    alongside_sidecar_dir,
+):
+    stem = "a" * 233 + "界界"  # 239 bytes; the 235-byte cut lands mid-界
+
+    result = fit_stem_to_path_budget("/", stem, ".safetensors")
+
+    assert result == "a" * 233
+
+
+def test_fit_stem_to_path_budget_returns_empty_when_byte_budget_is_not_viable(
+    monkeypatch, alongside_sidecar_dir
+):
+    """A name-max probe below the viable stem size must skip, not stub."""
+
+    monkeypatch.setattr("py.utils.utils._probe_name_max_bytes", lambda path: 24)
+
+    assert fit_stem_to_path_budget("/models", "n" * 30, ".safetensors") == ""
+
+
+def test_calculate_filename_with_target_dir_trims_to_path_budget(
+    isolated_settings, alongside_sidecar_dir
+):
+    """The fixed stem cap ignores the real depth; target_dir tightens it."""
+    _set_filename_templates(isolated_settings, "{model_name}")
+    dir_path = "/" + "d" * 200  # 201 chars: 150-cap stem would overflow
+
+    model_data = {"model_name": "m" * 400, "file_path": "/models/V1.safetensors"}
+
+    result = calculate_filename_for_model(model_data, "lora", target_dir=dir_path)
+
+    assert result
+    assert len(result) < MAX_FILENAME_STEM_LENGTH
+    assert len(os.path.join(dir_path, result)) == PATH_BUDGET
+
+
+def test_calculate_filename_with_target_dir_returns_empty_when_unviable(
+    isolated_settings, alongside_sidecar_dir
+):
+    _set_filename_templates(isolated_settings, "{model_name}")
+    dir_path = "/" + "d" * 235  # 236 chars: no viable stem fits
+
+    model_data = {"model_name": "m" * 400, "file_path": "/models/V1.safetensors"}
+
+    assert calculate_filename_for_model(model_data, "lora", target_dir=dir_path) == ""
+
+
+def test_calculate_filename_without_target_dir_keeps_fixed_cap(isolated_settings):
+    _set_filename_templates(isolated_settings, "{model_name}")
+
+    model_data = {"model_name": "m" * 400, "file_path": "/models/V1.safetensors"}
+
+    result = calculate_filename_for_model(model_data, "lora")
+
+    assert len(result) == MAX_FILENAME_STEM_LENGTH
+
+
+# Real raw stored fileName served by CivitAI's mini endpoint for model
+# version 1714548: non-ASCII names are percent-encoded server-side.
+PERCENT_ENCODED_STORED_NAME = (
+    "%E7%8A%AC%E5%A4%9C%E5%8F%89%E6%97%A5%E6%9A%AE%E3%81%8B%E3%81%94"
+    "%E3%82%812000%E5%B9%B4%E4%BB%A3%E3%82%A2%E3%83%8B%E3%83%A1%E3%82%A2"
+    "%E3%83%8A%E3%83%AD%E3%82%B0%E4%BD%9C%E7%94%BB%E9%A2%A8illustrious"
+    "InuyashaHigurashi_Kagome2000s_anime_analog_painting_Styleillustrious"
+    ".safetensors"
+)
+
+
+def test_decode_percent_encoded_filename_decodes_non_ascii_names():
+    result = decode_percent_encoded_filename(PERCENT_ENCODED_STORED_NAME)
+
+    assert result == (
+        "犬夜叉日暮かごめ2000年代アニメアナログ作画風illustrious"
+        "InuyashaHigurashi_Kagome2000s_anime_analog_painting_Styleillustrious"
+        ".safetensors"
+    )
+
+
+def test_decode_percent_encoded_filename_passes_plain_names_through():
+    assert decode_percent_encoded_filename("model.safetensors") == "model.safetensors"
+
+
+def test_decode_percent_encoded_filename_keeps_ascii_only_escapes_literal():
+    # A literal "%" is stored as "%25", so decoding would yield pure ASCII:
+    # treat the string as a real name and leave it alone.
+    assert (
+        decode_percent_encoded_filename("100%25cool.safetensors")
+        == "100%25cool.safetensors"
+    )
+
+
+def test_decode_percent_encoded_filename_keeps_invalid_escapes_literal():
+    assert (
+        decode_percent_encoded_filename("100%zzcool.safetensors")
+        == "100%zzcool.safetensors"
+    )
+
+
+def test_decode_percent_encoded_filename_keeps_truncated_escapes_literal():
+    # A mid-triplet cut (e.g. from a previous length-truncation bug) does not
+    # decode to valid UTF-8 and must pass through untouched.
+    truncated = PERCENT_ENCODED_STORED_NAME[:100]
+    assert decode_percent_encoded_filename(truncated) == truncated

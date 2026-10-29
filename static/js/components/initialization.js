@@ -14,7 +14,10 @@ class InitializationManager {
         this.processingStartTime = null;
         this.processedFilesCount = 0;
         this.totalFilesCount = 0;
+        this.bytesDone = 0;
+        this.totalBytes = 0;
         this.averageProcessingTime = null;
+        this.averageTimePerByte = null;
         this.pageType = null; // Added page type property
     }
 
@@ -32,16 +35,32 @@ class InitializationManager {
 
         // Check session storage for saved progress
         this.restoreProgress();
-        
+
+        // Wire up the error retry button
+        const retryBtn = document.getElementById('initRetryBtn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => window.location.reload());
+        }
+
+        // A server-rendered error means the failure happened while this page
+        // was being generated (e.g. the cache read threw). Polling would
+        // report "complete" for the idle scanner and reload straight back
+        // into the same failure, so stay on the error state until the user
+        // retries manually.
+        const serverError = document.getElementById('initError');
+        if (serverError && !serverError.hidden) {
+            return;
+        }
+
         // Setup the tip carousel
         this.setupTipCarousel();
-        
+
         // Connect to WebSocket for progress updates
         this.connectWebSocket();
 
         // Add event listeners for tip navigation
         this.setupTipNavigation();
-        
+
         // Show first tip as active
         document.querySelector('.tip-item').classList.add('active');
     }
@@ -95,14 +114,29 @@ class InitializationManager {
             if (savedProgress.processedFiles !== undefined) {
                 this.processedFilesCount = savedProgress.processedFiles;
             }
-            
+
             if (savedProgress.totalFiles !== undefined) {
                 this.totalFilesCount = savedProgress.totalFiles;
             }
-            
+
+            if (savedProgress.bytesDone !== undefined) {
+                this.bytesDone = savedProgress.bytesDone;
+            }
+
+            if (savedProgress.totalBytes !== undefined) {
+                this.totalBytes = savedProgress.totalBytes;
+            }
+
             // Restore processing time metrics if available
             if (savedProgress.averageProcessingTime !== undefined) {
                 this.averageProcessingTime = savedProgress.averageProcessingTime;
+            }
+
+            if (savedProgress.averageTimePerByte !== undefined) {
+                this.averageTimePerByte = savedProgress.averageTimePerByte;
+            }
+
+            if (savedProgress.averageProcessingTime !== undefined || savedProgress.averageTimePerByte !== undefined) {
                 this.updateRemainingTime();
             }
             
@@ -177,16 +211,20 @@ class InitializationManager {
      */
     pollProgress() {
         const checkProgress = () => {
-            fetch('/api/lm/init-status')
+            // Scope the status check to this page's scanner(s), mirroring the
+            // WebSocket completion semantics (per-pageType broadcasts).
+            fetch(`/api/lm/init-status?page=${encodeURIComponent(this.pageType)}`)
                 .then(response => response.json())
                 .then(data => {
                     this.handleProgressUpdate(data);
-                    
-                    // If initialization is complete, stop polling
-                    if (data.status !== 'complete') {
-                        setTimeout(checkProgress, 2000);
-                    } else {
+
+                    if (data.status === 'complete') {
+                        // Initialization is complete, stop polling
                         window.location.reload();
+                    } else if (data.status !== 'error') {
+                        // Errors are already displayed by handleProgressUpdate;
+                        // polling again would just reload into the same failure.
+                        setTimeout(checkProgress, 2000);
                     }
                 })
                 .catch(error => {
@@ -194,7 +232,7 @@ class InitializationManager {
                     setTimeout(checkProgress, 3000); // Try again after a longer delay
                 });
         };
-        
+
         checkProgress();
     }
 
@@ -208,6 +246,12 @@ class InitializationManager {
         // Handle cache health warning messages
         if (data.type === 'cache_health_warning') {
             this.handleCacheHealthWarning(data);
+            return;
+        }
+
+        // The first-run welcome page owns the pre-scan state; once the scan
+        // starts the page reloads into the progress view on its own.
+        if (data.stage === 'scan_started') {
             return;
         }
         
@@ -232,13 +276,22 @@ class InitializationManager {
                 return;
             }
         }
+
+        // Show scan failures instead of silently sitting on the progress view
+        if (data.status === 'error') {
+            this.showError(data.details);
+            return;
+        }
         
         // Save progress data to session storage
         setSessionItem(this.getStorageKey('initProgress'), {
             ...data,
             averageProcessingTime: this.averageProcessingTime,
+            averageTimePerByte: this.averageTimePerByte,
             processedFiles: this.processedFilesCount,
-            totalFiles: this.totalFilesCount
+            totalFiles: this.totalFilesCount,
+            bytesDone: this.bytesDone,
+            totalBytes: this.totalBytes
         });
         
         // Update progress percentage
@@ -251,50 +304,76 @@ class InitializationManager {
             this.updateStatusMessage(data.details);
         }
         
-        // Track files count for time estimation
-        if (data.stage === 'count_models' && data.details) {
-            const match = data.details.match(/Found (\d+)/);
-            if (match && match[1]) {
-                this.totalFilesCount = parseInt(match[1]);
+        // Structured progress fields broadcast by the backend; the English
+        // `details` string is display-only and never parsed here.
+        if (data.stage === 'count_models') {
+            if (typeof data.total === 'number') {
+                this.totalFilesCount = data.total;
+            }
+            if (typeof data.bytes_total === 'number') {
+                this.totalBytes = data.bytes_total;
             }
         }
-        
-        // Track processed files for time estimation
-        if (data.stage === 'process_models' && data.details) {
-            const match = data.details.match(/Processing .* files: (\d+)\/(\d+)/);
-            if (match && match[1] && match[2]) {
-                const currentCount = parseInt(match[1]);
-                const totalCount = parseInt(match[2]);
-                
-                // Make sure we have valid total count
-                if (totalCount > 0 && this.totalFilesCount === 0) {
-                    this.totalFilesCount = totalCount;
-                }
-                
-                // Start tracking processing time once we've processed some files
-                if (currentCount > 0 && !this.processingStartTime && this.processedFilesCount === 0) {
+
+        // Track processed files/bytes for time estimation
+        if (data.stage === 'process_models') {
+            const processed = typeof data.processed === 'number' ? data.processed : null;
+            const total = typeof data.total === 'number' ? data.total : null;
+            const bytesDone = typeof data.bytes_done === 'number' ? data.bytes_done : null;
+            const bytesTotal = typeof data.bytes_total === 'number' ? data.bytes_total : null;
+
+            if (total > 0 && this.totalFilesCount === 0) {
+                this.totalFilesCount = total;
+            }
+            if (bytesTotal > 0 && this.totalBytes === 0) {
+                this.totalBytes = bytesTotal;
+            }
+
+            // Byte-weighted ETA when sizes are available: a 7 GB file and a
+            // 100 KB file must not advance the estimate by the same amount.
+            if (bytesDone > 0) {
+                if (!this.processingStartTime && this.bytesDone === 0) {
                     this.processingStartTime = Date.now();
                 }
-                
-                // Calculate average processing time based on elapsed time and files processed
-                if (this.processingStartTime && currentCount > this.processedFilesCount) {
-                    const newFiles = currentCount - this.processedFilesCount;
+
+                if (this.processingStartTime && bytesDone > this.bytesDone) {
                     const elapsedTime = Date.now() - this.processingStartTime;
-                    const timePerFile = elapsedTime / currentCount; // ms per file
-                    
-                    // Update moving average
+                    const timePerByte = elapsedTime / bytesDone; // ms per byte
+
+                    // Simple exponential moving average
+                    if (!this.averageTimePerByte) {
+                        this.averageTimePerByte = timePerByte;
+                    } else {
+                        this.averageTimePerByte = this.averageTimePerByte * 0.7 + timePerByte * 0.3;
+                    }
+
+                    this.updateRemainingTime();
+                }
+
+                this.bytesDone = bytesDone;
+            } else if (processed !== null) {
+                // File-count fallback for progress sources without byte data
+                if (processed > 0 && !this.processingStartTime && this.processedFilesCount === 0) {
+                    this.processingStartTime = Date.now();
+                }
+
+                if (this.processingStartTime && processed > this.processedFilesCount) {
+                    const elapsedTime = Date.now() - this.processingStartTime;
+                    const timePerFile = elapsedTime / processed; // ms per file
+
+                    // Simple exponential moving average
                     if (!this.averageProcessingTime) {
                         this.averageProcessingTime = timePerFile;
                     } else {
-                        // Simple exponential moving average
                         this.averageProcessingTime = this.averageProcessingTime * 0.7 + timePerFile * 0.3;
                     }
-                    
-                    // Update remaining time estimate
+
                     this.updateRemainingTime();
                 }
-                
-                this.processedFilesCount = currentCount;
+            }
+
+            if (processed !== null) {
+                this.processedFilesCount = processed;
             }
         }
         
@@ -316,14 +395,21 @@ class InitializationManager {
      * Update the remaining time display based on current progress
      */
     updateRemainingTime() {
-        if (!this.averageProcessingTime || !this.totalFilesCount || this.totalFilesCount <= 0) {
+        // Byte-weighted estimate when sizes are known, file-count fallback
+        // otherwise.
+        let remainingTimeMs = null;
+        if (this.averageTimePerByte && this.totalBytes > 0) {
+            remainingTimeMs = (this.totalBytes - this.bytesDone) * this.averageTimePerByte;
+        } else if (this.averageProcessingTime && this.totalFilesCount > 0) {
+            const remainingFiles = this.totalFilesCount - this.processedFilesCount;
+            remainingTimeMs = remainingFiles * this.averageProcessingTime;
+        }
+
+        if (remainingTimeMs === null) {
             document.getElementById('remainingTime').textContent = 'Estimating...';
             return;
         }
-        
-        const remainingFiles = this.totalFilesCount - this.processedFilesCount;
-        const remainingTimeMs = remainingFiles * this.averageProcessingTime;
-        
+
         if (remainingTimeMs <= 0) {
             document.getElementById('remainingTime').textContent = 'Almost done...';
             return;
@@ -449,6 +535,27 @@ class InitializationManager {
             this.tipInterval = setInterval(() => {
                 this.showNextTip();
             }, 8000);
+        }
+    }
+
+    /**
+     * Show an initialization error with a retry button
+     */
+    showError(details) {
+        const loadingContent = document.querySelector('.initialization-container .loading-content');
+        const errorEl = document.getElementById('initError');
+        const errorText = document.getElementById('initErrorText');
+
+        if (loadingContent) {
+            loadingContent.style.display = 'none';
+        }
+
+        if (errorText) {
+            errorText.textContent = details || '';
+        }
+
+        if (errorEl) {
+            errorEl.hidden = false;
         }
     }
 

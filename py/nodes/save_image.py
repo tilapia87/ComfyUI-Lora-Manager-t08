@@ -40,6 +40,14 @@ CIVITAI_SAMPLER_MAP = {
     "lcm": "LCM",
 }
 
+# Civitai infers the image's "Tools" field from a lowercase `engine` detail key
+# when the image is uploaded: post.addImage resolves it with getToolByAlias /
+# getToolByName, and a Tool named "ComfyUI" exists, so this value tags every
+# saved image as ComfyUI. Techniques are intentionally NOT written: the detail
+# keys are `process`/`type`/`workflow` and the graph alone cannot tell txt2img
+# from img2img reliably, while a wrong value is user-visible on Civitai.
+CIVITAI_ENGINE = "ComfyUI"
+
 # Base model display name → AIR URN slug
 # Sourced from civitai source: src/shared/constants/basemodel.constants.ts
 BASE_MODEL_AIR_SLUG = {
@@ -204,6 +212,12 @@ class SaveImageLM:
                 ),
             },
             "optional": {
+                "metadata": (
+                    "METADATA",
+                    {
+                        "tooltip": "Optional metadata input from a Metadata Overwrite (LoraManager) node. When connected, that node's values override the automatically collected metadata for this Save node only.",
+                    },
+                ),
                 "lossless_webp": (
                     "BOOLEAN",
                     {
@@ -491,6 +505,10 @@ class SaveImageLM:
                 params.append(f"Clip skip: {abs(int(clip_skip))}")
             except (ValueError, TypeError):
                 pass
+        # Tells Civitai which Tool generated the image. Emitted before
+        # additional_data on purpose: duplicate detail keys are last-one-wins,
+        # so a user-supplied `engine:` in additional_data still overrides this.
+        params.append(f"engine: {CIVITAI_ENGINE}")
         additional_data = metadata_dict.get("additional_data", "")
         if additional_data:
             params.append(additional_data)
@@ -795,6 +813,28 @@ class SaveImageLM:
         ExifUtils.append_recipe_metadata(image_path, recipe_data)
         self._sync_recipe_cache(recipe_scanner, recipe_data, json_path)
 
+    @staticmethod
+    def _dedupe_existing_filename(full_output_folder, file):
+        """Return (file, file_path), appending an incrementing suffix when the
+        target file already exists so a counter-less save never overwrites."""
+        original_file = file
+        file_path = os.path.join(full_output_folder, file)
+        if not os.path.exists(file_path):
+            return file, file_path
+
+        stem, extension = os.path.splitext(original_file)
+        suffix = 1
+        while os.path.exists(file_path):
+            file = f"{stem}_{suffix:04}{extension}"
+            file_path = os.path.join(full_output_folder, file)
+            suffix += 1
+        logger.warning(
+            "Output file %s already exists; saving as %s to avoid overwriting it",
+            original_file,
+            file,
+        )
+        return file, file_path
+
     def save_images(
         self,
         images,
@@ -803,6 +843,7 @@ class SaveImageLM:
         id,
         prompt=None,
         extra_pnginfo=None,
+        metadata=None,
         lossless_webp=True,
         quality=100,
         webp_method=6,
@@ -820,7 +861,14 @@ class SaveImageLM:
         raw_metadata = get_metadata()
         metadata_dict = MetadataProcessor.to_dict(raw_metadata, id)
 
-        metadata = self.format_metadata(metadata_dict, add_loras_to_prompt)
+        # A Metadata Overwrite node wired directly into this Save node applies
+        # its values on top of the collected metadata for this node only.
+        if metadata:
+            metadata_dict = MetadataProcessor.apply_overwrite_params(
+                metadata_dict, metadata
+            )
+
+        metadata_text = self.format_metadata(metadata_dict, add_loras_to_prompt)
 
         # Process filename_prefix with pattern substitution
         filename_prefix = self.format_filename(filename_prefix, metadata_dict)
@@ -836,6 +884,21 @@ class SaveImageLM:
         if not os.path.exists(full_output_folder):
             os.makedirs(full_output_folder, exist_ok=True)
 
+        # Batch images with identical prefixes would silently overwrite each other;
+        # force a counter suffix when nothing else disambiguates the filenames.
+        force_counter = (
+            len(images) > 1
+            and not add_counter_to_filename
+            and "%batch_num%" not in filename
+        )
+        if force_counter:
+            logger.warning(
+                "Saving %d images with add_counter_to_filename disabled and no "
+                "%%batch_num%% pattern in the filename; adding a counter suffix "
+                "to avoid overwriting batch images.",
+                len(images),
+            )
+
         # Process each image with incrementing counter
         for i, image in enumerate(images):
             # Convert the tensor image to numpy array
@@ -844,7 +907,7 @@ class SaveImageLM:
 
             # Generate filename with counter if needed
             base_filename = filename.replace("%batch_num%", str(i))
-            if add_counter_to_filename:
+            if add_counter_to_filename or force_counter:
                 # Use counter + i to ensure unique filenames for all images in batch
                 current_counter = counter + i
                 base_filename += f"_{current_counter:05}_"
@@ -876,13 +939,17 @@ class SaveImageLM:
 
             # Full save path
             file_path = os.path.join(full_output_folder, file)
+            if not add_counter_to_filename and not force_counter:
+                file, file_path = self._dedupe_existing_filename(
+                    full_output_folder, file
+                )
 
             # Save the image with metadata
             try:
                 if file_format == "png":
                     assert pnginfo is not None
-                    if save_with_metadata and metadata:
-                        pnginfo.add_text("parameters", metadata)
+                    if save_with_metadata and metadata_text:
+                        pnginfo.add_text("parameters", metadata_text)
                     if embed_workflow and extra_pnginfo is not None:
                         workflow_json = json.dumps(extra_pnginfo["workflow"])
                         pnginfo.add_text("workflow", workflow_json)
@@ -890,12 +957,12 @@ class SaveImageLM:
                     img.save(file_path, format="PNG", **save_kwargs)
                 elif file_format == "jpeg":
                     # For JPEG, use piexif
-                    if save_with_metadata and metadata:
+                    if save_with_metadata and metadata_text:
                         try:
                             exif_dict = {
                                 "Exif": {
                                     piexif.ExifIFD.UserComment: b"UNICODE\0"
-                                    + metadata.encode("utf-16be")
+                                    + metadata_text.encode("utf-16be")
                                 }
                             }
                             exif_bytes = piexif.dump(exif_dict)
@@ -908,10 +975,10 @@ class SaveImageLM:
                         # For WebP, use piexif for metadata
                         exif_dict = {}
 
-                        if save_with_metadata and metadata:
+                        if save_with_metadata and metadata_text:
                             exif_dict["Exif"] = {
                                 piexif.ExifIFD.UserComment: b"UNICODE\0"
-                                + metadata.encode("utf-16be")
+                                + metadata_text.encode("utf-16be")
                             }
 
                         # Add workflow if needed
@@ -954,6 +1021,7 @@ class SaveImageLM:
         file_format="png",
         prompt=None,
         extra_pnginfo=None,
+        metadata=None,
         lossless_webp=True,
         quality=100,
         webp_method=6,
@@ -986,6 +1054,7 @@ class SaveImageLM:
             id,
             prompt,
             extra_pnginfo,
+            metadata,
             lossless_webp,
             quality,
             webp_method,

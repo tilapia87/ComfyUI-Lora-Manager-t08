@@ -13,6 +13,7 @@ from py.services.download_manager import (
     DownloadManager,
 )
 from py.services import download_manager
+from py.services.errors import RateLimitError
 from py.services.service_registry import ServiceRegistry
 from py.services.settings_manager import SettingsManager, get_settings_manager
 from py.utils.metadata_manager import MetadataManager
@@ -128,20 +129,21 @@ async def test_execute_download_uses_rewritten_civitai_preview(monkeypatch, tmp_
     class DummyDownloader:
         def __init__(self):
             self.file_calls: list[tuple[str, str]] = []
-            self.memory_calls = 0
+            self.memory_calls: list[str] = []
 
         async def download_file(self, url, path, progress_callback=None, use_auth=None, **_kwargs):
             self.file_calls.append((url, path))
-            if url.endswith(".jpeg"):
-                Path(path).write_bytes(b"preview")
-                return True, None
             if url.endswith(".safetensors"):
                 Path(path).write_bytes(b"model")
                 return True, None
             return False, "unexpected url"
 
-        async def download_to_memory(self, *_args, **_kwargs):
-            self.memory_calls += 1
+        async def download_to_memory(self, url, **_kwargs):
+            self.memory_calls.append(url)
+            if "width=450,optimized=true" in url:
+                # Civitai's optimized rendition is WebP even though the URL
+                # path ends in .jpeg
+                return True, b"RIFF\x00\x00\x00\x00WEBPpreview", {"content-type": "image/webp"}
             return False, b"", {}
 
     dummy_downloader = DummyDownloader()
@@ -177,17 +179,13 @@ async def test_execute_download_uses_rewritten_civitai_preview(monkeypatch, tmp_
     )
 
     assert result == {"success": True}
-    preview_urls = [
-        url for url, _ in dummy_downloader.file_calls if url.endswith(".jpeg")
-    ]
-    assert any("width=450,optimized=true" in url for url in preview_urls)
-    assert dummy_downloader.memory_calls == 0
+    assert any("width=450,optimized=true" in url for url in dummy_downloader.memory_calls)
     assert optimize_called["value"] is False
     assert metadata.preview_url is not None
-    assert metadata.preview_url.endswith(".jpeg")
+    assert metadata.preview_url.endswith(".webp")
     assert metadata.preview_nsfw_level == 2
     stored_preview = manager._active_downloads["dl"]["preview_path"]
-    assert stored_preview.endswith(".jpeg")
+    assert stored_preview.endswith(".webp")
     assert Path(stored_preview).exists()
 
 
@@ -247,18 +245,19 @@ async def test_execute_download_respects_blur_setting(monkeypatch, tmp_path):
     class DummyDownloader:
         def __init__(self):
             self.file_calls: list[tuple[str, str]] = []
+            self.memory_calls: list[str] = []
 
         async def download_file(self, url, path, progress_callback=None, use_auth=None, **_kwargs):
             self.file_calls.append((url, path))
             if url.endswith(".safetensors"):
                 Path(path).write_bytes(b"model")
                 return True, None
-            if "safe.jpeg" in url:
-                Path(path).write_bytes(b"preview")
-                return True, None
             return False, "unexpected url"
 
-        async def download_to_memory(self, *_args, **_kwargs):
+        async def download_to_memory(self, url, **_kwargs):
+            self.memory_calls.append(url)
+            if "safe.jpeg" in url:
+                return True, b"RIFF\x00\x00\x00\x00WEBPpreview", {"content-type": "image/webp"}
             return False, b"", {}
 
     dummy_downloader = DummyDownloader()
@@ -305,15 +304,13 @@ async def test_execute_download_respects_blur_setting(monkeypatch, tmp_path):
     )
 
     assert result == {"success": True}
-    preview_urls = [
-        url for url, _ in dummy_downloader.file_calls if url.endswith(".jpeg")
-    ]
+    preview_urls = dummy_downloader.memory_calls
     assert preview_urls
     assert all("nsfw.jpeg" not in url for url in preview_urls)
     assert any("safe.jpeg" in url for url in preview_urls)
     assert metadata.preview_nsfw_level == 1
     stored_preview = manager._active_downloads["dl"].get("preview_path")
-    assert stored_preview and stored_preview.endswith(".jpeg")
+    assert stored_preview and stored_preview.endswith(".webp")
 
 
 @pytest.mark.asyncio
@@ -657,3 +654,142 @@ async def test_civarchive_source_fallback_to_default_provider(
 
     assert result["success"] is True
     assert captured_providers == ["civarchive_api", "default"]
+
+
+@pytest.mark.asyncio
+async def test_civarchive_rate_limit_falls_back_to_default_provider(
+    monkeypatch, scanners, tmp_path
+):
+    """A CivArchive API cooldown (429) must not block models that are still
+    on CivitAI: the metadata step falls back to the default provider."""
+    manager = DownloadManager()
+
+    class CivArchiveProvider:
+        async def get_model_version(self, model_id, model_version_id):
+            raise RateLimitError(
+                "Rate limit wait for 'civarchive.com' exceeds the 300s cap",
+                retry_after=1339.0,
+                provider="civarchive_api",
+            )
+
+    class DefaultProvider:
+        async def get_model_version(self, model_id, model_version_id):
+            return {
+                "id": 119514,
+                "model": {"type": "LoRA", "tags": ["celebrity"]},
+                "baseModel": "SD 1.5",
+                "creator": {"username": "dogu_cat"},
+                "files": [
+                    {
+                        "type": "Model",
+                        "primary": True,
+                        "downloadUrl": "https://civitai.com/api/download/models/119514",
+                        "name": "file.safetensors",
+                        "hashes": {"SHA256": "abc123"},
+                    }
+                ],
+            }
+
+    captured_providers = []
+
+    async def get_metadata_provider(provider_name):
+        if provider_name == "civarchive_api":
+            captured_providers.append("civarchive_api")
+            return CivArchiveProvider()
+        return None
+
+    async def get_default_metadata_provider():
+        captured_providers.append("default")
+        return DefaultProvider()
+
+    monkeypatch.setattr(
+        download_manager, "get_metadata_provider", get_metadata_provider
+    )
+    monkeypatch.setattr(
+        download_manager, "get_default_metadata_provider", get_default_metadata_provider
+    )
+
+    captured = {}
+
+    async def fake_execute_download(
+        self,
+        *,
+        download_urls,
+        save_dir,
+        metadata,
+        version_info,
+        relative_path,
+        progress_callback,
+        model_type,
+        download_id,
+    ):
+        captured["download_urls"] = download_urls
+        return {"success": True}
+
+    monkeypatch.setattr(
+        DownloadManager, "_execute_download", fake_execute_download, raising=False
+    )
+
+    result = await manager.download_from_civitai(
+        model_id=110828,
+        model_version_id=119514,
+        save_dir=str(tmp_path),
+        use_default_paths=True,
+        progress_callback=None,
+        source="civarchive",
+    )
+
+    assert result["success"] is True
+    assert captured_providers == ["civarchive_api", "default"]
+    assert captured["download_urls"] == [
+        "https://civitai.com/api/download/models/119514"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_civarchive_rate_limit_reraised_when_default_provider_has_nothing(
+    monkeypatch, scanners, tmp_path
+):
+    """Archive-only model + CivArchive cooling down: the structured 429 must
+    survive so the queue re-queues the download instead of failing it."""
+    manager = DownloadManager()
+
+    class CivArchiveProvider:
+        async def get_model_version(self, model_id, model_version_id):
+            raise RateLimitError(
+                "Rate limit wait for 'civarchive.com' exceeds the 300s cap",
+                retry_after=1339.0,
+                provider="civarchive_api",
+            )
+
+    class DefaultProvider:
+        async def get_model_version(self, model_id, model_version_id):
+            return None
+
+    async def get_metadata_provider(provider_name):
+        if provider_name == "civarchive_api":
+            return CivArchiveProvider()
+        return None
+
+    async def get_default_metadata_provider():
+        return DefaultProvider()
+
+    monkeypatch.setattr(
+        download_manager, "get_metadata_provider", get_metadata_provider
+    )
+    monkeypatch.setattr(
+        download_manager, "get_default_metadata_provider", get_default_metadata_provider
+    )
+
+    result = await manager.download_from_civitai(
+        model_id=110828,
+        model_version_id=119514,
+        save_dir=str(tmp_path),
+        use_default_paths=True,
+        progress_callback=None,
+        source="civarchive",
+    )
+
+    assert result["success"] is False
+    assert result["reason"] == "rate_limited"
+    assert result["retry_after"] == 1339

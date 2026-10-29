@@ -762,13 +762,86 @@ class Config:
             if fingerprint_valid and mappings_valid:
                 return
 
-            logger.info("Symlink configuration changed; rescanning symbolic links")
+            logger.info(
+                "Symlink configuration changed; rescanning symbolic links (%s)",
+                self._describe_symlink_cache_invalidation(current_fingerprint),
+            )
 
         self.rebuild_symlink_cache()
         logger.info(
             "Symlink mappings rebuilt and cached in %.2f ms",
             (time.perf_counter() - start) * 1000,
         )
+
+    def _describe_symlink_cache_invalidation(
+        self, current_fingerprint: Dict[str, object]
+    ) -> str:
+        """Summarize why the persisted symlink cache was invalidated.
+
+        Distinguishes a fingerprint mismatch (root set or first-level symlink
+        layout changed) from a stale mapping (a cached link vanished or was
+        retargeted), so the startup log records what actually changed instead
+        of a bare "configuration changed".
+        """
+        cached = self._cached_fingerprint
+        if not isinstance(cached, dict) or not cached:
+            return "cache has no usable fingerprint"
+
+        if current_fingerprint == cached:
+            return "cached symlink mapping failed validation"
+
+        def _root_set(value: object) -> Set[str]:
+            if not isinstance(value, list):
+                return set()
+            return {item for item in value if isinstance(item, str)}
+
+        def _link_set(value: object) -> Set[Tuple[str, str]]:
+            pairs: Set[Tuple[str, str]] = set()
+            if isinstance(value, list):
+                for entry in value:
+                    if isinstance(entry, (list, tuple)) and len(entry) == 2:
+                        pairs.add((str(entry[0]), str(entry[1])))
+            return pairs
+
+        def _format(items: List[str]) -> str:
+            shown = items[:3]
+            suffix = f" +{len(items) - 3} more" if len(items) > 3 else ""
+            return ", ".join(shown) + suffix
+
+        reasons: List[str] = []
+        added_roots = sorted(
+            _root_set(current_fingerprint.get("roots"))
+            - _root_set(cached.get("roots"))
+        )
+        removed_roots = sorted(
+            _root_set(cached.get("roots"))
+            - _root_set(current_fingerprint.get("roots"))
+        )
+        if added_roots:
+            reasons.append(f"roots added: {_format(added_roots)}")
+        if removed_roots:
+            reasons.append(f"roots removed: {_format(removed_roots)}")
+
+        added_links = sorted(
+            _link_set(current_fingerprint.get("direct_symlinks"))
+            - _link_set(cached.get("direct_symlinks"))
+        )
+        removed_links = sorted(
+            _link_set(cached.get("direct_symlinks"))
+            - _link_set(current_fingerprint.get("direct_symlinks"))
+        )
+        if added_links:
+            reasons.append(
+                "symlinks added: "
+                + _format([f"{link} -> {target}" for link, target in added_links])
+            )
+        if removed_links:
+            reasons.append(
+                "symlinks removed: "
+                + _format([f"{link} -> {target}" for link, target in removed_links])
+            )
+
+        return "; ".join(reasons) or "fingerprint structure differs"
 
     def rebuild_symlink_cache(self) -> None:
         """Force a fresh scan of all symbolic links and update the persistent cache."""
@@ -871,14 +944,14 @@ class Config:
 
             # Check if symlink still exists
             if not self._is_link(link_path):
-                logger.debug("Cached symlink no longer exists: %s", link_path)
+                logger.info("Cached symlink no longer exists: %s", link_path)
                 return False
 
             # Check if target is still the same
             try:
                 actual_target = self._normalize_path(os.path.realpath(link_path))
                 if actual_target != target:
-                    logger.debug(
+                    logger.info(
                         "Symlink target changed: %s -> %s (cached: %s)",
                         link_path,
                         actual_target,
@@ -886,7 +959,7 @@ class Config:
                     )
                     return False
             except OSError:
-                logger.debug("Cannot resolve symlink: %s", link_path)
+                logger.info("Cannot resolve symlink: %s", link_path)
                 return False
 
         return True
@@ -1768,6 +1841,30 @@ class Config:
         """
         return list((getattr(self, "_configured_root_paths", None) or {}).get(model_type, []))
 
+    @staticmethod
+    def _unadmitted_paths(
+        configured: Iterable[str], live: Iterable[str]
+    ) -> List[str]:
+        """Configured roots missing from the live list.
+
+        Admission only ever appends, so a root that is already live can never
+        gain a new entry from re-preparation. Skipping those avoids an
+        ``os.path.exists``/``os.path.realpath`` stat per configured root on
+        every call — a single stat is enough to spin up a sleeping drive,
+        which made even a single-root scan touch every configured disk.
+        """
+        live_identities = {
+            Config._normalize_path_for_comparison(path)
+            for path in (live or [])
+            if isinstance(path, str)
+        }
+        return [
+            path
+            for path in configured
+            if isinstance(path, str)
+            and Config._normalize_path_for_comparison(path) not in live_identities
+        ]
+
     def admit_configured_roots(self) -> List[str]:
         """Append configured roots that became readable again, never removing any.
 
@@ -1777,6 +1874,10 @@ class Config:
         paths and appending only the new entries is what makes "plug the drive
         in, scan it" work without a restart. Nothing is ever dropped or
         re-ordered — see ``_append_new_paths`` for why order matters.
+
+        Only configured roots that are not live yet are probed on the
+        filesystem (``_unadmitted_paths``); already-live roots are skipped so
+        routine scans never stat healthy drives.
 
         Returns the paths that were admitted by this call.
         """
@@ -1790,14 +1891,20 @@ class Config:
             return merged
 
         try:
-            lora_configured = self.configured_roots_for("lora")
+            lora_configured = self._unadmitted_paths(
+                self.configured_roots_for("lora"), self.loras_roots
+            )
             if lora_configured:
                 self.loras_roots = _extend(
                     self.loras_roots, self._prepare_lora_paths(lora_configured)
                 )
 
-            checkpoint_configured = self.configured_roots_for("checkpoint")
-            unet_configured = self.configured_roots_for("unet")
+            checkpoint_configured = self._unadmitted_paths(
+                self.configured_roots_for("checkpoint"), self.checkpoints_roots
+            )
+            unet_configured = self._unadmitted_paths(
+                self.configured_roots_for("unet"), self.unet_roots
+            )
             if checkpoint_configured or unet_configured:
                 (
                     all_roots,
@@ -1810,28 +1917,31 @@ class Config:
                 self.checkpoints_roots = _extend(self.checkpoints_roots, checkpoint_roots)
                 self.unet_roots = _extend(self.unet_roots, unet_roots)
 
-            embedding_configured = self.configured_roots_for("embedding")
+            embedding_configured = self._unadmitted_paths(
+                self.configured_roots_for("embedding"), self.embeddings_roots
+            )
             if embedding_configured:
                 self.embeddings_roots = _extend(
                     self.embeddings_roots,
                     self._prepare_embedding_paths(embedding_configured),
                 )
 
-            other_configured = self.configured_roots_for("other")
-            if other_configured:
+            other_missing_by_key = {
+                key: missing
+                for key in self._get_enabled_other_folder_keys()
+                if (
+                    missing := self._unadmitted_paths(
+                        self._configured_other_paths_for_key(key),
+                        self.other_folder_roots.get(key, []),
+                    )
+                )
+            }
+            if other_missing_by_key:
                 (
                     other_roots,
                     other_subtypes,
                     other_per_key,
-                ) = self._prepare_other_paths(
-                    {
-                        key: [
-                            path
-                            for path in self._configured_other_paths_for_key(key)
-                        ]
-                        for key in self._get_enabled_other_folder_keys()
-                    }
-                )
+                ) = self._prepare_other_paths(other_missing_by_key)
                 self.other_roots = _extend(self.other_roots, other_roots)
                 for root, sub_type in other_subtypes.items():
                     self.other_root_subtypes.setdefault(root, sub_type)
