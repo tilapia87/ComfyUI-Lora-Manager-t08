@@ -206,13 +206,13 @@ def parse_image(
         if not lora_name or lora_name in seen:
             continue
         seen.add(lora_name)
-        resolved = resolve_lora_hash(lora_name, lora_index)
+        installed, digest = resolve_lora(lora_name, lora_index)
         loras.append(
             {
                 "name": lora_name,
                 "weight": model_weight,
-                "exists_locally": resolved is not None,
-                "hash": resolved,
+                "exists_locally": installed,
+                "hash": digest,
             }
         )
     record["loras"] = loras
@@ -232,6 +232,11 @@ _MODEL_EXTENSIONS = (
     ".onnx",
     ".msgpack",
 )
+
+# Version markers carry no identity: `x v1.0`, `x_v10` and `x` are the same
+# model as far as "is it installed?" goes.
+_VERSION_PATTERN = re.compile(r"\bv\d+(?:\s+\d+)*\b|\bver(?:sion)?\s+\d+\b|\b\d+\.\d+\b")
+_VERSION_TOKEN_PATTERN = re.compile(r"^v\d+$")
 
 
 def _strip_model_extension(name: str) -> str:
@@ -256,10 +261,14 @@ def normalize_lora_name(name: str) -> str:
     base = _strip_model_extension(base)
     if not base:
         return ""
-    # Brackets and parentheses only decorate a name: `[Marvel Comics (Capcom)]
-    # Marvel vs. Capcom 2` and `Marvel vs. Capcom 2` are the same file.
     words = re.sub(r"[^0-9A-Za-z]+", " ", base)
     return " ".join(words.lower().split())
+
+
+def _strip_version_markers(normalized: str) -> str:
+    """Drop ``v1``/``v1.0``/``ver 2`` decorations from a normalized name."""
+    without_versions = _VERSION_PATTERN.sub(" ", normalized or "")
+    return " ".join(without_versions.split())
 
 
 def _strip_leading_brackets(name: str) -> str:
@@ -286,6 +295,10 @@ def _strip_leading_brackets(name: str) -> str:
     return text
 
 
+def _sorted_words(normalized: str) -> str:
+    return " ".join(sorted(normalized.split()))
+
+
 def _lora_name_variants(name: str) -> List[str]:
     """The spellings worth comparing for one LoRA name, best first."""
     if not name:
@@ -306,8 +319,21 @@ def _lora_name_variants(name: str) -> List[str]:
     stripped = _strip_leading_brackets(without_extension)
     if stripped and stripped != without_extension:
         add(stripped)
+
+    # Normalized spellings come last so an exact match always wins.
     for raw in (without_extension, stripped):
-        add(normalize_lora_name(raw))
+        if not raw:
+            continue
+        normalized = normalize_lora_name(raw)
+        if not normalized:
+            continue
+        add(normalized)
+        no_versions = _strip_version_markers(normalized)
+        if no_versions:
+            add(no_versions)
+        add(_sorted_words(normalized))
+        if no_versions:
+            add(_sorted_words(no_versions))
     return variants
 
 
@@ -315,8 +341,9 @@ def _lora_name_keys(item: Dict[str, Any]) -> List[str]:
     """Every spelling a prompt might use for one library LoRA.
 
     A prompt can reference ``style_a.safetensors``, the same file through a
-    subfolder, the ``<lora:name:weight>`` syntax without the extension, or a
-    name that only differs in punctuation and case, so all of those resolve.
+    subfolder, the ``<lora:name:weight>`` syntax without the extension, or a name
+    that only differs in punctuation, case, a ``[creator]`` prefix or a version
+    suffix, so all of those resolve.
     """
     keys: List[str] = []
     for field in ("file_name", "model_name", "file_path"):
@@ -329,15 +356,36 @@ def _lora_name_keys(item: Dict[str, Any]) -> List[str]:
     return keys
 
 
-def build_lora_index(scanner_cache: Any) -> Dict[str, Optional[str]]:
+def _name_tokens(name: str) -> Set[str]:
+    """Token bag used by the last-resort fuzzy comparison."""
+    stripped = _strip_leading_brackets(
+        _strip_model_extension(os.path.basename(str(name or "").replace("\\", "/")))
+    )
+    return set(normalize_lora_name(stripped).split())
+
+
+class LoraIndex(dict):
+    """``alias -> sha256`` plus the token bags used when a name drifted.
+
+    ``None`` as a value means "the library has it, but the digest is unknown"
+    (ambiguous name, or a hash the scanner has not computed yet): that still
+    counts as installed, it just cannot be linked to a model page.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.token_bags: List[Tuple[frozenset, Optional[str]]] = []
+
+
+def build_lora_index(scanner_cache: Any) -> "LoraIndex":
     """Map every name a prompt may use to the local LoRA's sha256.
 
-    A name matching two different models maps to ``None``: linking a chip to the
-    wrong LoRA is worse than not linking it at all, and the caller treats
-    ``None`` as "no local match" (which is also how a cold scanner cache
-    behaves, so a missing cache never fails a scan).
+    Every library entry is indexed, including the ones whose digest is still
+    pending: "installed" and "linkable" are different questions, and answering
+    the first one wrong is what makes the gallery claim a LoRA the user owns is
+    missing.
     """
-    index: Dict[str, Optional[str]] = {}
+    index = LoraIndex()
     try:
         raw = getattr(scanner_cache, "raw_data", None) or []
     except Exception:  # pragma: no cover - defensive
@@ -346,25 +394,88 @@ def build_lora_index(scanner_cache: Any) -> Dict[str, Optional[str]]:
     for item in raw:
         if not isinstance(item, dict):
             continue
-        digest = item.get("sha256")
-        if not isinstance(digest, str) or not digest:
+        keys = _lora_name_keys(item)
+        if not keys:
             continue
-        for key in _lora_name_keys(item):
+        digest = item.get("sha256")
+        digest = digest if isinstance(digest, str) and digest else None
+        for key in keys:
             if key not in index:
                 index[key] = digest
-            elif index[key] != digest:
-                # Same name, different models: stop claiming to know.
+            elif digest and index[key] and index[key] != digest:
+                # Same name, different models: stop claiming to know the digest.
                 index[key] = None
+        tokens = _name_tokens(item.get("file_name") or item.get("model_name") or "")
+        if tokens:
+            index.token_bags.append((frozenset(tokens), digest))
     return index
+
+
+def _fuzzy_match(name: str, index: "LoraIndex") -> Optional[Tuple[bool, Optional[str]]]:
+    """Last resort: highest token overlap, but only when it is unambiguous."""
+    bags = getattr(index, "token_bags", None) or []
+    if not bags:
+        return None
+    wanted = _name_tokens(name)
+    if not wanted:
+        return None
+    version_tokens = {token for token in wanted if _VERSION_TOKEN_PATTERN.match(token)}
+
+    best_score = 0.0
+    second_score = 0.0
+    best_digests: Set[Optional[str]] = set()
+    for bag, digest in bags:
+        if version_tokens and not version_tokens.issubset(bag):
+            # 2 must never fuzzy-match 3.
+            continue
+        union = wanted | bag
+        if not union:
+            continue
+        overlap = len(wanted & bag)
+        if wanted <= bag or bag <= wanted:
+            # One name is the other plus decoration/version words: that is the
+            # common "prompt uses a shorter spelling" case, not a different model.
+            score = max(0.9, overlap / len(union))
+        else:
+            score = overlap / len(union)
+        if score > best_score + 1e-9:
+            second_score = best_score
+            best_score = score
+            best_digests = {digest}
+        elif abs(score - best_score) <= 1e-9:
+            best_digests.add(digest)
+        elif score > second_score:
+            second_score = score
+
+    if best_score < 0.82:
+        return None
+    # A close second candidate means the name is genuinely ambiguous.
+    if 0.7 <= second_score < best_score - 1e-9:
+        return None
+    # Two different models tied for the best score: do not guess.
+    if len(best_digests) > 1:
+        return None
+    return True, next(iter(best_digests))
+
+
+def resolve_lora(name: str, index: Dict[str, Optional[str]]) -> Tuple[bool, Optional[str]]:
+    """Resolve a prompt LoRA reference to ``(installed, sha256)``.
+
+    ``installed`` is the question the gallery chips ask; the digest is only
+    needed to link the chip to the model page.
+    """
+    if not name or not index:
+        return False, None
+    for candidate in _lora_name_variants(name):
+        if candidate in index:
+            return True, index[candidate]
+    fuzzy = _fuzzy_match(name, index)
+    if fuzzy is not None:
+        return fuzzy
+    return False, None
 
 
 def resolve_lora_hash(name: str, index: Dict[str, Optional[str]]) -> Optional[str]:
     """Resolve one prompt LoRA reference to a local hash, or ``None``."""
-    if not name or not index:
-        return None
-    # ``_lora_name_variants`` already yields the exact spellings first and the
-    # normalized ones last, which is the order we want to accept matches in.
-    for candidate in _lora_name_variants(name):
-        if candidate in index:
-            return index[candidate]
-    return None
+    installed, digest = resolve_lora(name, index)
+    return digest if installed else None

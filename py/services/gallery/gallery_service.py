@@ -24,7 +24,7 @@ from .gallery_indexer import (
     build_lora_index,
     iter_image_paths,
     parse_image,
-    resolve_lora_hash,
+    resolve_lora,
     resolve_output_dir,
 )
 from .lora_previews import build_lora_preview_index
@@ -390,10 +390,11 @@ class GalleryService:
             index = await self._lora_index()
             previews = await self._lora_preview_map()
             for row in page_rows:
-                digest = resolve_lora_hash(str(row.get("key") or ""), index)
-                if digest:
-                    row["hash"] = digest
+                installed, digest = resolve_lora(str(row.get("key") or ""), index)
+                if installed:
                     row["known"] = True
+                    if digest:
+                        row["hash"] = digest
                 row["preview_url"] = previews.get(str(row.get("hash") or ""), "")
 
         return {
@@ -438,10 +439,11 @@ class GalleryService:
             for lora in item.get("loras") or []:
                 if lora.get("hash"):
                     continue
-                digest = resolve_lora_hash(str(lora.get("name") or ""), index)
-                if digest:
-                    lora["hash"] = digest
+                installed, digest = resolve_lora(str(lora.get("name") or ""), index)
+                if installed:
                     lora["exists_locally"] = True
+                    if digest:
+                        lora["hash"] = digest
 
     async def _lora_preview_map(self) -> Dict[str, str]:
         """``sha256`` -> preview URL of the local LoRA library.

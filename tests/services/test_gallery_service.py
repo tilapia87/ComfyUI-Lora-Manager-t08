@@ -471,12 +471,70 @@ def test_build_lora_index_refuses_an_ambiguous_name():
 def test_build_lora_index_survives_a_cold_or_missing_cache():
     from types import SimpleNamespace
 
-    from py.services.gallery.gallery_indexer import build_lora_index, resolve_lora_hash
+    from py.services.gallery.gallery_indexer import build_lora_index, resolve_lora, resolve_lora_hash
 
     assert build_lora_index(None) == {}
     assert build_lora_index(SimpleNamespace(raw_data=None)) == {}
-    assert build_lora_index(SimpleNamespace(raw_data=[{"file_name": "x"}, "junk"])) == {}
     assert resolve_lora_hash("anything", {}) is None
+
+    # Junk entries are skipped, but a real entry whose hash the scanner has not
+    # computed yet is still an installed model.
+    pending = build_lora_index(SimpleNamespace(raw_data=[{"file_name": "x"}, "junk"]))
+    assert resolve_lora("x", pending) == (True, None)
+    assert resolve_lora_hash("x", pending) is None
+
+
+def test_build_lora_index_ignores_version_and_decoration_drift():
+    from types import SimpleNamespace
+
+    from py.services.gallery.gallery_indexer import build_lora_index, resolve_lora
+
+    cache = SimpleNamespace(
+        raw_data=[
+            _lora_cache_item("[Av1] Girls Frontline 2 Gallery v1.0.safetensors", "g" * 64),
+        ]
+    )
+    index = build_lora_index(cache)
+    expected = (True, "g" * 64)
+
+    assert resolve_lora("[Av1] Girls Frontline 2 Gallery v1.0", index) == expected
+    # No decoration, no version marker, different separators.
+    assert resolve_lora("Girls Frontline 2 Gallery", index) == expected
+    assert resolve_lora("girls_frontline_2_gallery_v10", index) == expected
+    # Word order does not matter either.
+    assert resolve_lora("Gallery Girls Frontline 2 v1.0", index) == expected
+    assert resolve_lora("Something Else Entirely", index) == (False, None)
+
+
+def test_build_lora_index_matches_a_shorter_prompt_spelling():
+    from types import SimpleNamespace
+
+    from py.services.gallery.gallery_indexer import build_lora_index, resolve_lora
+
+    cache = SimpleNamespace(
+        raw_data=[_lora_cache_item("Some Style Concept Art Anima v1.safetensors", "s" * 64)]
+    )
+    index = build_lora_index(cache)
+
+    # The prompt drops the trailing words; the library file has them.
+    assert resolve_lora("Some Style Concept Art", index) == (True, "s" * 64)
+
+
+def test_build_lora_index_never_guesses_between_two_close_matches():
+    from types import SimpleNamespace
+
+    from py.services.gallery.gallery_indexer import build_lora_index, resolve_lora
+
+    cache = SimpleNamespace(
+        raw_data=[
+            _lora_cache_item("Girls Frontline 2 Gallery A.safetensors", "a" * 64),
+            _lora_cache_item("Girls Frontline 2 Gallery B.safetensors", "b" * 64),
+        ]
+    )
+    index = build_lora_index(cache)
+
+    # The shared words are not enough to pick one of the two.
+    assert resolve_lora("Girls Frontline 2 Gallery", index) == (False, None)
 
 
 async def test_scan_records_the_resolved_lora_hash(service, monkeypatch):
