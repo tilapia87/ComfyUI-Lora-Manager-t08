@@ -2970,7 +2970,9 @@
             "scanComplete": "Сканирование завершено: новых {added}, обновлено {updated}, удалено {removed}",
             "settingsSaved": "Настройки галереи сохранены",
             "settingsSaveFailed": "Не удалось сохранить настройки галереи: {message}",
-            "loraLinkFailed": "Не удалось открыть {name} на странице LoRA"
+            "loraLinkFailed": "Не удалось открыть {name} на странице LoRA",
+            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
+            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
         },
         "agent": {
             "llmNotConfigured": "Поставщик ИИ не настроен. Включите его в Настройки → Поставщик ИИ.",
@@ -3105,6 +3107,8 @@
         },
         "actions": {
             "scan": "Сканировать папку вывода",
+            "loadMore": "[TODO: Translate] Load more images",
+            "loadingMore": "[TODO: Translate] Loading more...",
             "scanNow": "Сканировать сейчас",
             "settings": "Настройки галереи",
             "setOutputFolder": "Указать папку вывода",
@@ -3198,6 +3202,13 @@
             "recursiveHint": "Также сканировать подпапки папки вывода.",
             "effectivePath": "Действующая папка: {path} ({source})",
             "effectivePathUnset": "Не удалось обнаружить папку вывода.",
+            "thumbnailSize": "[TODO: Translate] Thumbnail size",
+            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
+            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
+            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
+            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
+            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
+            "clearCache": "[TODO: Translate] Clear cache",
             "source": {
                 "comfyui": "определена автоматически",
                 "setting": "из вашей настройки",

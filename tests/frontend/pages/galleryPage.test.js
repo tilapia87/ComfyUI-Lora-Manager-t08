@@ -152,6 +152,11 @@ function installFetchStub(overrides = {}) {
     },
     '/api/lm/gallery/stats': { success: true, data: STATS_PAYLOAD },
     '/api/lm/gallery/rating': { success: true, data: { image_path: '', rating: 0 } },
+    '/api/lm/gallery/thumbnail-cache': {
+      success: true,
+      data: { count: 12, bytes: 3 * 1024 * 1024, directory: 'C:\\tmp\\thumbs', size: 512 },
+    },
+    '/api/lm/gallery/thumbnail-cache/clear': { success: true, data: { removed: 12 } },
     '/api/lm/gallery/index': { success: true, data: { started: true } },
     ...overrides,
   };
@@ -698,6 +703,85 @@ describe('GalleryPage', () => {
     expect(imageCalls(fetchStub.calls)[1].url).toContain('artist=nnn+yryr');
     expect(document.getElementById('galleryImagesPanel').classList.contains('hidden')).toBe(false);
     expect(document.getElementById('galleryStatsPanel').classList.contains('hidden')).toBe(true);
+  });
+
+  it('appends the next page instead of paging with buttons', async () => {
+    fetchStub.setRoute('/api/lm/gallery/images', (url) => {
+      const requested = Number(new URL(url, 'http://localhost').searchParams.get('page') || 1);
+      const third = {
+        ...IMAGE_UNRATED,
+        image_path: 'C:\\ComfyUI\\output\\anima_00003_.png',
+        file_name: 'anima_00003_.png',
+        image_url: '/api/lm/gallery/image?path=third',
+        thumb_url: '/api/lm/gallery/thumbnail?path=third&size=512',
+      };
+      const items = requested === 1 ? [IMAGE_LIKED, IMAGE_UNRATED] : [third];
+      return jsonResponse({
+        success: true,
+        data: { items, total: 3, page: requested, page_size: 40, total_pages: 2 },
+      });
+    });
+
+    await boot();
+
+    expect(document.querySelectorAll('.gallery-card').length).toBe(2);
+    // A pager is not used for the grid; the scroll/load-more block is.
+    expect(document.getElementById('galleryPagination').classList.contains('hidden')).toBe(true);
+    const loadMore = document.getElementById('galleryLoadMore');
+    expect(loadMore.classList.contains('hidden')).toBe(false);
+
+    document.getElementById('galleryLoadMoreBtn').click();
+
+    await vi.waitFor(() => expect(document.querySelectorAll('.gallery-card').length).toBe(3));
+    expect(cardAt(2).dataset.path).toContain('anima_00003_.png');
+    expect(imageCalls(fetchStub.calls)[1].url).toContain('page=2');
+    // Nothing left to load, so the block disappears.
+    await vi.waitFor(() => expect(loadMore.classList.contains('hidden')).toBe(true));
+  });
+
+  it('sorts the ranking from the metric pills and from a card metric', async () => {
+    await boot();
+
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(3)
+    );
+
+    const statsCalls = () => fetchStub.calls.filter((call) => call.url.startsWith('/api/lm/gallery/stats'));
+    expect(statsCalls()[0].url).toContain('sort=net');
+
+    document.querySelector('#galleryStatsSortPills [data-sort="likes"]').click();
+    await vi.waitFor(() => expect(statsCalls().length).toBe(2));
+    expect(statsCalls()[1].url).toContain('sort=likes');
+    expect(
+      document.querySelector('#galleryStatsSortPills [data-sort="likes"]').classList.contains('active')
+    ).toBe(true);
+
+    // Clicking a metric on a card is the same control.
+    document.querySelector('#galleryStatsBody .gallery-col-total').click();
+    await vi.waitFor(() => expect(statsCalls().length).toBe(3));
+    expect(statsCalls()[2].url).toContain('sort=total');
+  });
+
+  it('shows how big the thumbnail cache is and clears it', async () => {
+    await boot();
+
+    document.getElementById('gallerySettingsToggle').click();
+
+    const info = document.getElementById('galleryThumbnailCacheInfo');
+    await vi.waitFor(() => expect(info.textContent).toContain('12'));
+    expect(info.textContent).toContain('3.0 MB');
+
+    document.getElementById('galleryThumbnailCacheClear').click();
+
+    await vi.waitFor(() =>
+      expect(
+        fetchStub.calls.some((call) =>
+          call.url.startsWith('/api/lm/gallery/thumbnail-cache/clear')
+        )
+      ).toBe(true)
+    );
+    await vi.waitFor(() => expect(info.textContent).toContain('12'));
   });
 
   it('shows the empty state with a scan action when nothing is indexed', async () => {

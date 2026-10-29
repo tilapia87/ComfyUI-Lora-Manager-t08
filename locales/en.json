@@ -2970,7 +2970,9 @@
       "scanComplete": "Scan complete: {added} added, {updated} updated, {removed} removed",
       "settingsSaved": "Gallery settings saved",
       "settingsSaveFailed": "Failed to save gallery settings: {message}",
-      "loraLinkFailed": "Could not open {name} on the LoRA page"
+      "loraLinkFailed": "Could not open {name} on the LoRA page",
+      "cacheCleared": "Removed {count} cached thumbnails",
+      "cacheClearFailed": "Could not clear the thumbnail cache: {message}"
     },
     "agent": {
       "llmNotConfigured": "AI provider not configured. Enable it in Settings → AI Provider.",
@@ -3105,6 +3107,8 @@
     },
     "actions": {
       "scan": "Scan output folder",
+      "loadMore": "Load more images",
+      "loadingMore": "Loading more...",
       "scanNow": "Scan now",
       "settings": "Gallery settings",
       "setOutputFolder": "Set output folder",
@@ -3198,6 +3202,13 @@
       "recursiveHint": "Also scan subfolders of the output folder.",
       "effectivePath": "Effective folder: {path} ({source})",
       "effectivePathUnset": "No output folder could be detected.",
+      "thumbnailSize": "Thumbnail size",
+      "thumbnailSizeHint": "Used by the grid and the statistics previews.",
+      "thumbnailCache": "Thumbnail cache",
+      "thumbnailCacheHint": "Thumbnails are generated on demand and safe to delete.",
+      "thumbnailCacheValue": "{count} thumbnails · {size}",
+      "thumbnailCacheUnavailable": "Cache information unavailable",
+      "clearCache": "Clear cache",
       "source": {
         "comfyui": "detected automatically",
         "setting": "from your setting",

@@ -12,6 +12,8 @@ const GALLERY_ENDPOINTS = {
     stats: '/api/lm/gallery/stats',
     // Artist thumbnails are proxied through the backend (animadex.net lookup).
     artistPreview: '/api/lm/gallery/artist-preview',
+    thumbnailCache: '/api/lm/gallery/thumbnail-cache',
+    thumbnailCacheClear: '/api/lm/gallery/thumbnail-cache/clear',
     index: '/api/lm/gallery/index',
     indexStatus: '/api/lm/gallery/index/status',
     config: '/api/lm/gallery/config',
@@ -279,6 +281,29 @@ export async function fetchArtistPreview(name) {
         console.debug('Artist preview unavailable:', name, error?.message);
         return { artist: name, matched_name: '', thumb_url: '', page_url: '', count: 0 };
     }
+}
+
+/**
+ * Read what the on-disk thumbnail cache currently holds.
+ * @returns {Promise<{count: number, bytes: number, directory: string, size: number}>}
+ */
+export async function fetchThumbnailCache() {
+    const data = await requestJson(GALLERY_ENDPOINTS.thumbnailCache);
+    return {
+        count: Number(data?.count) || 0,
+        bytes: Number(data?.bytes) || 0,
+        directory: data?.directory || '',
+        size: Number(data?.size) || 0,
+    };
+}
+
+/**
+ * Delete every cached thumbnail; they are regenerated on demand.
+ * @returns {Promise<{removed: number}>}
+ */
+export async function clearThumbnailCache() {
+    const data = await requestJson(GALLERY_ENDPOINTS.thumbnailCacheClear, { method: 'POST' });
+    return { removed: Number(data?.removed) || 0 };
 }
 
 /**

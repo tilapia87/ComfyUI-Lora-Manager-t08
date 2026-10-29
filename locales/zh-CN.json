@@ -2970,7 +2970,9 @@
             "scanComplete": "扫描完成：新增 {added}，更新 {updated}，移除 {removed}",
             "settingsSaved": "画廊设置已保存",
             "settingsSaveFailed": "保存画廊设置失败：{message}",
-            "loraLinkFailed": "无法在 LoRA 页面打开 {name}"
+            "loraLinkFailed": "无法在 LoRA 页面打开 {name}",
+            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
+            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
         },
         "agent": {
             "llmNotConfigured": "AI 提供商未配置。请在 设置 → AI 提供商 中进行配置。",
@@ -3105,6 +3107,8 @@
         },
         "actions": {
             "scan": "扫描输出目录",
+            "loadMore": "[TODO: Translate] Load more images",
+            "loadingMore": "[TODO: Translate] Loading more...",
             "scanNow": "立即扫描",
             "settings": "画廊设置",
             "setOutputFolder": "设置输出目录",
@@ -3198,6 +3202,13 @@
             "recursiveHint": "同时扫描输出目录的子文件夹。",
             "effectivePath": "当前生效目录：{path}（{source}）",
             "effectivePathUnset": "未能检测到输出目录。",
+            "thumbnailSize": "[TODO: Translate] Thumbnail size",
+            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
+            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
+            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
+            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
+            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
+            "clearCache": "[TODO: Translate] Clear cache",
             "source": {
                 "comfyui": "自动检测",
                 "setting": "来自你的设置",

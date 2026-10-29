@@ -20,6 +20,8 @@ import {
     startGalleryIndex,
     fetchGalleryIndexStatus,
     fetchGalleryConfig,
+    fetchThumbnailCache,
+    clearThumbnailCache,
 } from './api/galleryApi.js';
 
 const GALLERY_PAGE_SIZE = 40;
@@ -43,6 +45,14 @@ function readGalleryDensity() {
         // Private mode or disabled storage: fall through to the default.
     }
     return 'comfortable';
+}
+
+function formatBytes(bytes) {
+    const value = Number(bytes) || 0;
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 function persistGalleryDensity(density) {
@@ -77,6 +87,7 @@ function readGallerySettings() {
     const sort = typeof settings.gallery_sort === 'string' && settings.gallery_sort
         ? settings.gallery_sort
         : 'newest';
+    const thumbnailSize = Number(settings.gallery_thumbnail_size);
     return {
         outputPath: typeof settings.gallery_output_path === 'string' ? settings.gallery_output_path : '',
         artistListPath: typeof settings.gallery_artist_list_path === 'string'
@@ -84,6 +95,7 @@ function readGallerySettings() {
             : '',
         recursive: settings.gallery_recursive !== false,
         sort,
+        thumbnailSize: [256, 512, 768, 1024].includes(thumbnailSize) ? thumbnailSize : 512,
     };
 }
 
@@ -157,6 +169,11 @@ export class GalleryPage {
         this.isLoading = false;
         this.pendingReload = false;
         this.density = readGalleryDensity();
+        // The grid scrolls instead of paging, so the next page is appended.
+        this.loadingMore = false;
+        this.hasMoreImages = false;
+        this.thumbnailCache = null;
+        this._sentinelObserver = null;
     }
 
     /**
@@ -173,6 +190,7 @@ export class GalleryPage {
         this._applySettingsToForm();
         this._bindEvents();
         this._applyDensity();
+        this._setupInfiniteScroll();
 
         await this._loadConfig();
         await this.loadImages();
@@ -209,6 +227,9 @@ export class GalleryPage {
             filterBannerText: byId('galleryFilterBannerText'),
             filterClearBtn: byId('galleryFilterClearBtn'),
             grid: byId('galleryGrid'),
+            loadMore: byId('galleryLoadMore'),
+            loadMoreBtn: byId('galleryLoadMoreBtn'),
+            loadMoreText: byId('galleryLoadMoreText'),
             status: byId('galleryStatus'),
             statusText: byId('galleryStatusText'),
             errorState: byId('galleryErrorState'),
@@ -224,7 +245,7 @@ export class GalleryPage {
             prevPage: byId('galleryPrevPage'),
             nextPage: byId('galleryNextPage'),
             statsBySwitch: byId('galleryStatsBySwitch'),
-            statsSortSelect: byId('galleryStatsSortSelect'),
+            statsSortPills: byId('galleryStatsSortPills'),
             statsSummary: byId('galleryStatsSummary'),
             statsTableWrap: byId('galleryStatsTableWrap'),
             statsBody: byId('galleryStatsBody'),
@@ -234,6 +255,9 @@ export class GalleryPage {
             statsPageInfo: byId('galleryStatsPageInfo'),
             statsPrevPage: byId('galleryStatsPrevPage'),
             statsNextPage: byId('galleryStatsNextPage'),
+            thumbnailSizeSelect: byId('galleryThumbnailSizeSelect'),
+            thumbnailCacheInfo: byId('galleryThumbnailCacheInfo'),
+            thumbnailCacheClear: byId('galleryThumbnailCacheClear'),
         };
     }
 
@@ -249,6 +273,8 @@ export class GalleryPage {
         el.settingsSave?.addEventListener('click', () => this.saveSettings());
         el.outputPathBrowse?.addEventListener('click', () => this._browseFor('output'));
         el.artistListBrowse?.addEventListener('click', () => this._browseFor('artistList'));
+        el.thumbnailSizeSelect?.addEventListener('change', () => this._setThumbnailSize());
+        el.thumbnailCacheClear?.addEventListener('click', () => this._clearThumbnailCache());
 
         el.viewSwitch?.addEventListener('click', (event) => {
             const button = event.target.closest('[data-view]');
@@ -295,6 +321,10 @@ export class GalleryPage {
         el.prevPage?.addEventListener('click', () => this.goToPage(this.page - 1));
         el.nextPage?.addEventListener('click', () => this.goToPage(this.page + 1));
 
+        // The scroll sentinel is the primary path; this button keeps the grid
+        // usable with no IntersectionObserver (and for keyboard users).
+        el.loadMoreBtn?.addEventListener('click', () => this.loadMoreImages());
+
         el.grid?.addEventListener('click', (event) => this._onGridClick(event));
         el.grid?.addEventListener('keydown', (event) => this._onGridKeydown(event));
 
@@ -308,10 +338,10 @@ export class GalleryPage {
             this.loadStats();
         });
 
-        el.statsSortSelect?.addEventListener('change', () => {
-            this.statsSort = el.statsSortSelect.value;
-            this.statsPage = 1;
-            this.loadStats();
+        el.statsSortPills?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-sort]');
+            if (!button) return;
+            this.setStatsSort(button.dataset.sort);
         });
 
         el.statsPrevPage?.addEventListener('click', () => this.goToStatsPage(this.statsPage - 1));
@@ -321,6 +351,13 @@ export class GalleryPage {
             const jumpButton = event.target.closest('.gallery-open-lora');
             if (jumpButton) {
                 this.openStatRowInLoraPage(jumpButton);
+                return;
+            }
+            // A metric is also a sort control: clicking the thumbs-up count
+            // ranks by likes instead of filtering the grid.
+            const metric = event.target.closest('[data-sort-metric]');
+            if (metric) {
+                this.setStatsSort(metric.dataset.sortMetric);
                 return;
             }
             const row = event.target.closest('[data-key]');
@@ -357,12 +394,20 @@ export class GalleryPage {
      * dropped.
      * @returns {Promise<void>}
      */
-    async loadImages() {
+    async loadImages({ append = false } = {}) {
         if (this.isLoading) {
-            this.pendingReload = true;
+            // A filter change must win over a half-finished append.
+            if (!append) this.pendingReload = true;
             return;
         }
+        if (append && !this.hasMoreImages) return;
         this.isLoading = true;
+        if (append) {
+            this.loadingMore = true;
+            this.renderPagination();
+        } else if (!this.items.length) {
+            this._showSkeletons();
+        }
         this._setBusy(true);
 
         try {
@@ -377,21 +422,27 @@ export class GalleryPage {
                 q: this.search,
             });
 
-            this.items = result.items;
+            const incoming = result.items;
+            const previousCount = append ? this.items.length : 0;
+            this.items = append ? [...this.items, ...incoming] : incoming;
             this.totalItems = result.totalItems;
             this.totalPages = result.totalPages;
             this.page = result.currentPage || this.page;
+            this.hasMoreImages = this.page < this.totalPages;
 
             this._hide(this.el.errorState);
-            this.renderImages();
+            this.renderImages({ append, from: previousCount });
             this.renderPagination();
         } catch (error) {
             this.items = [];
+            this.hasMoreImages = false;
             this.el.grid.innerHTML = '';
             this._hide(this.el.pagination);
+            this._hide(this.el.loadMore);
             this._showError(error.message);
         } finally {
             this.isLoading = false;
+            this.loadingMore = false;
             if (this.pendingReload) {
                 this.pendingReload = false;
                 this.loadImages();
@@ -436,7 +487,7 @@ export class GalleryPage {
     /**
      * Render the image grid from `this.items`.
      */
-    renderImages() {
+    renderImages({ append = false, from = 0 } = {}) {
         if (!this.el.grid) return;
 
         this._updateTotalCount();
@@ -449,9 +500,66 @@ export class GalleryPage {
         }
 
         this._hide(this.el.emptyState);
-        this.el.grid.innerHTML = this.items.map((item, index) => this._renderCard(item, index)).join('');
+        // On append only the incoming items are rendered: their indexes stay
+        // absolute so `data-index` keeps pointing into `this.items`.
+        const visible = append ? this.items.slice(from) : this.items;
+        const markup = visible
+            .map((item, offset) => this._renderCard(item, (append ? from : 0) + offset))
+            .join('');
+        // Appending keeps the cards that are already on screen (and their
+        // thumbnails) untouched when the next page scrolls in.
+        if (append) this.el.grid.insertAdjacentHTML('beforeend', markup);
+        else this.el.grid.innerHTML = markup;
         this._wireCardImages();
         this._applyDensity();
+    }
+
+    /**
+     * Load the next page of images and append it to the grid.
+     * @returns {Promise<void>}
+     */
+    async loadMoreImages() {
+        if (this.loadingMore || !this.hasMoreImages) return;
+        this.page += 1;
+        await this.loadImages({ append: true });
+    }
+
+    /**
+     * Scroll-triggered loading.
+     *
+     * Falls back to the explicit button when the browser (or jsdom) has no
+     * IntersectionObserver; the button is always in the DOM for keyboard users.
+     */
+    _setupInfiniteScroll() {
+        if (typeof IntersectionObserver === 'undefined') return;
+        const target = this.el.loadMoreBtn;
+        if (!target) return;
+        this._sentinelObserver = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    void this.loadMoreImages();
+                }
+            },
+            { rootMargin: '600px 0px' }
+        );
+        this._sentinelObserver.observe(target);
+    }
+
+    /**
+     * Reserve the grid so the first paint is not a flash of empty page.
+     */
+    _showSkeletons() {
+        const grid = this.el.grid;
+        if (!grid) return;
+        const card = `
+            <div class="gallery-card gallery-card-skeleton" aria-hidden="true">
+                <div class="gallery-card-media is-loading"></div>
+                <div class="gallery-card-body">
+                    <span class="gallery-skeleton-line"></span>
+                    <span class="gallery-skeleton-line is-short"></span>
+                </div>
+            </div>`;
+        grid.innerHTML = card.repeat(8);
     }
 
     /**
@@ -734,7 +842,26 @@ export class GalleryPage {
         if (!this.items.length) return;
         const items = this.items.map((item) => ({ url: item.image_url, type: 'image' }));
         const safeIndex = index >= 0 && index < items.length ? index : 0;
+        this._preloadViewerNeighbours(safeIndex);
         openMediaViewer(items, safeIndex, { title: this.items[safeIndex]?.file_name || '' });
+    }
+
+    /**
+     * Warm the browser cache for the images the viewer opens next.
+     *
+     * The viewer shows full-resolution files, which are heavy; having the
+     * neighbours already decoded makes stepping through a page feel immediate.
+     * @param {number} index - Index of the image being opened.
+     */
+    _preloadViewerNeighbours(index) {
+        if (typeof Image === 'undefined') return;
+        for (const offset of [-1, 1, 2]) {
+            const item = this.items[index + offset];
+            if (!item?.image_url) continue;
+            const image = new Image();
+            image.decoding = 'async';
+            image.src = item.image_url;
+        }
     }
 
     // ── Filters ───────────────────────────────────────────────────────────
@@ -797,20 +924,23 @@ export class GalleryPage {
     }
 
     renderPagination() {
-        if (!this.el.pagination) return;
-        if (this.totalPages <= 1) {
-            this._hide(this.el.pagination);
+        // The grid appends instead of paging, so the pager stays hidden; the
+        // load-more block is its replacement.
+        if (this.el.pagination) this._hide(this.el.pagination);
+
+        const block = this.el.loadMore;
+        if (!block) return;
+        if (!this.hasMoreImages) {
+            this._hide(block);
             return;
         }
-        this._show(this.el.pagination);
-        if (this.el.pageInfo) {
-            this.el.pageInfo.textContent = translate('gallery.pagination.page', {
-                page: this.page,
-                total: this.totalPages,
-            });
+        this._show(block);
+        if (this.el.loadMoreText) {
+            this.el.loadMoreText.textContent = translate(
+                this.loadingMore ? 'gallery.actions.loadingMore' : 'gallery.actions.loadMore'
+            );
         }
-        if (this.el.prevPage) this.el.prevPage.disabled = this.page <= 1;
-        if (this.el.nextPage) this.el.nextPage.disabled = this.page >= this.totalPages;
+        if (this.el.loadMoreBtn) this.el.loadMoreBtn.disabled = this.loadingMore;
     }
 
     // ── Empty / error states ──────────────────────────────────────────────
@@ -977,16 +1107,16 @@ export class GalleryPage {
                                 <div class="gallery-stat-sub">${escapeHtml(sub)}</div>
                             </div>
                             <div class="gallery-rank-metrics">
-                                <span class="gallery-metric gallery-col-liked" title="${tooltip('likes')}">
+                                <span class="gallery-metric gallery-col-liked" data-sort-metric="likes" title="${tooltip('likes')}">
                                     <i class="fas fa-thumbs-up" aria-hidden="true"></i>${Number(row.likes) || 0}
                                 </span>
-                                <span class="gallery-metric gallery-col-disliked" title="${tooltip('dislikes')}">
+                                <span class="gallery-metric gallery-col-disliked" data-sort-metric="dislikes" title="${tooltip('dislikes')}">
                                     <i class="fas fa-thumbs-down" aria-hidden="true"></i>${Number(row.dislikes) || 0}
                                 </span>
-                                <span class="gallery-metric gallery-col-unrated" title="${tooltip('unrated')}">
+                                <span class="gallery-metric gallery-col-unrated" data-sort-metric="total" title="${tooltip('unrated')}">
                                     <i class="fas fa-minus" aria-hidden="true"></i>${Number(row.unrated) || 0}
                                 </span>
-                                <span class="gallery-metric gallery-col-total" title="${tooltip('total')}">
+                                <span class="gallery-metric gallery-col-total" data-sort-metric="total" title="${tooltip('total')}">
                                     <i class="fas fa-layer-group" aria-hidden="true"></i>${total}
                                 </span>
                                 <span class="gallery-metric gallery-col-net${netClass}" title="${tooltip('net')}">
@@ -1005,6 +1135,7 @@ export class GalleryPage {
 
         this._wireThumbFallbacks();
         this._applyArtistPreviews(items);
+        this._syncStatsSortPills();
     }
 
     /**
@@ -1173,6 +1304,82 @@ export class GalleryPage {
      * @param {string} label - Displayed row name.
      * @returns {string} Button markup, or '' when the row is not linkable.
      */
+    /**
+     * Sort the ranking by one metric.
+     * @param {string} sort - net|likes|dislikes|total|ratio.
+     */
+    setStatsSort(sort) {
+        const allowed = ['net', 'likes', 'dislikes', 'total', 'ratio'];
+        if (!allowed.includes(sort) || sort === this.statsSort) return;
+        this.statsSort = sort;
+        this.statsPage = 1;
+        this._syncStatsSortPills();
+        this.loadStats();
+    }
+
+    _syncStatsSortPills() {
+        const pills = this.el.statsSortPills;
+        if (!pills) return;
+        for (const button of pills.querySelectorAll('[data-sort]')) {
+            const active = button.dataset.sort === this.statsSort;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', String(active));
+        }
+    }
+
+    /**
+     * Change the side of the grid thumbnails, then reload so the URLs follow.
+     * @returns {Promise<void>}
+     */
+    async _setThumbnailSize() {
+        const select = this.el.thumbnailSizeSelect;
+        if (!select) return;
+        const size = Number(select.value);
+        if (![256, 512, 768, 1024].includes(size)) return;
+        try {
+            await persistGallerySetting('gallery_thumbnail_size', size);
+        } catch (error) {
+            console.debug('Could not remember the thumbnail size:', error);
+        }
+        this.thumbnailCache = null;
+        this.page = 1;
+        await this.loadImages();
+        await this._refreshThumbnailCacheInfo();
+    }
+
+    /**
+     * Show how much disk the on-demand thumbnail cache uses.
+     * @returns {Promise<void>}
+     */
+    async _refreshThumbnailCacheInfo() {
+        const label = this.el.thumbnailCacheInfo;
+        if (!label) return;
+        try {
+            const info = await fetchThumbnailCache();
+            this.thumbnailCache = info;
+            label.textContent = translate('gallery.settings.thumbnailCacheValue', {
+                count: info.count,
+                size: formatBytes(info.bytes),
+            });
+        } catch (error) {
+            label.textContent = translate('gallery.settings.thumbnailCacheUnavailable');
+        }
+    }
+
+    async _clearThumbnailCache() {
+        const button = this.el.thumbnailCacheClear;
+        if (button) button.disabled = true;
+        try {
+            const result = await clearThumbnailCache();
+            showToast('toast.gallery.cacheCleared', { count: result.removed }, 'success');
+            await this._refreshThumbnailCacheInfo();
+        } catch (error) {
+            showToast('toast.gallery.cacheClearFailed', { message: error.message }, 'error');
+        } finally {
+            if (button) button.disabled = false;
+        }
+    }
+
     _renderStatRowJump(row, label) {
         if (this.statsBy !== 'lora' || row.known === false) return '';
 
@@ -1434,6 +1641,7 @@ export class GalleryPage {
         if (this.el.outputPathInput) this.el.outputPathInput.value = settings.outputPath;
         if (this.el.artistListInput) this.el.artistListInput.value = settings.artistListPath;
         if (this.el.recursiveToggle) this.el.recursiveToggle.checked = settings.recursive;
+        if (this.el.thumbnailSizeSelect) this.el.thumbnailSizeSelect.value = String(settings.thumbnailSize);
     }
 
     toggleSettings() {
@@ -1442,6 +1650,7 @@ export class GalleryPage {
         const willShow = panel.classList.contains('hidden');
         panel.classList.toggle('hidden', !willShow);
         this.el.settingsToggle?.setAttribute('aria-expanded', String(willShow));
+        if (willShow) void this._refreshThumbnailCacheInfo();
     }
 
     openSettings() {
@@ -1450,6 +1659,7 @@ export class GalleryPage {
         panel.classList.remove('hidden');
         this.el.settingsToggle?.setAttribute('aria-expanded', 'true');
         this.el.outputPathInput?.focus();
+        void this._refreshThumbnailCacheInfo();
     }
 
     _browseFor(target) {
@@ -1494,6 +1704,8 @@ export class GalleryPage {
         this._stopScanPolling();
         clearTimeout(this.searchTimer);
         clearTimeout(this.progressTimer);
+        this._sentinelObserver?.disconnect();
+        this._sentinelObserver = null;
     }
 }
 

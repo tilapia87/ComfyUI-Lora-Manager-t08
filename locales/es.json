@@ -2970,7 +2970,9 @@
             "scanComplete": "Escaneo completado: {added} nuevo(s), {updated} actualizado(s), {removed} eliminado(s)",
             "settingsSaved": "Ajustes de la galería guardados",
             "settingsSaveFailed": "No se pudieron guardar los ajustes de la galería: {message}",
-            "loraLinkFailed": "No se pudo abrir {name} en la página de LoRA"
+            "loraLinkFailed": "No se pudo abrir {name} en la página de LoRA",
+            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
+            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
         },
         "agent": {
             "llmNotConfigured": "Proveedor de IA no configurado. Actívelo en Configuración → Proveedor de IA.",
@@ -3105,6 +3107,8 @@
         },
         "actions": {
             "scan": "Escanear carpeta de salida",
+            "loadMore": "[TODO: Translate] Load more images",
+            "loadingMore": "[TODO: Translate] Loading more...",
             "scanNow": "Escanear ahora",
             "settings": "Ajustes de la galería",
             "setOutputFolder": "Definir carpeta de salida",
@@ -3198,6 +3202,13 @@
             "recursiveHint": "Escanear también las subcarpetas de la carpeta de salida.",
             "effectivePath": "Carpeta efectiva: {path} ({source})",
             "effectivePathUnset": "No se pudo detectar ninguna carpeta de salida.",
+            "thumbnailSize": "[TODO: Translate] Thumbnail size",
+            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
+            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
+            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
+            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
+            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
+            "clearCache": "[TODO: Translate] Clear cache",
             "source": {
                 "comfyui": "detectada automáticamente",
                 "setting": "desde tu ajuste",

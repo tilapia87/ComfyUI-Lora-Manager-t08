@@ -2970,7 +2970,9 @@
             "scanComplete": "Scan abgeschlossen: {added} neu, {updated} aktualisiert, {removed} entfernt",
             "settingsSaved": "Galerie-Einstellungen gespeichert",
             "settingsSaveFailed": "Galerie-Einstellungen konnten nicht gespeichert werden: {message}",
-            "loraLinkFailed": "{name} konnte nicht auf der LoRA-Seite geöffnet werden"
+            "loraLinkFailed": "{name} konnte nicht auf der LoRA-Seite geöffnet werden",
+            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
+            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
         },
         "agent": {
             "llmNotConfigured": "KI-Anbieter nicht konfiguriert. Aktivieren Sie ihn unter Einstellungen → KI-Anbieter.",
@@ -3105,6 +3107,8 @@
         },
         "actions": {
             "scan": "Ausgabeordner scannen",
+            "loadMore": "[TODO: Translate] Load more images",
+            "loadingMore": "[TODO: Translate] Loading more...",
             "scanNow": "Jetzt scannen",
             "settings": "Galerie-Einstellungen",
             "setOutputFolder": "Ausgabeordner festlegen",
@@ -3198,6 +3202,13 @@
             "recursiveHint": "Auch Unterordner des Ausgabeordners scannen.",
             "effectivePath": "Effektiver Ordner: {path} ({source})",
             "effectivePathUnset": "Es konnte kein Ausgabeordner erkannt werden.",
+            "thumbnailSize": "[TODO: Translate] Thumbnail size",
+            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
+            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
+            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
+            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
+            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
+            "clearCache": "[TODO: Translate] Clear cache",
             "source": {
                 "comfyui": "automatisch erkannt",
                 "setting": "aus Ihrer Einstellung",

@@ -1111,3 +1111,63 @@
         animation: none;
     }
 }
+
+/* ------------------------------------------------ infinite scroll + cache */
+
+.gallery-load-more {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-3, 12px) 0 var(--space-6, 24px);
+}
+
+.gallery-load-more .gallery-btn {
+    min-width: 200px;
+}
+
+/* Ranking sort pills: five labels do not fit on a narrow screen. */
+.gallery-stats-sort {
+    flex-wrap: wrap;
+}
+
+/* Card skeleton, shown while the first page is in flight. */
+.gallery-card-skeleton {
+    pointer-events: none;
+}
+
+.gallery-card-skeleton .gallery-card-media {
+    background: var(--surface-subtle, rgba(0, 0, 0, 0.25));
+}
+
+.gallery-skeleton-line {
+    display: block;
+    height: 10px;
+    margin: 4px 0;
+    border-radius: var(--radius-full, 9999px);
+    background: var(--bg-hover, rgba(127, 127, 127, 0.16));
+    animation: gallery-shimmer 1.4s ease-in-out infinite;
+}
+
+.gallery-skeleton-line.is-short {
+    width: 55%;
+}
+
+/* Settings: thumbnail cache row. */
+.gallery-cache-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2, 8px);
+    flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+    .gallery-load-more .gallery-btn {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gallery-skeleton-line {
+        animation: none;
+    }
+}

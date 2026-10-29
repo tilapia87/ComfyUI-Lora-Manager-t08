@@ -2970,7 +2970,9 @@
             "scanComplete": "スキャン完了：新規 {added} 件、更新 {updated} 件、削除 {removed} 件",
             "settingsSaved": "ギャラリー設定を保存しました",
             "settingsSaveFailed": "ギャラリー設定の保存に失敗しました：{message}",
-            "loraLinkFailed": "LoRA ページで {name} を開けませんでした"
+            "loraLinkFailed": "LoRA ページで {name} を開けませんでした",
+            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
+            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
         },
         "agent": {
             "llmNotConfigured": "AIプロバイダーが設定されていません。設定 → AIプロバイダーで有効にしてください。",
@@ -3105,6 +3107,8 @@
         },
         "actions": {
             "scan": "出力フォルダをスキャン",
+            "loadMore": "[TODO: Translate] Load more images",
+            "loadingMore": "[TODO: Translate] Loading more...",
             "scanNow": "今すぐスキャン",
             "settings": "ギャラリー設定",
             "setOutputFolder": "出力フォルダを設定",
@@ -3198,6 +3202,13 @@
             "recursiveHint": "出力フォルダのサブフォルダもスキャンします。",
             "effectivePath": "有効なフォルダ：{path}（{source}）",
             "effectivePathUnset": "出力フォルダを検出できませんでした。",
+            "thumbnailSize": "[TODO: Translate] Thumbnail size",
+            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
+            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
+            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
+            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
+            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
+            "clearCache": "[TODO: Translate] Clear cache",
             "source": {
                 "comfyui": "自動検出",
                 "setting": "設定から",

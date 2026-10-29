@@ -2970,7 +2970,9 @@
             "scanComplete": "Analyse terminée : {added} ajout(s), {updated} mise(s) à jour, {removed} supprimé(s)",
             "settingsSaved": "Paramètres de la galerie enregistrés",
             "settingsSaveFailed": "Échec de l'enregistrement des paramètres de la galerie : {message}",
-            "loraLinkFailed": "Impossible d'ouvrir {name} dans la page LoRA"
+            "loraLinkFailed": "Impossible d'ouvrir {name} dans la page LoRA",
+            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
+            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
         },
         "agent": {
             "llmNotConfigured": "Fournisseur d'IA non configuré. Activez-le dans Paramètres → Fournisseur d'IA.",
@@ -3105,6 +3107,8 @@
         },
         "actions": {
             "scan": "Analyser le dossier de sortie",
+            "loadMore": "[TODO: Translate] Load more images",
+            "loadingMore": "[TODO: Translate] Loading more...",
             "scanNow": "Analyser maintenant",
             "settings": "Paramètres de la galerie",
             "setOutputFolder": "Définir le dossier de sortie",
@@ -3198,6 +3202,13 @@
             "recursiveHint": "Analyser aussi les sous-dossiers du dossier de sortie.",
             "effectivePath": "Dossier effectif : {path} ({source})",
             "effectivePathUnset": "Aucun dossier de sortie n'a pu être détecté.",
+            "thumbnailSize": "[TODO: Translate] Thumbnail size",
+            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
+            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
+            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
+            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
+            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
+            "clearCache": "[TODO: Translate] Clear cache",
             "source": {
                 "comfyui": "détecté automatiquement",
                 "setting": "depuis votre paramètre",

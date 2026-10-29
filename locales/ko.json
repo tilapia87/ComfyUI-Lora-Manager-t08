@@ -2970,7 +2970,9 @@
             "scanComplete": "스캔 완료: 새 이미지 {added}개, 업데이트 {updated}개, 제거 {removed}개",
             "settingsSaved": "갤러리 설정을 저장했습니다",
             "settingsSaveFailed": "갤러리 설정을 저장하지 못했습니다: {message}",
-            "loraLinkFailed": "LoRA 페이지에서 {name}을(를) 열 수 없습니다"
+            "loraLinkFailed": "LoRA 페이지에서 {name}을(를) 열 수 없습니다",
+            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
+            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
         },
         "agent": {
             "llmNotConfigured": "AI 제공자가 설정되지 않았습니다. 설정 → AI 제공자에서 활성화하세요.",
@@ -3105,6 +3107,8 @@
         },
         "actions": {
             "scan": "출력 폴더 스캔",
+            "loadMore": "[TODO: Translate] Load more images",
+            "loadingMore": "[TODO: Translate] Loading more...",
             "scanNow": "지금 스캔",
             "settings": "갤러리 설정",
             "setOutputFolder": "출력 폴더 설정",
@@ -3198,6 +3202,13 @@
             "recursiveHint": "출력 폴더의 하위 폴더도 스캔합니다.",
             "effectivePath": "실제 폴더: {path} ({source})",
             "effectivePathUnset": "출력 폴더를 감지할 수 없습니다.",
+            "thumbnailSize": "[TODO: Translate] Thumbnail size",
+            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
+            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
+            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
+            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
+            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
+            "clearCache": "[TODO: Translate] Clear cache",
             "source": {
                 "comfyui": "자동 감지됨",
                 "setting": "설정에서 가져옴",

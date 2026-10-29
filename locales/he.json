@@ -2970,7 +2970,9 @@
             "scanComplete": "הסריקה הושלמה: {added} נוספו, {updated} עודכנו, {removed} הוסרו",
             "settingsSaved": "הגדרות הגלריה נשמרו",
             "settingsSaveFailed": "שמירת הגדרות הגלריה נכשלה: {message}",
-            "loraLinkFailed": "לא ניתן לפתוח את {name} בעמוד ה-LoRA"
+            "loraLinkFailed": "לא ניתן לפתוח את {name} בעמוד ה-LoRA",
+            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
+            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
         },
         "agent": {
             "llmNotConfigured": "ספק AI לא הוגדר. הפעל אותו בהגדרות → ספק AI.",
@@ -3105,6 +3107,8 @@
         },
         "actions": {
             "scan": "סרוק את תיקיית הפלט",
+            "loadMore": "[TODO: Translate] Load more images",
+            "loadingMore": "[TODO: Translate] Loading more...",
             "scanNow": "סרוק כעת",
             "settings": "הגדרות הגלריה",
             "setOutputFolder": "הגדר תיקיית פלט",
@@ -3198,6 +3202,13 @@
             "recursiveHint": "סרוק גם תיקיות משנה של תיקיית הפלט.",
             "effectivePath": "תיקייה פעילה: {path} ({source})",
             "effectivePathUnset": "לא זוהתה תיקיית פלט.",
+            "thumbnailSize": "[TODO: Translate] Thumbnail size",
+            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
+            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
+            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
+            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
+            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
+            "clearCache": "[TODO: Translate] Clear cache",
             "source": {
                 "comfyui": "זוהתה אוטומטית",
                 "setting": "מההגדרה שלך",

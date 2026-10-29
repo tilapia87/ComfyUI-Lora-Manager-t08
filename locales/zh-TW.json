@@ -2970,7 +2970,9 @@
             "scanComplete": "掃描完成：新增 {added}，更新 {updated}，移除 {removed}",
             "settingsSaved": "圖庫設定已儲存",
             "settingsSaveFailed": "儲存圖庫設定失敗：{message}",
-            "loraLinkFailed": "無法在 LoRA 頁面開啟 {name}"
+            "loraLinkFailed": "無法在 LoRA 頁面開啟 {name}",
+            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
+            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
         },
         "agent": {
             "llmNotConfigured": "AI 提供者尚未設定。請在 設定 → AI 提供者 中進行設定。",
@@ -3105,6 +3107,8 @@
         },
         "actions": {
             "scan": "掃描輸出資料夾",
+            "loadMore": "[TODO: Translate] Load more images",
+            "loadingMore": "[TODO: Translate] Loading more...",
             "scanNow": "立即掃描",
             "settings": "圖庫設定",
             "setOutputFolder": "設定輸出資料夾",
@@ -3198,6 +3202,13 @@
             "recursiveHint": "同時掃描輸出資料夾的子資料夾。",
             "effectivePath": "目前生效資料夾：{path}（{source}）",
             "effectivePathUnset": "未能偵測到輸出資料夾。",
+            "thumbnailSize": "[TODO: Translate] Thumbnail size",
+            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
+            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
+            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
+            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
+            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
+            "clearCache": "[TODO: Translate] Clear cache",
             "source": {
                 "comfyui": "自動偵測",
                 "setting": "來自您的設定",
