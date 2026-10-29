@@ -74,6 +74,7 @@ class GalleryHandlerSet:
             metadata = (query.get("metadata") or "all").lower()
             if metadata not in ("all", "with", "without"):
                 metadata = "all"
+            order = "asc" if (query.get("order") or "").lower() == "asc" else "desc"
             service = await self._service()
             data = await service.list_images(
                 page=page,
@@ -84,6 +85,7 @@ class GalleryHandlerSet:
                 lora=query.get("lora") or None,
                 query=(query.get("q") or "").strip() or None,
                 metadata=metadata,
+                order=order,
             )
             return web.json_response({"success": True, "data": data})
         except Exception as exc:
@@ -155,6 +157,7 @@ class GalleryHandlerSet:
                 limit=_parse_int(query.get("limit"), 200, minimum=1, maximum=1000),
                 offset=_parse_int(query.get("offset"), 0, minimum=0, maximum=10_000_000),
                 min_total=_parse_int(query.get("min_total"), 1, minimum=1, maximum=1000),
+                order="asc" if (query.get("order") or "").lower() == "asc" else "desc",
             )
             return web.json_response({"success": True, "data": data})
         except Exception as exc:

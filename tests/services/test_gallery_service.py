@@ -606,6 +606,29 @@ async def test_images_for_lora_paginates(service):
     assert page["items"] == []
 
 
+async def test_reverse_order_walks_the_listing_from_the_other_end(service):
+    await _scan(service)
+
+    forward = await service.list_images(sort="name")
+    backward = await service.list_images(sort="name", order="asc")
+
+    forward_names = [item["file_name"] for item in forward["items"]]
+    backward_names = [item["file_name"] for item in backward["items"]]
+    assert forward_names
+    assert backward_names == list(reversed(forward_names))
+
+
+async def test_statistics_can_be_reversed(service):
+    await _scan(service)
+
+    forward = await service.stats(by="artist", sort="total")
+    reversed_ranking = await service.stats(by="artist", sort="total", order="asc")
+
+    forward_keys = [row["key"] for row in forward["items"]]
+    assert forward_keys
+    assert [row["key"] for row in reversed_ranking["items"]] == list(reversed(forward_keys))
+
+
 async def test_statistics_rows_carry_preview_images(service):
     await _scan(service)
     items = _by_name((await service.list_images())["items"])

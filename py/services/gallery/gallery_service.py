@@ -314,7 +314,9 @@ class GalleryService:
         lora: Optional[str] = None,
         query: Optional[str] = None,
         metadata: str = "all",
+        order: str = "desc",
     ) -> Dict[str, Any]:
+        ascending = str(order).lower() == "asc"
         items, total = self.cache.list_images(
             page=page,
             page_size=page_size,
@@ -324,6 +326,7 @@ class GalleryService:
             lora=lora,
             query=query,
             metadata=metadata,
+            ascending=ascending,
         )
         for item in items:
             item["image_url"] = self.image_url(item["image_path"])
@@ -356,12 +359,17 @@ class GalleryService:
         limit: int = 200,
         offset: int = 0,
         min_total: int = 1,
+        order: str = "desc",
     ) -> Dict[str, Any]:
         rows = self.cache.stats_by_lora() if by == "lora" else self.cache.stats_by_artist()
         rows = [row for row in rows if row["total"] >= max(1, min_total)]
         key = _STATS_SORT_KEYS.get(sort, _STATS_SORT_KEYS["net"])
         # Secondary key keeps equal scores in a stable, human-sensible order.
         rows.sort(key=lambda item: (key(item), item["total"], item["key"]), reverse=True)
+        # The ranking is descending by default; reversing before slicing keeps
+        # the page numbers consistent with the visible order.
+        if str(order).lower() == "asc":
+            rows.reverse()
 
         # The ranking can be thousands of rows long, so the caller pages through
         # it: ``total`` is the number of ranked rows, not of images.

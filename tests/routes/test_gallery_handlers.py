@@ -439,6 +439,34 @@ async def test_list_images_carries_a_thumbnail_url(service):
     assert "size=" in data["items"][0]["thumb_url"]
 
 
+async def test_list_images_forwards_the_order(service, monkeypatch):
+    captured = {}
+
+    async def _list(**kwargs):
+        captured.update(kwargs)
+        return {"items": [], "total": 0, "page": 1, "page_size": 40, "total_pages": 0}
+
+    monkeypatch.setattr(service, "list_images", _list)
+
+    await GalleryHandlerSet().list_images(FakeRequest(query={"order": "asc"}))
+
+    assert captured["order"] == "asc"
+
+
+async def test_stats_endpoint_forwards_the_order(service, monkeypatch):
+    captured = {}
+
+    async def _stats(**kwargs):
+        captured.update(kwargs)
+        return {"by": "artist", "totals": {}, "total": 0, "offset": 0, "limit": 200, "items": []}
+
+    monkeypatch.setattr(service, "stats", _stats)
+
+    await GalleryHandlerSet().get_stats(FakeRequest(query={"order": "asc"}))
+
+    assert captured["order"] == "asc"
+
+
 def test_thumbnail_cache_routes_are_registered():
     paths = {(definition.method, definition.path) for definition in ROUTE_DEFINITIONS}
     assert ("GET", "/api/lm/gallery/thumbnail-cache") in paths

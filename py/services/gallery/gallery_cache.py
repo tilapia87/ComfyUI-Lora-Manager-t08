@@ -115,6 +115,21 @@ def default_db_path() -> str:
     return os.path.join(directory, "gallery.sqlite")
 
 
+def _reverse_order_clause(clause: str) -> str:
+    """Flip ``ASC``/``DESC`` on every term of an ``ORDER BY`` clause."""
+    flipped = []
+    for term in (clause or "").split(","):
+        term = term.strip()
+        upper = term.upper()
+        if upper.endswith(" DESC"):
+            flipped.append(term[:-5].rstrip() + " ASC")
+        elif upper.endswith(" ASC"):
+            flipped.append(term[:-4].rstrip() + " DESC")
+        elif term:
+            flipped.append(term + " DESC")
+    return ", ".join(flipped)
+
+
 class GalleryCache:
     """Persistence for gallery images and their like/dislike ratings."""
 
@@ -404,11 +419,16 @@ class GalleryCache:
         lora: Optional[str] = None,
         query: Optional[str] = None,
         metadata: str = "all",
+        ascending: bool = False,
     ) -> Tuple[List[Dict[str, Any]], int]:
         self._ensure_schema()
         clauses, params = self._build_filters(rating, artist, lora, query, metadata)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         order = _SORT_SQL.get(sort, _SORT_SQL["newest"])
+        if ascending:
+            # The reverse toggle flips every ordering term, so paging still
+            # walks the ranking from the other end.
+            order = _reverse_order_clause(order)
         offset = max(0, (max(1, page) - 1) * page_size)
 
         with self._db_lock:
