@@ -772,6 +772,15 @@ describe('GalleryPage', () => {
     expect(first.querySelector('.gallery-col-unrated').textContent.trim()).toBe('2');
     expect(first.querySelector('.gallery-col-score').textContent.trim()).toBe('+6');
     expect(first.querySelector('.gallery-col-score').dataset.sortMetric).toBe('score');
+    // The score is the headline of the card, not one more small metric: it sits
+    // in the header block with its own label, tinted by sign.
+    const scoreBlock = first.querySelector('.gallery-rank-head .gallery-rank-score');
+    expect(scoreBlock).not.toBeNull();
+    expect(scoreBlock.classList.contains('is-positive')).toBe(true);
+    expect(scoreBlock.querySelector('.gallery-rank-score-label').textContent).toBe(
+      'gallery.stats.summary.score'
+    );
+    expect(first.querySelector('.gallery-rank-metrics .gallery-col-score')).toBeNull();
     expect(first.querySelector('.gallery-ratio-value').textContent.trim()).toBe('83%');
     expect(first.querySelectorAll('.gallery-level-bar .gallery-level-seg').length).toBe(3);
 

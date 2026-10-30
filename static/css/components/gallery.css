@@ -1280,11 +1280,52 @@
     min-width: 0;
 }
 
+/* Name + sample size on the left, the weighted score on the right: the score
+   is what a leaderboard is read by, so it gets its own large, tinted block
+   instead of sharing the small metric row. */
 .gallery-rank-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-2, 8px);
+    min-width: 0;
+}
+
+.gallery-rank-title {
     display: flex;
     flex-direction: column;
     gap: 2px;
     min-width: 0;
+}
+
+.gallery-rank-score {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    flex: 0 0 auto;
+    padding: 2px var(--space-2, 8px);
+    border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.2));
+    border-radius: var(--radius-md, 8px);
+    background: var(--bg-hover, rgba(127, 127, 127, 0.12));
+}
+
+.gallery-rank-score.is-positive {
+    border-color: rgba(46, 204, 113, 0.35);
+    background: rgba(46, 204, 113, 0.12);
+}
+
+.gallery-rank-score.is-negative {
+    border-color: rgba(231, 76, 60, 0.35);
+    background: rgba(231, 76, 60, 0.12);
+}
+
+.gallery-rank-score-label {
+    font-size: 9px;
+    font-weight: var(--weight-semibold, 600);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary, #b8b8b8);
 }
 
 .gallery-stat-label {
@@ -1344,14 +1385,37 @@
     opacity: 0.75;
 }
 
+/* The weighted score is the headline number of a ranking card. */
+.gallery-col-score {
+    font-size: var(--text-lg, 16px);
+    font-weight: var(--weight-bold, 700);
+    line-height: 1.1;
+    color: var(--text-primary, #f2f2f2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* It is also a sort control, so it keeps the metric row's hover affordance. */
+.gallery-col-score[data-sort-metric] {
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    transition: opacity var(--transition-fast, 150ms) ease;
+}
+
+.gallery-col-score[data-sort-metric]:hover {
+    opacity: 0.78;
+}
+
+.gallery-col-score:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus, 0 0 0 2px var(--color-accent, #4f8cff));
+}
+
 .gallery-col-score.is-positive {
     color: var(--color-success, #2ecc71);
-    font-weight: var(--weight-semibold, 600);
 }
 
 .gallery-col-score.is-negative {
     color: var(--color-error, #e74c3c);
-    font-weight: var(--weight-semibold, 600);
 }
 
 /* Exact-level metrics: a tiny tag carries the level, the count follows. */

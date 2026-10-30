@@ -1546,8 +1546,21 @@ export class GalleryPage {
                         </div>
                         <div class="gallery-rank-body">
                             <div class="gallery-rank-head">
-                                <div class="gallery-stat-label" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
-                                <div class="gallery-stat-sub">${escapeHtml(sub)}</div>
+                                <div class="gallery-rank-title">
+                                    <div class="gallery-stat-label" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+                                    <div class="gallery-stat-sub">${escapeHtml(sub)}</div>
+                                </div>
+                                <!-- The weighted score is the headline of the
+                                     ranking, so it gets its own large, tinted
+                                     block instead of sharing the small metric
+                                     row: a leaderboard is read by this number. -->
+                                <span class="gallery-rank-score${scoreClass}" title="${tooltip('score')}">
+                                    <b class="gallery-col-score${scoreClass}" data-sort-metric="score"
+                                        title="${tooltip('score')}">${formatScore(score)}</b>
+                                    <span class="gallery-rank-score-label">${escapeHtml(
+                                        translate('gallery.stats.summary.score')
+                                    )}</span>
+                                </span>
                             </div>
                             <div class="gallery-rank-metrics">
                                 ${levelMetric('love', '+3', 'loved', 'loved')}
@@ -1556,9 +1569,6 @@ export class GalleryPage {
                                 ${levelMetric('hate', '−3', 'hated', 'hated')}
                                 <span class="gallery-metric gallery-col-unrated" title="${tooltip('unrated')}">
                                     <i class="fas fa-minus" aria-hidden="true"></i>${Number(row.unrated) || 0}
-                                </span>
-                                <span class="gallery-metric gallery-col-score${scoreClass}" data-sort-metric="score" title="${tooltip('score')}">
-                                    ${formatScore(score)}
                                 </span>
                             </div>
                             <div class="gallery-col-levels">
