@@ -1,6 +1,6 @@
 """SQLite cache for the gallery: image facts, artists, LoRAs, and ratings.
 
-The gallery is a *user-facing* dataset, not a derived index: a like/dislike is
+The gallery is a *user-facing* dataset, not a derived index: a rating is
 irreplaceable and must survive a rescan, so it lives in its own database next to
 the other caches rather than inside the model cache. Artists and LoRAs are
 normalized into child tables so the preference statistics are a plain
@@ -23,10 +23,15 @@ from ...utils.cache_paths import get_cache_base_dir
 logger = logging.getLogger(__name__)
 
 # A rating is one of these; anything else is rejected rather than coerced.
+# Four levels plus "unrated". The magnitude is the *weight*: a strong vote
+# counts three times a mild one in the preference statistics, so an image the
+# user loves outweighs three mild likes.
+RATING_HATED = -3
 RATING_DISLIKED = -1
 RATING_NONE = 0
 RATING_LIKED = 1
-VALID_RATINGS = (RATING_DISLIKED, RATING_NONE, RATING_LIKED)
+RATING_LOVED = 3
+VALID_RATINGS = (RATING_HATED, RATING_DISLIKED, RATING_NONE, RATING_LIKED, RATING_LOVED)
 
 _SCHEMA_STATEMENTS: Tuple[str, ...] = (
     """
@@ -90,10 +95,25 @@ _SORT_SQL: Dict[str, str] = {
     "name": "i.file_name COLLATE NOCASE ASC",
 }
 
+# Both the exact levels and the two sides are exposed: "positive" means any
+# positive vote, which keeps the old like/dislike filter meaningful under the
+# four-level scale. "liked"/"disliked" stay as aliases so a client built
+# against the previous two-level UI keeps working.
 _RATING_FILTERS: Dict[str, str] = {
     "all": "",
+    # Exact-level filters for the facet chips; the sides ("positive"/"negative")
+    # aggregate the levels they contain. "hate" is the chip spelling the page
+    # sends for the -3 facet, so it must resolve like "hated" rather than
+    # silently falling back to "all".
+    "like": f"i.rating = {RATING_LIKED}",
+    "dislike": f"i.rating = {RATING_DISLIKED}",
+    "hate": f"i.rating = {RATING_HATED}",
+    "loved": f"i.rating >= {RATING_LOVED}",
+    "positive": "i.rating > 0",
     "liked": "i.rating > 0",
+    "negative": "i.rating < 0",
     "disliked": "i.rating < 0",
+    "hated": f"i.rating <= {RATING_HATED}",
     "unrated": "i.rating = 0",
 }
 
@@ -131,7 +151,7 @@ def _reverse_order_clause(clause: str) -> str:
 
 
 class GalleryCache:
-    """Persistence for gallery images and their like/dislike ratings."""
+    """Persistence for gallery images and their four-level ratings."""
 
     _instance: Optional["GalleryCache"] = None
     _instance_lock = threading.Lock()
@@ -549,6 +569,11 @@ class GalleryCache:
                            SUM(CASE WHEN i.rating > 0 THEN 1 ELSE 0 END) AS likes,
                            SUM(CASE WHEN i.rating < 0 THEN 1 ELSE 0 END) AS dislikes,
                            SUM(CASE WHEN i.rating = 0 THEN 1 ELSE 0 END) AS unrated,
+                           SUM(CASE WHEN i.rating = {RATING_LOVED} THEN 1 ELSE 0 END) AS loved,
+                           SUM(CASE WHEN i.rating = {RATING_LIKED} THEN 1 ELSE 0 END) AS liked_mild,
+                           SUM(CASE WHEN i.rating = {RATING_DISLIKED} THEN 1 ELSE 0 END) AS disliked_mild,
+                           SUM(CASE WHEN i.rating = {RATING_HATED} THEN 1 ELSE 0 END) AS hated,
+                           SUM(i.rating) AS score,
                            COUNT(*) AS total
                            {label_sql}
                     FROM {table} c
@@ -574,7 +599,18 @@ class GalleryCache:
                 "dislikes": dislikes,
                 "unrated": int(row["unrated"] or 0),
                 "total": int(row["total"] or 0),
+                # `net` counts votes, `score` weighs them: the ranking and the
+                # headline metric use the weighted number, the two vote counts
+                # stay so the card can still say how many images agreed.
                 "net": likes - dislikes,
+                "score": int(row["score"] or 0),
+                # Exact distribution of the four levels, for the card's bar.
+                "levels": {
+                    "love": int(row["loved"] or 0),
+                    "like": int(row["liked_mild"] or 0),
+                    "dislike": int(row["disliked_mild"] or 0),
+                    "hate": int(row["hated"] or 0),
+                },
                 "like_ratio": (likes / rated) if rated else None,
                 # A row without a thumbnail is hard to judge, so the ranking
                 # carries the images behind the number.
@@ -695,8 +731,8 @@ class GalleryCache:
 
     def lora_rating_summary(
         self, *, lora_hash: Optional[str] = None, lora_name: Optional[str] = None
-    ) -> Dict[str, int]:
-        """Like/dislike counts across the images that used one LoRA."""
+    ) -> Dict[str, Any]:
+        """Vote counts, weighted score, and level distribution for one LoRA."""
         self._ensure_schema()
         clause, params = self._lora_filter(lora_hash, lora_name)
         with self._db_lock:
@@ -706,7 +742,12 @@ class GalleryCache:
                     f"""
                     SELECT COUNT(*) AS total,
                            SUM(CASE WHEN i.rating > 0 THEN 1 ELSE 0 END) AS liked,
-                           SUM(CASE WHEN i.rating < 0 THEN 1 ELSE 0 END) AS disliked
+                           SUM(CASE WHEN i.rating < 0 THEN 1 ELSE 0 END) AS disliked,
+                           SUM(CASE WHEN i.rating = {RATING_LOVED} THEN 1 ELSE 0 END) AS loved,
+                           SUM(CASE WHEN i.rating = {RATING_LIKED} THEN 1 ELSE 0 END) AS liked_mild,
+                           SUM(CASE WHEN i.rating = {RATING_DISLIKED} THEN 1 ELSE 0 END) AS disliked_mild,
+                           SUM(CASE WHEN i.rating = {RATING_HATED} THEN 1 ELSE 0 END) AS hated,
+                           SUM(i.rating) AS score
                     FROM gallery_images i WHERE {clause}
                     """,
                     params,
@@ -722,16 +763,26 @@ class GalleryCache:
             "disliked": disliked,
             "unrated": total - liked - disliked,
             "net": liked - disliked,
+            "loved": int(row["loved"] or 0),
+            "hated": int(row["hated"] or 0),
+            "score": int(row["score"] or 0),
+            # Exact per-level distribution, for the LoRA modal's bar.
+            "levels": {
+                "love": int(row["loved"] or 0),
+                "like": int(row["liked_mild"] or 0),
+                "dislike": int(row["disliked_mild"] or 0),
+                "hate": int(row["hated"] or 0),
+            },
         }
 
     def stats_by_artist(self) -> List[Dict[str, Any]]:
-        """Per-artist like/dislike counts, grouped by canonical artist name."""
+        """Per-artist vote counts and weighted scores, by canonical artist name."""
         return self._aggregate(
             "gallery_image_artists", "canonical_name", extra_label="MAX(c.known) AS known"
         )
 
     def stats_by_lora(self) -> List[Dict[str, Any]]:
-        """Per-LoRA like/dislike counts, with the hash the scan resolved."""
+        """Per-LoRA vote counts and weighted scores, with the hash the scan resolved."""
         return self._aggregate(
             "gallery_image_loras",
             "lora_name",
@@ -741,26 +792,57 @@ class GalleryCache:
             group_extra="",
         )
 
-    def rating_totals(self) -> Dict[str, int]:
+    def rating_totals(self) -> Dict[str, Any]:
+        """Whole-gallery vote counts, weighted score, and level distribution.
+
+        The single source for the gallery's summary: every count is derived from
+        the same snapshot, so the facet chips and the headline numbers can never
+        disagree with each other. ``like_ratio`` is ``None`` rather than ``0.0``
+        while nothing is rated, because "no opinion yet" is not "nothing liked".
+        """
         self._ensure_schema()
         with self._db_lock:
             conn = self._connect(readonly=True)
             try:
                 row = conn.execute(
-                    """
+                    f"""
                     SELECT COUNT(*) AS images,
+                           SUM(CASE WHEN rating <> {RATING_NONE} THEN 1 ELSE 0 END) AS rated,
+                           SUM(CASE WHEN rating = {RATING_NONE} THEN 1 ELSE 0 END) AS unrated,
                            SUM(CASE WHEN rating > 0 THEN 1 ELSE 0 END) AS liked,
-                           SUM(CASE WHEN rating < 0 THEN 1 ELSE 0 END) AS disliked
+                           SUM(CASE WHEN rating < 0 THEN 1 ELSE 0 END) AS disliked,
+                           SUM(CASE WHEN rating = {RATING_LOVED} THEN 1 ELSE 0 END) AS loved,
+                           SUM(CASE WHEN rating = {RATING_LIKED} THEN 1 ELSE 0 END) AS liked_mild,
+                           SUM(CASE WHEN rating = {RATING_DISLIKED} THEN 1 ELSE 0 END) AS disliked_mild,
+                           SUM(CASE WHEN rating = {RATING_HATED} THEN 1 ELSE 0 END) AS hated,
+                           SUM(rating) AS score
                     FROM gallery_images
                     """
                 ).fetchone()
             finally:
                 conn.close()
+        images = int(row["images"] or 0)
+        rated = int(row["rated"] or 0)
         liked = int(row["liked"] or 0)
         disliked = int(row["disliked"] or 0)
         return {
-            "images": int(row["images"] or 0),
+            "images": images,
+            "rated": rated,
+            "unrated": int(row["unrated"] or 0),
             "liked": liked,
             "disliked": disliked,
-            "rated": liked + disliked,
+            "loved": int(row["loved"] or 0),
+            "hated": int(row["hated"] or 0),
+            # Weighted preference: +3 love, +1 like, -1 dislike, -3 hate.
+            "score": int(row["score"] or 0),
+            # `net` counts votes on both sides so a love and a hate cancel out.
+            "net": liked - disliked,
+            # Exact per-level distribution, for the summary's stacked bar.
+            "levels": {
+                "love": int(row["loved"] or 0),
+                "like": int(row["liked_mild"] or 0),
+                "dislike": int(row["disliked_mild"] or 0),
+                "hate": int(row["hated"] or 0),
+            },
+            "like_ratio": (liked / rated) if rated else None,
         }

@@ -117,6 +117,19 @@ async def test_stats_endpoint_is_usable_before_any_rating(client, tmp_path):
     assert body["data"]["totals"]["images"] == 0
 
 
+async def test_summary_endpoint_is_usable_before_any_rating(client, tmp_path):
+    """The facet bar must render on a fresh install, not 404 or divide by zero."""
+    get_settings_manager().set("gallery_output_path", str(tmp_path))
+    response = await client.get("/api/lm/gallery/summary")
+    assert response.status == 200
+    body = await response.json()
+    assert body["success"] is True
+    assert body["data"]["images"] == 0
+    assert body["data"]["rated"] == 0
+    assert body["data"]["levels"] == {"love": 0, "like": 0, "dislike": 0, "hate": 0}
+    assert body["data"]["like_ratio"] is None
+
+
 def test_gallery_stylesheet_is_imported_globally():
     """The page ships no <link>; forgetting the import leaves it unstyled."""
     from py.config import config

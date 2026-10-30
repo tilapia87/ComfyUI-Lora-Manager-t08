@@ -211,8 +211,19 @@ async def test_for_lora_endpoint_returns_images_and_a_summary(lora_hash_service)
     data = _payload(response)["data"]
     assert data["total"] == 2
     assert data["lora"] == {"name": None, "hash": "a" * 64}
-    assert set(data["summary"]) == {"total", "liked", "disliked", "unrated", "net"}
+    assert set(data["summary"]) == {
+        "total",
+        "liked",
+        "disliked",
+        "unrated",
+        "net",
+        "loved",
+        "hated",
+        "score",
+        "levels",
+    }
     assert data["summary"]["unrated"] == 2
+    assert data["summary"]["levels"] == {"love": 0, "like": 0, "dislike": 0, "hate": 0}
     for item in data["items"]:
         assert item["image_url"].startswith("/api/lm/gallery/image?path=")
 
@@ -258,6 +269,18 @@ async def test_rating_accepts_query_params_for_get(service, tmp_path):
     assert _payload(response)["data"]["rating"] == -1
 
 
+@pytest.mark.parametrize("rating", [3, -3])
+async def test_rating_accepts_the_strong_levels(service, tmp_path, rating):
+    image_path = str(tmp_path / "output" / "a.png")
+    response = await GalleryHandlerSet().set_rating(
+        FakeRequest(method="POST", body={"image_path": image_path, "rating": rating})
+    )
+    assert response.status == 200
+    assert _payload(response)["data"]["rating"] == rating
+    listed = await service.list_images()
+    assert listed["items"][0]["rating"] == rating
+
+
 @pytest.mark.parametrize(
     "request_kwargs, expected_status",
     [
@@ -292,6 +315,48 @@ async def test_stats_endpoint_reports_unknown_totals(service):
 async def test_stats_endpoint_accepts_by_lora(service):
     response = await GalleryHandlerSet().get_stats(FakeRequest(query={"by": "lora"}))
     assert _payload(response)["data"]["by"] == "lora"
+
+
+async def test_summary_endpoint_returns_the_contract_shape(service):
+    response = await GalleryHandlerSet().get_summary(FakeRequest())
+    assert response.status == 200
+    body = _payload(response)
+    assert body["success"] is True
+    data = body["data"]
+    assert set(data) == {
+        "images",
+        "rated",
+        "unrated",
+        "liked",
+        "disliked",
+        "loved",
+        "hated",
+        "score",
+        "net",
+        "levels",
+        "like_ratio",
+    }
+    # The fixture indexes one image and rates none of them.
+    assert data["images"] == 1
+    assert data["rated"] == 0 and data["unrated"] == 1
+    assert data["like_ratio"] is None
+    assert data["levels"] == {"love": 0, "like": 0, "dislike": 0, "hate": 0}
+
+
+async def test_summary_endpoint_reports_a_failure(service, monkeypatch):
+    async def _boom():
+        raise RuntimeError("cache unavailable")
+
+    monkeypatch.setattr(service, "summary", _boom)
+    response = await GalleryHandlerSet().get_summary(FakeRequest())
+    assert response.status == 500
+    assert _payload(response) == {"success": False, "error": "cache unavailable"}
+
+
+def test_summary_route_is_registered():
+    paths = {(definition.method, definition.path) for definition in ROUTE_DEFINITIONS}
+    assert ("GET", "/api/lm/gallery/summary") in paths
+    assert "get_gallery_summary" in GalleryHandlerSet().to_route_mapping()
 
 
 async def test_stats_endpoint_forwards_paging_parameters(service):

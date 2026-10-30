@@ -269,7 +269,7 @@ async def test_set_rating_rejects_unknown_images_and_bad_values(service):
         await service.set_rating("/not/indexed.png", -2)
 
 
-@pytest.mark.parametrize("rating", [1, -1, 0])
+@pytest.mark.parametrize("rating", [3, 1, -1, -3, 0])
 async def test_every_valid_rating_round_trips(service, rating):
     await _scan(service)
     items = _by_name((await service.list_images())["items"])
@@ -289,26 +289,172 @@ async def test_statistics_aggregate_per_artist_and_per_lora(service):
     await service.set_rating(items["a1111_00002_.png"]["image_path"], -1)
 
     artist_stats = await service.stats(by="artist")
-    assert artist_stats["totals"] == {"images": 3, "liked": 1, "disliked": 1, "rated": 2}
+    assert artist_stats["totals"] == {
+        "images": 3,
+        "rated": 2,
+        "unrated": 1,
+        "liked": 1,
+        "disliked": 1,
+        "loved": 0,
+        "hated": 0,
+        "score": 0,
+        "net": 0,
+        "levels": {"love": 0, "like": 1, "dislike": 1, "hate": 0},
+        "like_ratio": 0.5,
+    }
     rows = {row["key"]: row for row in artist_stats["items"]}
     assert rows["nnn yryr"]["likes"] == 1 and rows["nnn yryr"]["net"] == 1
+    assert rows["nnn yryr"]["score"] == 1
+    assert rows["nnn yryr"]["levels"] == {"love": 0, "like": 1, "dislike": 0, "hate": 0}
     assert rows["nnn yryr"]["like_ratio"] == 1.0 and rows["nnn yryr"]["known"] is True
     assert rows["heripantomorrow"]["dislikes"] == 1 and rows["heripantomorrow"]["net"] == -1
+    assert rows["heripantomorrow"]["score"] == -1
     assert rows["heripantomorrow"]["like_ratio"] == 0.0
 
     lora_stats = await service.stats(by="lora")
     lora_rows = {row["key"]: row for row in lora_stats["items"]}
     assert set(lora_rows) == {"style_a.safetensors", "style_b.safetensors"}
 
-    # Default sort is net score, descending.
+    # Default sort is the weighted score, descending.
     assert [row["key"] for row in artist_stats["items"]][0] == "nnn yryr"
 
     # An unrated artist reports no ratio rather than a fake 0.
     await service.set_rating(items["a1111_00002_.png"]["image_path"], 0)
-    unrated = await service.stats(by="artist", sort="net")
+    unrated = await service.stats(by="artist", sort="score")
     rows = {row["key"]: row for row in unrated["items"]}
     assert rows["heripantomorrow"]["like_ratio"] is None
     assert rows["heripantomorrow"]["unrated"] == 1
+
+
+async def test_weighted_score_makes_a_strong_vote_outweigh_a_mild_one(service):
+    await _scan(service)
+    items = _by_name((await service.list_images())["items"])
+    # A single +3 must outrank the mild +1 on another artist.
+    await service.set_rating(items["a1111_00002_.png"]["image_path"], 3)
+    await service.set_rating(items["comfy_00001_.png"]["image_path"], 1)
+
+    stats = await service.stats(by="artist")
+    rows = {row["key"]: row for row in stats["items"]}
+    assert rows["heripantomorrow"]["score"] == 3
+    assert rows["heripantomorrow"]["levels"]["love"] == 1
+    assert rows["nnn yryr"]["score"] == 1
+    assert rows["nnn yryr"]["levels"]["like"] == 1
+    assert stats["totals"]["score"] == 4
+    assert stats["totals"]["loved"] == 1
+    # The vote counts still report one like per side.
+    assert rows["heripantomorrow"]["likes"] == rows["nnn yryr"]["likes"] == 1
+    assert [row["key"] for row in stats["items"]][0] == "heripantomorrow"
+
+
+def _seed_ratings(tmp_path, ratings) -> GalleryService:
+    """Index one image per rating, bypassing the scan (summary reads the cache)."""
+    cache = GalleryCache(str(tmp_path / "gallery.sqlite"))
+    paths = [str(tmp_path / "output" / f"{index}.png") for index in range(len(ratings))]
+    cache.upsert_images(
+        [
+            {
+                "image_path": path,
+                "file_name": os.path.basename(path),
+                "mtime": float(index),
+                "size": 10,
+                "width": 8,
+                "height": 8,
+                "has_metadata": False,
+                "artists": [],
+                "loras": [],
+            }
+            for index, path in enumerate(paths)
+        ]
+    )
+    for path, rating in zip(paths, ratings):
+        assert cache.set_rating(path, rating) is True
+    return GalleryService(cache=cache)
+
+
+def _seed_lora_ratings(
+    tmp_path, ratings, lora_name: str = "style_x.safetensors"
+) -> GalleryService:
+    """One image per rating, all using the same LoRA, without a scan."""
+    cache = GalleryCache(str(tmp_path / "gallery.sqlite"))
+    paths = [str(tmp_path / "output" / f"{index}.png") for index in range(len(ratings))]
+    cache.upsert_images(
+        [
+            {
+                "image_path": path,
+                "file_name": os.path.basename(path),
+                "mtime": float(index),
+                "size": 10,
+                "width": 8,
+                "height": 8,
+                "has_metadata": False,
+                "artists": [],
+                "loras": [{"name": lora_name, "weight": 0.8, "exists_locally": False}],
+            }
+            for index, path in enumerate(paths)
+        ]
+    )
+    for path, rating in zip(paths, ratings):
+        assert cache.set_rating(path, rating) is True
+    return GalleryService(cache=cache)
+
+
+async def test_summary_counts_every_level_of_the_scale(tmp_path):
+    # +3 loved, +1 liked, -1 disliked, -3 hated, and one unrated image.
+    service = _seed_ratings(tmp_path, [3, 1, -1, -3, 0])
+
+    assert await service.summary() == {
+        "images": 5,
+        "rated": 4,
+        "unrated": 1,
+        "liked": 2,
+        "disliked": 2,
+        "loved": 1,
+        "hated": 1,
+        # The two sides cancel out, which the weighted score must show too.
+        "score": 0,
+        "net": 0,
+        "levels": {"love": 1, "like": 1, "dislike": 1, "hate": 1},
+        "like_ratio": 0.5,
+    }
+
+    # Promoting the unrated image moves it out of `unrated` and into a vote,
+    # so the ratio follows the new denominator and the score follows the weight.
+    await service.set_rating(str(tmp_path / "output" / "4.png"), 3)
+    promoted = await service.summary()
+    assert promoted["rated"] == 5 and promoted["unrated"] == 0
+    assert promoted["liked"] == 3 and promoted["net"] == 1
+    assert promoted["score"] == 3
+    assert promoted["levels"]["love"] == 2
+    assert promoted["like_ratio"] == 0.6
+
+
+async def test_summary_reports_no_ratio_before_anything_is_rated(tmp_path):
+    empty = GalleryService(cache=GalleryCache(str(tmp_path / "empty.sqlite")))
+    summary = await empty.summary()
+    assert summary["images"] == 0
+    assert summary["rated"] == 0
+    assert summary["like_ratio"] is None
+    assert summary["levels"] == {"love": 0, "like": 0, "dislike": 0, "hate": 0}
+
+    # Indexed but unrated is "no opinion yet", not a zero ratio.
+    unrated = _seed_ratings(tmp_path, [0, 0])
+    summary = await unrated.summary()
+    assert summary["images"] == 2 and summary["unrated"] == 2
+    assert summary["rated"] == 0 and summary["like_ratio"] is None
+
+
+async def test_statistics_sort_by_exact_level_counts(service):
+    """The level sort keys rank by one level, not by the weighted score."""
+    await _scan(service)
+    items = _by_name((await service.list_images())["items"])
+    await service.set_rating(items["comfy_00001_.png"]["image_path"], 3)
+    await service.set_rating(items["a1111_00002_.png"]["image_path"], -3)
+
+    loved = await service.stats(by="artist", sort="loved")
+    assert [row["key"] for row in loved["items"]][:2] == ["nnn yryr", "heripantomorrow"]
+
+    hated = await service.stats(by="artist", sort="hated")
+    assert [row["key"] for row in hated["items"]][:2] == ["heripantomorrow", "nnn yryr"]
 
 
 async def test_statistics_min_total_filters_singletons(service):
@@ -321,7 +467,18 @@ async def test_statistics_sort_options(service):
     items = _by_name((await service.list_images())["items"])
     await service.set_rating(items["comfy_00001_.png"]["image_path"], 1)
     await service.set_rating(items["a1111_00002_.png"]["image_path"], -1)
-    for sort in ("net", "likes", "dislikes", "total", "ratio"):
+    for sort in (
+        "score",
+        "net",
+        "likes",
+        "dislikes",
+        "total",
+        "ratio",
+        "loved",
+        "liked",
+        "disliked",
+        "hated",
+    ):
         rows = (await service.stats(by="artist", sort=sort))["items"]
         assert len(rows) == 2
 
@@ -347,6 +504,54 @@ async def test_list_filters_by_rating_artist_lora_and_text(service):
     assert (await service.list_images(lora="style_b.safetensors"))["total"] == 1
     assert (await service.list_images(query="style_a"))["total"] == 1
     assert (await service.list_images(query="masterpiece"))["total"] == 2
+
+
+async def test_rating_filters_cover_both_sides_of_the_four_level_scale(service):
+    await _scan(service)
+    items = _by_name((await service.list_images())["items"])
+    await service.set_rating(items["comfy_00001_.png"]["image_path"], 3)
+    await service.set_rating(items["a1111_00002_.png"]["image_path"], -3)
+
+    loved = await service.list_images(rating="loved")
+    assert [item["file_name"] for item in loved["items"]] == ["comfy_00001_.png"]
+    hated = await service.list_images(rating="hated")
+    assert [item["file_name"] for item in hated["items"]] == ["a1111_00002_.png"]
+
+    # The two sides aggregate the levels they contain, and the previous
+    # like/dislike spellings stay as aliases for clients built against them.
+    assert (await service.list_images(rating="positive"))["total"] == 1
+    assert (await service.list_images(rating="negative"))["total"] == 1
+    assert (await service.list_images(rating="liked"))["total"] == 1
+    assert (await service.list_images(rating="disliked"))["total"] == 1
+    assert (await service.list_images(rating="unrated"))["total"] == 1
+
+
+async def test_exact_level_filters_isolate_one_level(service):
+    """The "like"/"dislike" chips select one exact level each."""
+    await _scan(service)
+    items = _by_name((await service.list_images())["items"])
+    await service.set_rating(items["comfy_00001_.png"]["image_path"], 3)
+    await service.set_rating(items["a1111_00002_.png"]["image_path"], 1)
+    await service.set_rating(items["plain.png"]["image_path"], -1)
+
+    liked = await service.list_images(rating="like")
+    assert [item["file_name"] for item in liked["items"]] == ["a1111_00002_.png"]
+    disliked = await service.list_images(rating="dislike")
+    assert [item["file_name"] for item in disliked["items"]] == ["plain.png"]
+
+    # The side aliases keep aggregating both levels, so the exact chips narrow
+    # the same set instead of replacing it.
+    assert (await service.list_images(rating="positive"))["total"] == 2
+    assert (await service.list_images(rating="negative"))["total"] == 1
+    assert (await service.list_images(rating="loved"))["total"] == 1
+
+    # The page's -3 facet chip sends "hate": it must narrow the list (here to
+    # nothing) instead of falling back to "all".
+    assert (await service.list_images(rating="hate"))["total"] == 0
+    await service.set_rating(items["plain.png"]["image_path"], -3)
+    assert [item["file_name"] for item in (await service.list_images(rating="hate"))["items"]] == [
+        "plain.png"
+    ]
 
 
 async def test_pagination_math(service):
@@ -586,8 +791,30 @@ async def test_images_for_lora_carries_a_rating_summary(service):
         "disliked": 0,
         "unrated": 0,
         "net": 1,
+        "loved": 0,
+        "hated": 0,
+        "score": 1,
+        "levels": {"love": 0, "like": 1, "dislike": 0, "hate": 0},
     }
     assert page["items"][0]["image_url"].startswith("/api/lm/gallery/image?path=")
+
+
+async def test_lora_summary_counts_every_level(tmp_path):
+    """The LoRA modal's bar needs one count per level, not just the two sides."""
+    service = _seed_lora_ratings(tmp_path, [3, 1, -1, -3])
+    page = await service.list_images_for_lora(lora_name="style_x.safetensors")
+    assert page["summary"] == {
+        "total": 4,
+        "liked": 2,
+        "disliked": 2,
+        "unrated": 0,
+        "net": 0,
+        "loved": 1,
+        "hated": 1,
+        "score": 0,
+        "levels": {"love": 1, "like": 1, "dislike": 1, "hate": 1},
+    }
+    assert page["total"] == 4
 
 
 async def test_images_for_lora_lists_liked_images_first(service):

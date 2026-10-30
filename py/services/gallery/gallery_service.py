@@ -42,12 +42,22 @@ _PROGRESS_INTERVAL_SECONDS = 0.5
 # is reused for a short while instead of re-walking the scanner cache.
 _LORA_PREVIEW_TTL_SECONDS = 30.0
 
+# Rankings can be sorted by the weighted score of the four-level ratings, or by
+# the plain vote counts. `net` stays a valid key for older clients; `score` is
+# the default because a strong vote carries three times the weight. The four
+# exact-level keys rank by how many images sit on one level, so "most loved"
+# and "most hated" are answerable without the weighted score blurring them.
 _STATS_SORT_KEYS = {
+    "score": lambda item: item["score"],
     "net": lambda item: item["net"],
     "likes": lambda item: item["likes"],
     "dislikes": lambda item: item["dislikes"],
     "total": lambda item: item["total"],
     "ratio": lambda item: (item["like_ratio"] if item["like_ratio"] is not None else -1.0),
+    "loved": lambda item: item["levels"]["love"],
+    "liked": lambda item: item["levels"]["like"],
+    "disliked": lambda item: item["levels"]["dislike"],
+    "hated": lambda item: item["levels"]["hate"],
 }
 
 
@@ -355,7 +365,7 @@ class GalleryService:
         self,
         *,
         by: str = "artist",
-        sort: str = "net",
+        sort: str = "score",
         limit: int = 200,
         offset: int = 0,
         min_total: int = 1,
@@ -363,7 +373,7 @@ class GalleryService:
     ) -> Dict[str, Any]:
         rows = self.cache.stats_by_lora() if by == "lora" else self.cache.stats_by_artist()
         rows = [row for row in rows if row["total"] >= max(1, min_total)]
-        key = _STATS_SORT_KEYS.get(sort, _STATS_SORT_KEYS["net"])
+        key = _STATS_SORT_KEYS.get(sort, _STATS_SORT_KEYS["score"])
         # Secondary key keeps equal scores in a stable, human-sensible order.
         rows.sort(key=lambda item: (key(item), item["total"], item["key"]), reverse=True)
         # The ranking is descending by default; reversing before slicing keeps
@@ -413,6 +423,15 @@ class GalleryService:
             "limit": limit,
             "items": page_rows,
         }
+
+    async def summary(self) -> Dict[str, Any]:
+        """Whole-gallery counts behind the summary bar and the facet chips.
+
+        Kept beside :meth:`stats` because the two share the same snapshot; the
+        cache derives every number in one query, so the headline score and the
+        per-level counts can never disagree with each other.
+        """
+        return self.cache.rating_totals()
 
     async def _lora_index(self) -> Dict[str, Optional[str]]:
         """``name -> sha256`` of the current local LoRA library.

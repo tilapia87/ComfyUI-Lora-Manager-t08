@@ -50,6 +50,7 @@ class GalleryHandlerSet:
             "list_gallery_images_for_lora": self.list_images_for_lora,
             "set_gallery_rating": self.set_rating,
             "get_gallery_stats": self.get_stats,
+            "get_gallery_summary": self.get_summary,
             "get_gallery_artist_preview": self.get_artist_preview,
             "start_gallery_index": self.start_index,
             "get_gallery_index_status": self.get_index_status,
@@ -131,7 +132,7 @@ class GalleryHandlerSet:
             try:
                 rating = int(payload.get("rating"))
             except (TypeError, ValueError):
-                return _error("rating must be -1, 0 or 1", 400)
+                return _error("rating must be -3, -1, 0, 1 or 3", 400)
 
             service = await self._service()
             updated = await service.set_rating(image_path, rating)
@@ -153,7 +154,7 @@ class GalleryHandlerSet:
             service = await self._service()
             data = await service.stats(
                 by=by,
-                sort=query.get("sort") or "net",
+                sort=query.get("sort") or "score",
                 limit=_parse_int(query.get("limit"), 200, minimum=1, maximum=1000),
                 offset=_parse_int(query.get("offset"), 0, minimum=0, maximum=10_000_000),
                 min_total=_parse_int(query.get("min_total"), 1, minimum=1, maximum=1000),
@@ -162,6 +163,15 @@ class GalleryHandlerSet:
             return web.json_response({"success": True, "data": data})
         except Exception as exc:
             logger.error("Gallery stats failed: %s", exc, exc_info=True)
+            return _error(str(exc))
+
+    async def get_summary(self, request: web.Request) -> web.Response:
+        """Headline counts for the gallery summary bar and its facet chips."""
+        try:
+            service = await self._service()
+            return web.json_response({"success": True, "data": await service.summary()})
+        except Exception as exc:
+            logger.error("Gallery summary failed: %s", exc, exc_info=True)
             return _error(str(exc))
 
     async def get_artist_preview(self, request: web.Request) -> web.Response:
