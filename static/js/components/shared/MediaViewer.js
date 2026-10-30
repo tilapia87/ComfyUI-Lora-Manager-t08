@@ -29,20 +29,38 @@ function preloadAdjacent(items, index) {
     });
 }
 
+/**
+ * Open the shared full-screen viewer.
+ *
+ * Besides the plain (url) and (items, index) forms the options object accepts
+ * two optional hooks so a page can add its own controls without forking the
+ * component:
+ * - `footer(container, item, index)`: called on open and after every
+ *   navigation; the container is emptied first, so the hook only renders.
+ * - `onKey(event, index)`: called before the viewer's own shortcuts; returning
+ *   true means "handled" and suppresses them (Escape still wins).
+ * @param {string|Array} arg1 - URL, or the item array.
+ * @param {number|Object} [arg2] - Index when arg1 is an array, options otherwise.
+ * @param {Object} [arg3] - Options when arg1 is an array.
+ */
 export function openMediaViewer(arg1, arg2, arg3) {
     closeMediaViewer();
 
-    let items, currentIndex, title = '';
+    let items, currentIndex, options;
 
     if (Array.isArray(arg1)) {
         items = arg1;
         currentIndex = typeof arg2 === 'number' ? arg2 : 0;
-        title = (arg3 && arg3.title) || '';
+        options = arg3 || {};
     } else {
         items = [{ url: arg1, type: (arg2 && arg2.type) || 'image' }];
         currentIndex = 0;
-        title = (arg2 && arg2.title) || '';
+        options = arg2 || {};
     }
+
+    const title = options.title || '';
+    const renderFooter = typeof options.footer === 'function' ? options.footer : null;
+    const onKey = typeof options.onKey === 'function' ? options.onKey : null;
 
     if (currentIndex < 0 || currentIndex >= items.length) currentIndex = 0;
 
@@ -80,6 +98,23 @@ export function openMediaViewer(arg1, arg2, arg3) {
         contentContainer.appendChild(titleBar);
     }
 
+    // The optional footer belongs to the page that opened the viewer; the
+    // viewer only reserves the slot and keeps it in sync with navigation.
+    let footerContainer = null;
+    const drawFooter = () => {
+        if (!renderFooter) return;
+        if (!footerContainer) {
+            footerContainer = document.createElement('div');
+            footerContainer.className = 'media-viewer-footer';
+            contentContainer.appendChild(footerContainer);
+            // The media already claims up to 85vh; a footer needs its own room
+            // or the whole dialog overflows a short window.
+            contentContainer.classList.add('has-footer');
+        }
+        footerContainer.innerHTML = '';
+        renderFooter(footerContainer, items[currentIndex], currentIndex);
+    };
+
     let prevBtn, nextBtn;
     if (hasNavigation) {
         prevBtn = document.createElement('button');
@@ -109,6 +144,7 @@ export function openMediaViewer(arg1, arg2, arg3) {
 
             counter.textContent = `${currentIndex + 1} / ${items.length}`;
             preloadAdjacent(items, currentIndex);
+            drawFooter();
         };
 
         prevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigate(-1); });
@@ -141,6 +177,13 @@ export function openMediaViewer(arg1, arg2, arg3) {
             closeMediaViewer();
             return;
         }
+        // The page's own shortcuts take precedence over the viewer's navigation
+        // keys, so a page can rate the current media with the arrow keys.
+        if (onKey && onKey(e, currentIndex)) {
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+        }
         if (hasNavigation) {
             if (e.key === 'ArrowLeft') {
                 e.stopPropagation();
@@ -160,6 +203,7 @@ export function openMediaViewer(arg1, arg2, arg3) {
 
     activeViewer = { overlay, keyHandler };
     preloadAdjacent(items, currentIndex);
+    drawFooter();
 
     if (items[currentIndex].type === 'video') {
         const recipeVideo = document.getElementById('recipeModalVideo');

@@ -57,18 +57,6 @@
                         </div>
 
                         <div class="gallery-control">
-                            <label class="gallery-control-label" for="galleryRatingSelect">
-                                {{ t('gallery.rating.label') }}
-                            </label>
-                            <select id="galleryRatingSelect">
-                                <option value="all">{{ t('gallery.rating.all') }}</option>
-                                <option value="liked">{{ t('gallery.rating.liked') }}</option>
-                                <option value="disliked">{{ t('gallery.rating.disliked') }}</option>
-                                <option value="unrated">{{ t('gallery.rating.unrated') }}</option>
-                            </select>
-                        </div>
-
-                        <div class="gallery-control gallery-field-wide">
                             <label class="gallery-control-label" for="galleryMetadataSelect">
                                 {{ t('gallery.metadata.label') }}
                             </label>
@@ -77,6 +65,52 @@
                                 <option value="with">{{ t('gallery.metadata.with') }}</option>
                                 <option value="without">{{ t('gallery.metadata.without') }}</option>
                             </select>
+                        </div>
+
+                        <div class="gallery-control gallery-field-wide">
+                            <div class="gallery-facet-head">
+                                <span class="gallery-control-label">{{ t('gallery.rating.label') }}</span>
+                                <span class="gallery-facet-score" id="galleryRatingScore"
+                                    title="{{ t('gallery.stats.summary.score') }}"></span>
+                            </div>
+                            <!-- The four levels are the filter, each with its own
+                                 count: a select cannot show the distribution, and
+                                 "liked" alone no longer says how strong a vote is. -->
+                            <div class="gallery-rating-facets" id="galleryRatingFacets" role="group"
+                                aria-label="{{ t('gallery.rating.label') }}">
+                                <button type="button" class="gallery-facet active" data-rating-filter="all"
+                                    aria-pressed="true" title="{{ t('gallery.rating.all') }}">
+                                    <span class="gallery-facet-label">{{ t('gallery.rating.all') }}</span>
+                                    <span class="gallery-facet-count" data-facet-count="all">–</span>
+                                </button>
+                                <button type="button" class="gallery-facet is-love" data-rating-filter="loved"
+                                    aria-pressed="false" title="{{ t('gallery.rating.loved') }}">
+                                    <span class="gallery-facet-label">+3</span>
+                                    <span class="gallery-facet-count" data-facet-count="love">–</span>
+                                </button>
+                                <button type="button" class="gallery-facet is-like" data-rating-filter="like"
+                                    aria-pressed="false" title="{{ t('gallery.rating.like') }}">
+                                    <span class="gallery-facet-label">+1</span>
+                                    <span class="gallery-facet-count" data-facet-count="like">–</span>
+                                </button>
+                                <button type="button" class="gallery-facet is-dislike" data-rating-filter="dislike"
+                                    aria-pressed="false" title="{{ t('gallery.rating.dislike') }}">
+                                    <span class="gallery-facet-label">−1</span>
+                                    <span class="gallery-facet-count" data-facet-count="dislike">–</span>
+                                </button>
+                                <button type="button" class="gallery-facet is-hate" data-rating-filter="hate"
+                                    aria-pressed="false" title="{{ t('gallery.rating.hated') }}">
+                                    <span class="gallery-facet-label">−3</span>
+                                    <span class="gallery-facet-count" data-facet-count="hate">–</span>
+                                </button>
+                                <button type="button" class="gallery-facet" data-rating-filter="unrated"
+                                    aria-pressed="false" title="{{ t('gallery.rating.unrated') }}">
+                                    <span class="gallery-facet-label">{{ t('gallery.rating.unrated') }}</span>
+                                    <span class="gallery-facet-count" data-facet-count="unrated">–</span>
+                                </button>
+                            </div>
+                            <span class="gallery-level-bar gallery-facet-bar" id="galleryRatingDistribution"
+                                aria-hidden="true"></span>
                         </div>
                     </div>
                     <div class="gallery-control">
@@ -132,6 +166,7 @@
 
                 <div class="gallery-sidebar-foot">
                     <span class="gallery-total" id="galleryTotalCount"></span>
+                    <span class="gallery-total gallery-rated-progress" id="galleryRatedProgress"></span>
                 </div>
             </aside>
 
@@ -298,15 +333,13 @@
                             <span class="gallery-control-label">{{ t('gallery.stats.sort.label') }}</span>
                             <div class="gallery-segmented gallery-stats-sort" id="galleryStatsSortPills" role="group"
                                 aria-label="{{ t('gallery.stats.sort.label') }}">
-                                <button type="button" class="gallery-segmented-btn active" data-sort="net">
-                                    {{ t('gallery.stats.sort.net') }}
+                                <button type="button" class="gallery-segmented-btn active" data-sort="score">
+                                    {{ t('gallery.stats.sort.score') }}
                                 </button>
-                                <button type="button" class="gallery-segmented-btn" data-sort="likes">
-                                    {{ t('gallery.stats.columns.likes') }}
-                                </button>
-                                <button type="button" class="gallery-segmented-btn" data-sort="dislikes">
-                                    {{ t('gallery.stats.columns.dislikes') }}
-                                </button>
+                                <button type="button" class="gallery-segmented-btn" data-sort="loved"
+                                    title="{{ t('gallery.rating.loved') }}">+3</button>
+                                <button type="button" class="gallery-segmented-btn" data-sort="hated"
+                                    title="{{ t('gallery.rating.hated') }}">−3</button>
                                 <button type="button" class="gallery-segmented-btn" data-sort="total">
                                     {{ t('gallery.stats.columns.total') }}
                                 </button>

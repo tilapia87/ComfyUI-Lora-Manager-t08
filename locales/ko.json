@@ -3137,10 +3137,14 @@
         },
         "rating": {
             "label": "평점",
-            "all": "모든 이미지",
-            "liked": "좋아요",
-            "disliked": "싫어요",
-            "unrated": "미평가"
+            "all": "[TODO: Translate] All",
+            "loved": "[TODO: Translate] Loved (+3)",
+            "like": "[TODO: Translate] Liked (+1)",
+            "dislike": "[TODO: Translate] Disliked (-1)",
+            "hated": "[TODO: Translate] Hated (-3)",
+            "unrated": "미평가",
+            "distribution": "[TODO: Translate] +3 {love} · +1 {like} · -1 {dislike} · -3 {hate} · unrated {unrated}",
+            "progress": "[TODO: Translate] {rated} of {images} rated"
         },
         "metadata": {
             "label": "메타데이터",
@@ -3161,14 +3165,19 @@
         },
         "card": {
             "unknownSize": "크기 알 수 없음",
+            "loveHint": "[TODO: Translate] Love it (+3, Shift+ArrowUp or I)",
             "likeHint": "좋아요 (↑ 또는 U)",
             "dislikeHint": "싫어요 (↓ 또는 D)",
+            "hateHint": "[TODO: Translate] Hate it (-3, Shift+ArrowDown or K)",
             "artistHint": "@{name} - 작가 목록에 있음",
             "unknownArtistHint": "@{name} - 작가 목록에서 찾을 수 없음",
             "loraHint": "{name}을(를) 사용하는 이미지 표시",
             "loraMissingHint": "{name} - 이 LoRA는 로컬 라이브러리에 없습니다",
             "noMetadata": "메타데이터 없음",
             "noMetadataHint": "이 이미지에는 읽을 수 있는 생성 메타데이터가 없어 사용된 작가와 LoRA를 알 수 없습니다."
+        },
+        "viewer": {
+            "hint": "[TODO: Translate] Click the active level again to clear · ↑/U +1 · Shift+↑/I +3 · ↓/D -1 · Shift+↓/K -3"
         },
         "progress": {
             "stage": {
@@ -3231,26 +3240,23 @@
             },
             "sort": {
                 "label": "정렬",
-                "net": "순점수",
-                "likes": "좋아요",
-                "dislikes": "싫어요",
+                "score": "[TODO: Translate] Weighted score",
                 "total": "전체",
                 "ratio": "좋아요 비율"
             },
             "summary": {
                 "images": "이미지",
                 "rated": "평가됨",
-                "liked": "좋아요",
-                "disliked": "싫어요"
+                "love": "[TODO: Translate] +3 Loved",
+                "like": "[TODO: Translate] +1 Liked",
+                "dislike": "[TODO: Translate] -1 Disliked",
+                "hate": "[TODO: Translate] -3 Hated",
+                "score": "[TODO: Translate] Score"
             },
             "columns": {
-                "rank": "#",
-                "name": "이름",
-                "likes": "좋아요",
-                "dislikes": "싫어요",
                 "unrated": "미평가",
                 "total": "전체",
-                "net": "순점수",
+                "score": "[TODO: Translate] Weighted score",
                 "ratio": "비율"
             },
             "noRatio": "없음",
@@ -3259,7 +3265,7 @@
         },
         "loraTab": {
             "title": "갤러리",
-            "summary": "이미지: {total} · 좋아요: {liked} · 싫어요: {disliked} · 미평가: {unrated} · 순점수: {net}",
+            "summary": "[TODO: Translate] {total} images · +3 {loved} · +1 {like} · -1 {dislike} · -3 {hated} · unrated {unrated}",
             "empty": "이 LoRA를 사용한 갤러리 이미지가 아직 없습니다.",
             "loadFailed": "갤러리 이미지를 불러오지 못했습니다. 나중에 다시 시도해 주세요."
         }

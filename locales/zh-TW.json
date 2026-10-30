@@ -3137,10 +3137,14 @@
         },
         "rating": {
             "label": "評分",
-            "all": "全部圖片",
-            "liked": "已按讚",
-            "disliked": "已倒讚",
-            "unrated": "未評分"
+            "all": "全部",
+            "loved": "特別中意（+3）",
+            "like": "按讚（+1）",
+            "dislike": "倒讚（-1）",
+            "hated": "特別討厭（-3）",
+            "unrated": "未評分",
+            "distribution": "+3 {love} · +1 {like} · -1 {dislike} · -3 {hate} · 未評分 {unrated}",
+            "progress": "已評分 {rated} / {images}"
         },
         "metadata": {
             "label": "中繼資料",
@@ -3161,14 +3165,19 @@
         },
         "card": {
             "unknownSize": "尺寸未知",
+            "loveHint": "特別中意（+3，Shift+↑ 或 I）",
             "likeHint": "按讚（↑ 或 U）",
             "dislikeHint": "倒讚（↓ 或 D）",
+            "hateHint": "特別討厭（-3，Shift+↓ 或 K）",
             "artistHint": "@{name} - 來自您的繪師表",
             "unknownArtistHint": "@{name} - 在您的繪師表中找不到",
             "loraHint": "顯示使用 {name} 的圖片",
             "loraMissingHint": "{name} - 這個 LoRA 不在您的本機媒體庫中",
             "noMetadata": "無中繼資料",
             "noMetadataHint": "這張圖片沒有可讀取的生成中繼資料，因此無法得知它使用的繪師和 LoRA。"
+        },
+        "viewer": {
+            "hint": "再次點擊目前等級可取消 · ↑/U +1 · Shift+↑/I +3 · ↓/D -1 · Shift+↓/K -3"
         },
         "progress": {
             "stage": {
@@ -3231,26 +3240,23 @@
             },
             "sort": {
                 "label": "排序",
-                "net": "淨分",
-                "likes": "按讚數",
-                "dislikes": "倒讚數",
+                "score": "加權得分",
                 "total": "總數",
                 "ratio": "按讚率"
             },
             "summary": {
                 "images": "圖片",
                 "rated": "已評分",
-                "liked": "已按讚",
-                "disliked": "已倒讚"
+                "love": "+3 特別中意",
+                "like": "+1 按讚",
+                "dislike": "-1 倒讚",
+                "hate": "-3 特別討厭",
+                "score": "得分"
             },
             "columns": {
-                "rank": "#",
-                "name": "名稱",
-                "likes": "按讚",
-                "dislikes": "倒讚",
                 "unrated": "未評分",
                 "total": "總數",
-                "net": "淨分",
+                "score": "加權得分",
                 "ratio": "按讚率"
             },
             "noRatio": "無",
@@ -3259,7 +3265,7 @@
         },
         "loraTab": {
             "title": "圖庫",
-            "summary": "圖片：{total} · 按讚：{liked} · 倒讚：{disliked} · 未評分：{unrated} · 淨分：{net}",
+            "summary": "圖片：{total} · +3 {loved} · +1 {like} · -1 {dislike} · -3 {hated} · 未評分 {unrated}",
             "empty": "圖庫中還沒有使用這個 LoRA 的圖片。",
             "loadFailed": "載入圖庫圖片失敗，請稍後重試。"
         }

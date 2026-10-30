@@ -127,7 +127,17 @@ const FOR_LORA_PAYLOAD = {
     page: 1,
     page_size: 60,
     total_pages: 1,
-    summary: { total: 2, liked: 1, disliked: 0, unrated: 1, net: 1 },
+    summary: {
+      total: 2,
+      liked: 1,
+      disliked: 0,
+      unrated: 1,
+      net: 1,
+      loved: 0,
+      hated: 0,
+      score: 1,
+      levels: { love: 0, like: 1, dislike: 0, hate: 0 },
+    },
     lora: { name: 'style_a.safetensors', hash: LORA_HASH },
   },
 };
@@ -264,7 +274,42 @@ describe('Model modal gallery tab', () => {
     expect(first.getAttribute('title')).toBe('anima_00001_.png');
 
     expect(document.querySelector('.gallery-tab-summary').textContent).toBe(
-      'gallery.loraTab.summary#2,1,0,1,1'
+      'gallery.loraTab.summary#2,0,1,0,0,1'
+    );
+  });
+
+  it('renders the four-level summary from summary.levels', async () => {
+    fetchStub.setForLoraRoute({
+      success: true,
+      data: {
+        items: [GALLERY_ITEM_LIKED, GALLERY_ITEM_UNRATED],
+        total: 2,
+        page: 1,
+        page_size: 60,
+        total_pages: 1,
+        summary: {
+          total: 6,
+          // The old two-side counts aggregate the levels; the line must use the
+          // exact level counts instead of re-deriving them from `liked`.
+          liked: 3,
+          disliked: 2,
+          unrated: 1,
+          net: 1,
+          loved: 2,
+          hated: 1,
+          score: 5,
+          levels: { love: 2, like: 1, dislike: 1, hate: 1 },
+        },
+        lora: { name: 'style_a.safetensors', hash: LORA_HASH },
+      },
+    });
+
+    await renderModal('loras');
+    await openGalleryTab();
+    await vi.waitFor(() => expect(thumbs().length).toBe(2));
+
+    expect(document.querySelector('.gallery-tab-summary').textContent).toBe(
+      'gallery.loraTab.summary#6,2,1,1,1,1'
     );
   });
 

@@ -107,6 +107,20 @@
   transition: opacity 0.2s ease, background 0.2s ease;
 }
 
+/* Optional per-page control strip below the media (see openMediaViewer's
+   `footer` hook). The page inside it supplies all the styling. */
+.media-viewer-footer {
+  margin-top: 8px;
+  max-width: 90vw;
+  display: flex;
+  justify-content: center;
+}
+
+/* The footer takes vertical space, so the media yields some of its 85vh. */
+.media-viewer-content-container.has-footer .media-viewer-media {
+  max-height: 76vh;
+}
+
 .media-viewer-overlay.active .media-viewer-nav {
   opacity: 1;
 }

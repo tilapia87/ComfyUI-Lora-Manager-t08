@@ -1,7 +1,8 @@
 # 画廊（Gallery）功能设计说明
 
-> 在 LoRA Manager 的 Web UI 中新增画廊：浏览 ComfyUI 输出目录里的图片，对每张图点赞/点踩，
-> 自动记录图中用到的**画师**与 **LoRA**，并按画师 / LoRA 聚合出「喜欢 / 不喜欢」统计。
+> 在 LoRA Manager 的 Web UI 中新增画廊：浏览 ComfyUI 输出目录里的图片，对每张图按
+> **+3 / +1 / −1 / −3 四档**评分，自动记录图中用到的**画师**与 **LoRA**，并按画师 / LoRA
+> 聚合出加权偏好统计。
 
 ## 1. 画师识别：为什么是 `@`
 
@@ -74,6 +75,10 @@ gallery_meta(key PK, value)
 画师与 LoRA 拆成子表，是为了让统计变成一次 `GROUP BY` 而不是全表 JSON 扫描。
 `rating` 存在主表且**重扫时不覆盖** —— 评分是用户数据，不可再生。
 
+`rating` 是四档评分：`+3`（特别中意）、`+1`（喜欢）、`-1`（不喜欢）、`-3`（特别讨厌），
+`0` 表示未评分。强度就是权重：统计里的加权得分 `score = Σ rating`，因此一张「特别中意」
+的图等于三张「喜欢」。旧存档里的 `±1` 原样保留、无需迁移。
+
 `lora_hash` 是后加的列（老库靠 `ALTER TABLE ... ADD COLUMN` 就地迁移，不需要重建），
 存的是这个 LoRA 名在**本机 LoRA 库**里解析出的 sha256 —— 画廊 → LoRA 页的跳转就靠它。
 冷缓存时为空，只是暂时没有跳转入口，不影响评分与统计。
@@ -92,9 +97,10 @@ gallery_meta(key PK, value)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/lm/gallery/images` | 分页列表。参数 `page`、`page_size`、`sort`(`newest/oldest/rating_desc/rating_asc/name`)、`rating`(`all/liked/disliked/unrated`)、`metadata`(`all/with/without`)、`artist`、`lora`、`q` |
-| POST/GET | `/api/lm/gallery/rating` | `{"image_path","rating"}`，rating 取 `1/-1/0` |
-| GET | `/api/lm/gallery/stats` | `by`(`artist/lora`)、`sort`(`net/likes/dislikes/total/ratio`)、`limit`、`min_total` |
+| GET | `/api/lm/gallery/images` | 分页列表。参数 `page`、`page_size`、`sort`(`newest/oldest/rating_desc/rating_asc/name`)、`rating`(`all/loved/like/dislike/hate/unrated`，精确到四档；`positive/negative`、`liked/disliked`、`hated` 为兼容别名)、`metadata`(`all/with/without`)、`artist`、`lora`、`q` |
+| POST/GET | `/api/lm/gallery/rating` | `{"image_path","rating"}`，rating 取 `3/1/-1/-3/0` |
+| GET | `/api/lm/gallery/summary` | 全库评分分布：`images/rated/unrated/liked/disliked/loved/hated/score/net/levels{love,like,dislike,hate}/like_ratio`，供侧栏分档计数与分布条使用 |
+| GET | `/api/lm/gallery/stats` | `by`(`artist/lora`)、`sort`(`score/loved/liked/disliked/hated/likes/dislikes/net/total/ratio`，默认 `score` 加权得分)、`limit`、`min_total`；每行带 `score`、`net`、`levels{love,like,dislike,hate}` 与 `images` 样本缩略图 |
 | POST/GET | `/api/lm/gallery/index` | 启动后台扫描，`force=1` 强制重新解析 |
 | GET | `/api/lm/gallery/index/status` | 扫描进度：`running/stage/progress/total/added/updated/removed/failed/root/root_source/error` |
 | GET | `/api/lm/gallery/image?path=` | 图片字节流（含包含性校验） |
@@ -108,7 +114,46 @@ gallery_meta(key PK, value)
 同时通过 `/ws/fetch-progress` 广播 `{"type": "gallery_index_progress", ...}`，
 与仓库既有的扫描进度约定一致（也支持轮询 `index/status`）。
 
-## 4. 与 LoRA 页的互相联通
+## 4. 界面与交互细节
+
+页面是「固定侧栏 + 内容区」两栏：侧栏承载开关与筛选，内容区在「图片」与「统计」两个视图间
+切换，切换不重建侧栏。
+
+### 四档评分怎么落到界面上
+
+强度就是权重，所以界面必须让人**一眼看出档位**，而不是把强度藏在图标后面：
+
+- **卡片按钮**：每张卡片底部一排四个按钮，直接显示 `+3 / +1 / −1 / −3`；命中档位实心填充，
+  弱档（±1）着色、强档（±3）实心，点当前档位再点一次即清除。悬停提示同时给出该档的键盘快捷键。
+- **键盘**：`↑ / U` = +1，`Shift+↑ / I` = +3，`↓ / D` = −1，`Shift+↓ / K` = −3；
+  `←/→/Home/End` 在卡片间移动焦点（每张卡是 roving focus 的焦点单元），`Enter` 打开大图。
+  键盘评分是刻意保留的主路径：一屏几十张图时，鼠标来回点按钮太慢。
+- **大图查看器**：共享的 `MediaViewer` 新增两个可选钩子（`footer(container, item, index)` 与
+  `onKey(event, index)`），画廊借此在底部放一条四档评分条——判断一张图要在原尺寸下看，
+  所以评分不能要求先关掉查看器；`←/→` 翻页仍然归查看器，评分键由画廊优先消费。
+- **投票即时反映**：卡片与大图评分条先乐观更新，接口失败再回退并 toast。
+  若当前筛选是「未评分」而这张图刚被评了分，卡片会**就地移出网格**（不整页重载、不丢滚动位置）。
+- **分布与计数去抖刷新**：一次评分只触发一次统计/侧栏刷新（400ms 合并），连续键盘投票不会打出一串请求。
+
+### 侧栏：四档筛选与分布
+
+侧栏不再用「点赞 / 点踩」下拉框，而是六个**分档切片**：`全部 / +3 / +1 / −1 / −3 / 未评分`，
+每个切片带全库计数（来自 `/api/lm/gallery/summary`），上方显示加权得分，下方是一条四段分布条。
+未评分部分画成空白轨道而不是第五种颜色——它表示「还没决定」，不是一种偏好。
+侧栏底部还会显示「已评分 N / M」：排名是否可信，取决于这个比例。
+切片点击即筛选（`rating=loved|like|dislike|hate|unrated`），**再点当前档位即取消**（回到全部），
+与排序、元数据、画师/LoRA 芯片、关键词筛选可叠加；筛选条件仍由「清除筛选」横幅统一清除。
+
+### 统计视图：四档而非两侧
+
+- 汇总卡：`图片 / 已评分 / +3 / +1 / −1 / −3 / 加权得分`，四档沿用侧栏的分档配色，
+  加权得分带正负色。
+- 排行卡：每行展示四档**精确计数**（旧的 👍/👎 只能说明两侧，无法区分强弱），
+  每个计数既是数值也是排序按钮（`sort=loved|liked|disliked|hated`）；下面保留分布条与点赞率。
+- 排序 pill：`加权得分 / +3 / −3 / 总数 / 点赞率`。`likes/dislikes/net` 作为兼容键仍由后端接受。
+- LoRA 弹窗的 Gallery 标签摘要同样按四档显示（`for-lora` 的 `summary.levels`）。
+
+## 5. 与 LoRA 页的互相联通
 
 画廊里的 LoRA 和 LoRA 库里的模型是同一个东西，所以两边互相能跳；两个方向都是**显式动作**，
 不会因为点错地方而顶掉对方正在看的视图。
@@ -137,7 +182,7 @@ gallery_meta(key PK, value)
 | `static/js/components/shared/GalleryTab.js` | 模型弹窗的 Gallery 标签：加载、空态、失败态 |
 | `static/js/gallery.js` | 两处 ↗ 按钮的渲染与点击分流（`gallery-open-lora` / `[data-lora-hash]`） |
 
-## 5. 设置项
+## 6. 设置项
 
 新增于 `DEFAULT_SETTINGS`（`py/services/settings_manager.py`）：
 
@@ -148,35 +193,44 @@ gallery_meta(key PK, value)
 | `gallery_recursive` | `true` | 是否扫描输出目录的子目录 |
 | `gallery_sort` | `"newest"` | 记住的排序方式 |
 
-## 6. 测试
+## 7. 测试
 
 ```bash
 # 后端（本机沙箱需先钉住设置目录，否则导入期 Config() 会去写真实用户目录）
 export LORA_MANAGER_SETTINGS_DIR=/tmp/lm-settings     # Windows: $env:LORA_MANAGER_SETTINGS_DIR="..."
-pytest tests/utils/test_artist_tags.py tests/services/test_gallery_service.py tests/routes/test_gallery_handlers.py
+pytest tests/utils/test_artist_tags.py tests/services/test_gallery_service.py \
+       tests/routes/test_gallery_handlers.py tests/routes/test_gallery_integration.py
 
-# 前端（联通相关的三个文件）
+# 前端（画廊页面 / LoRA 弹窗 Gallery 标签 / 共享查看器 / 深链）
 npx vitest run tests/frontend
 ```
 
 覆盖范围：画师解析的全部边界写法（含 Anima 的转义括号）、负向词不产生幻影画师、
 ComfyUI 图与 A1111 文本两种来源、`LoraLoaderModelOnly` 的 LoRA 抓取、
 无元数据图片的降级、递归开关与删除后的剪枝、**重扫保留评分**、
-统计聚合与排序、列表各过滤器（评分 / **元数据有无** / 画师 / LoRA / 关键词）及其组合、
-分页总计、包含性校验与扩展名白名单、路由注册完整性、评分接口的参数校验、
+统计聚合与排序（含**按精确档位 loved/hated 排序**与四档计数）、
+**四档评分**（每档独立计数、加权得分、`like_ratio` 在无评分时为 null）、
+列表各过滤器（精确四档 + 两侧兼容别名 / **元数据有无** / 画师 / LoRA / 关键词）及其组合、
+分页总计、包含性校验与扩展名白名单、路由注册完整性（含 summary 端点）、评分接口的参数校验、
 **LoRA 名 → hash 解析（名字对不上 / 一个名字多个文件时留空）**、
 **画廊 ↔ LoRA 页跳转**（芯片旁的 ↗ 只跳转不过滤、芯片本身仍过滤、
 统计行只有名字时先解析再跳、解析失败给提示且不跳）。
 
-## 7. 已知限制 / 后续可做
+前端用例另外覆盖：四档按钮与键盘快捷键、侧栏分档切片的计数/筛选/分布条、
+**在大图查看器里评分**（footer 与 onKey 两个钩子、翻页后评分条跟随）、
+评分后不匹配当前筛选项的卡片就地移出、统计页四档指标与排序 pill。
+
+## 8. 已知限制 / 后续可做
 
 - **画师表只用于确认，不做模糊匹配。** 表里没有的拼写会作为独立画师统计（标 `known: false`）。
   若同一画师的拼写变体很多，后续可加别名匹配（自带 CSV 的第 4 列就是别名，目前未使用）。
 - **不带括号消歧的画师更依赖画师表。** 提示词里只写了 `@name` 时，同一 `name` 在不同作品下可能是不同画师；
   画师表能消歧但不会猜测，未命中就按原样统计。
-- **不做服务端缩略图。** 卡片直接加载原图并配合浏览器懒加载；
-  与仓库现状一致（`/api/lm/previews` 同样直接流式返回原图），但大图多时首屏偏重。
+- **缩略图按需生成并落盘缓存**（`/api/lm/gallery/thumbnail`，WebP），设置页可查看占用并清空；
+  冷缓存时首屏仍要等一次生成。
 - **`exists_locally` 依赖 LoRA 扫描器缓存**，冷缓存时统一为 `false`（仅影响角标显示）。
 - **LoRA 跳转入口同样依赖扫描器缓存。** 冷缓存（还没扫过 LoRA 库）时解析不出 hash，
   芯片上的 ↗ 暂时不出现；扫描完成后重扫一次画廊即可补上。
   一个 LoRA 名在本机匹配到**多个**文件时不猜，按"无法确定"处理，不给跳转入口。
+- **侧栏分数刷新是去抖的**：评分后 400ms 才重新拉 `/summary`，极端情况下快速连评的计数会比
+  卡片晚一拍；这是刻意的取舍（避免键盘连评打出一串请求）。

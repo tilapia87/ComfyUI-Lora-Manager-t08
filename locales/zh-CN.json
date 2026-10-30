@@ -3137,10 +3137,14 @@
         },
         "rating": {
             "label": "评分",
-            "all": "全部图片",
-            "liked": "已点赞",
-            "disliked": "已点踩",
-            "unrated": "未评分"
+            "all": "全部",
+            "loved": "特别中意（+3）",
+            "like": "点赞（+1）",
+            "dislike": "点踩（-1）",
+            "hated": "特别讨厌（-3）",
+            "unrated": "未评分",
+            "distribution": "+3 {love} · +1 {like} · -1 {dislike} · -3 {hate} · 未评分 {unrated}",
+            "progress": "已评分 {rated} / {images}"
         },
         "metadata": {
             "label": "元数据",
@@ -3161,14 +3165,19 @@
         },
         "card": {
             "unknownSize": "尺寸未知",
+            "loveHint": "特别中意（+3，Shift+↑ 或 I）",
             "likeHint": "点赞（↑ 或 U）",
             "dislikeHint": "点踩（↓ 或 D）",
+            "hateHint": "特别讨厌（-3，Shift+↓ 或 K）",
             "artistHint": "@{name} - 来自你的画师表",
             "unknownArtistHint": "@{name} - 在你的画师表中未找到",
             "loraHint": "显示使用 {name} 的图片",
             "loraMissingHint": "{name} - 这个 LoRA 不在你的本地库中",
             "noMetadata": "无元数据",
             "noMetadataHint": "这张图片没有可读取的生成元数据，因此无法得知它使用的画师和 LoRA。"
+        },
+        "viewer": {
+            "hint": "再次点击当前档位可取消 · ↑/U +1 · Shift+↑/I +3 · ↓/D -1 · Shift+↓/K -3"
         },
         "progress": {
             "stage": {
@@ -3231,26 +3240,23 @@
             },
             "sort": {
                 "label": "排序",
-                "net": "净分",
-                "likes": "点赞数",
-                "dislikes": "点踩数",
+                "score": "加权得分",
                 "total": "总数",
                 "ratio": "点赞率"
             },
             "summary": {
                 "images": "图片",
                 "rated": "已评分",
-                "liked": "已点赞",
-                "disliked": "已点踩"
+                "love": "+3 特别中意",
+                "like": "+1 点赞",
+                "dislike": "-1 点踩",
+                "hate": "-3 特别讨厌",
+                "score": "得分"
             },
             "columns": {
-                "rank": "#",
-                "name": "名称",
-                "likes": "点赞",
-                "dislikes": "点踩",
                 "unrated": "未评分",
                 "total": "总数",
-                "net": "净分",
+                "score": "加权得分",
                 "ratio": "点赞率"
             },
             "noRatio": "无",
@@ -3259,7 +3265,7 @@
         },
         "loraTab": {
             "title": "画廊",
-            "summary": "图片：{total} · 点赞：{liked} · 点踩：{disliked} · 未评分：{unrated} · 净分：{net}",
+            "summary": "图片：{total} · +3 {loved} · +1 {like} · -1 {dislike} · -3 {hated} · 未评分 {unrated}",
             "empty": "画廊中还没有使用这个 LoRA 的图片。",
             "loadFailed": "加载画廊图片失败，请稍后重试。"
         }

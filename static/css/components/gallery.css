@@ -94,9 +94,18 @@
 }
 
 .gallery-sidebar-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     margin-top: auto;
     padding-top: var(--space-2, 8px);
     border-top: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+}
+
+/* Filtered result count on top, library-wide rating coverage below. */
+.gallery-rated-progress {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
 }
 
 .gallery-sidebar .gallery-control {
@@ -377,6 +386,120 @@
     padding: 0 var(--space-2, 8px);
 }
 
+/* --------------------------------------------------- rating facets (sidebar) */
+
+/* The four levels are a filter and a distribution at once: each facet shows its
+   own count, and one bar below sums the page up. Six compact chips fit the
+   sidebar in two rows without pushing the grid off the first screen. */
+.gallery-facet-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2, 8px);
+}
+
+.gallery-facet-score {
+    font-size: var(--text-xs, 12px);
+    font-weight: var(--weight-semibold, 600);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary, #b8b8b8);
+}
+
+.gallery-facet-score.is-positive {
+    color: var(--color-success, #2ecc71);
+}
+
+.gallery-facet-score.is-negative {
+    color: var(--color-error, #e74c3c);
+}
+
+.gallery-rating-facets {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.gallery-facet {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    min-height: 30px;
+    padding: 0 var(--space-2, 8px);
+    border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.2));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--bg-hover, rgba(127, 127, 127, 0.12));
+    color: var(--text-secondary, #b8b8b8);
+    font-family: inherit;
+    font-size: var(--text-xs, 12px);
+    font-weight: var(--weight-medium, 500);
+    cursor: pointer;
+    transition: background var(--transition-fast, 150ms) ease,
+        border-color var(--transition-fast, 150ms) ease,
+        color var(--transition-fast, 150ms) ease;
+}
+
+.gallery-facet:hover {
+    color: var(--text-primary, #f2f2f2);
+    border-color: var(--border-base, rgba(127, 127, 127, 0.32));
+}
+
+.gallery-facet:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus, 0 0 0 2px var(--color-accent, #4f8cff));
+}
+
+.gallery-facet.active {
+    border-color: var(--color-accent, #4f8cff);
+    background: var(--color-accent, #4f8cff);
+    color: var(--color-accent-contrast, #fff);
+}
+
+.gallery-facet-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gallery-facet-count {
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--weight-semibold, 600);
+    opacity: 0.85;
+}
+
+/* The level is still readable when its facet is not the active filter. */
+.gallery-facet.is-love .gallery-facet-label {
+    color: var(--color-success, #2ecc71);
+    font-weight: var(--weight-bold, 700);
+}
+
+.gallery-facet.is-like .gallery-facet-label {
+    color: rgba(46, 204, 113, 0.85);
+}
+
+.gallery-facet.is-dislike .gallery-facet-label {
+    color: rgba(231, 76, 60, 0.85);
+}
+
+.gallery-facet.is-hate .gallery-facet-label {
+    color: var(--color-error, #e74c3c);
+    font-weight: var(--weight-bold, 700);
+}
+
+.gallery-facet.active .gallery-facet-label {
+    color: inherit;
+}
+
+.gallery-facet-bar {
+    margin-top: 2px;
+}
+
+/* Unrated images are the bare track, not a colour: the blank share reads as
+   "not decided yet" instead of as a fifth level. */
+.gallery-level-seg.is-unrated {
+    background: transparent;
+}
+
 /* ------------------------------------------------------- filter / status */
 
 .gallery-filter-banner {
@@ -470,69 +593,85 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
+    min-width: 30px;
     height: 30px;
+    padding: 0 7px;
     border-radius: var(--radius-full, 9999px);
     backdrop-filter: blur(6px);
     font-size: 13px;
+    font-weight: var(--weight-bold, 700);
+    font-variant-numeric: tabular-nums;
     box-shadow: var(--shadow-md, 0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
-.gallery-card-badge.is-like {
+/* The badge carries the level itself instead of a thumbs icon: a thumbs-up
+   cannot distinguish +1 from +3. Strong votes are solid, mild votes tinted. */
+.gallery-card-badge.is-love {
     background: var(--color-success, #2ecc71);
-    color: #fff;
+    color: #06240f;
+}
+
+.gallery-card-badge.is-like {
+    background: rgba(46, 204, 113, 0.78);
+    color: #06240f;
 }
 
 .gallery-card-badge.is-dislike {
+    background: rgba(231, 76, 60, 0.78);
+    color: #ffffff;
+}
+
+.gallery-card-badge.is-hate {
     background: var(--color-error, #e74c3c);
-    color: #fff;
+    color: #ffffff;
 }
 
-/* Overlay: never blocks the click that opens the viewer, only its buttons
-   take pointer events. */
-.gallery-card-overlay {
-    position: absolute;
-    inset: auto 0 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-2, 8px);
-    padding: var(--space-2, 8px);
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent);
-    opacity: 0;
-    transform: translateY(6px);
-    transition: opacity var(--transition-fast, 150ms) ease,
-        transform var(--transition-fast, 150ms) ease;
-    pointer-events: none;
-}
-
-.gallery-card:hover .gallery-card-overlay,
-.gallery-card:focus-within .gallery-card-overlay {
-    opacity: 1;
-    transform: translateY(0);
+/* Four-level segmented rating control: each level is one button that shows its
+   own value, so the four choices are always visible and never need a hover. */
+.gallery-card-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 2px;
 }
 
 .gallery-rate-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
-    border: 1px solid rgba(255, 255, 255, 0.24);
+    width: auto;
+    height: 32px;
+    padding: 0 2px;
+    border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.2));
     border-radius: var(--radius-md, 8px);
-    background: rgba(0, 0, 0, 0.55);
-    color: #fff;
-    font-size: 16px;
+    background: var(--bg-hover, rgba(127, 127, 127, 0.12));
+    color: var(--text-secondary, #b8b8b8);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: var(--weight-semibold, 600);
+    font-variant-numeric: tabular-nums;
     cursor: pointer;
-    pointer-events: auto;
     transition: background var(--transition-fast, 150ms) ease,
         border-color var(--transition-fast, 150ms) ease,
+        color var(--transition-fast, 150ms) ease,
         transform var(--transition-fast, 150ms) ease;
 }
 
 .gallery-rate-btn:hover {
     transform: translateY(-1px);
-    border-color: var(--color-accent, #4f8cff);
+    color: var(--text-primary, #f2f2f2);
+}
+
+.gallery-rate-love:hover,
+.gallery-rate-like:hover {
+    border-color: var(--color-success, #2ecc71);
+    color: var(--color-success, #2ecc71);
+}
+
+.gallery-rate-dislike:hover,
+.gallery-rate-hate:hover {
+    border-color: var(--color-error, #e74c3c);
+    color: var(--color-error, #e74c3c);
 }
 
 .gallery-rate-btn:focus-visible {
@@ -540,48 +679,161 @@
     box-shadow: var(--shadow-focus, 0 0 0 2px var(--color-accent, #4f8cff));
 }
 
-.gallery-rate-up.is-active {
+/* Mild levels stay tinted when active, strong levels fill in: the selected
+   level is always readable and its strength is visible at a glance. */
+.gallery-rate-like.is-active {
+    background: rgba(46, 204, 113, 0.18);
+    border-color: var(--color-success, #2ecc71);
+    color: var(--color-success, #2ecc71);
+}
+
+.gallery-rate-love.is-active {
     background: var(--color-success, #2ecc71);
     border-color: var(--color-success, #2ecc71);
+    color: #06240f;
 }
 
-.gallery-rate-down.is-active {
+.gallery-rate-dislike.is-active {
+    background: rgba(231, 76, 60, 0.18);
+    border-color: var(--color-error, #e74c3c);
+    color: var(--color-error, #e74c3c);
+}
+
+.gallery-rate-hate.is-active {
     background: var(--color-error, #e74c3c);
     border-color: var(--color-error, #e74c3c);
+    color: #ffffff;
 }
 
-.gallery-card-actions {
+/* Compact cards are only 150px wide: four values still fit one step down. */
+.gallery-page[data-density="compact"] .gallery-card-actions .gallery-rate-btn {
+    height: 28px;
+    font-size: 11px;
+}
+
+.gallery-page[data-density="large"] .gallery-card-actions .gallery-rate-btn {
+    height: 38px;
+    font-size: 13px;
+}
+
+/* Rating while the full-size viewer is open: judging a picture means looking at
+   it large, so the same four levels are reachable from the viewer's footer. */
+.gallery-viewer-rate {
     display: flex;
-    gap: 6px;
-    margin-top: 2px;
+    align-items: center;
+    gap: var(--space-3, 12px);
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    backdrop-filter: blur(8px);
 }
 
-.gallery-card-actions .gallery-rate-btn {
-    flex: 1;
-    width: auto;
-    height: 36px;
-    pointer-events: auto;
-    border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.2));
-    background: var(--bg-hover, rgba(127, 127, 127, 0.12));
-    color: var(--text-secondary, #b8b8b8);
+.gallery-viewer-rate-value {
+    min-width: 4ch;
+    text-align: center;
+    font-size: var(--text-sm, 13px);
+    font-weight: var(--weight-bold, 700);
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 255, 255, 0.75);
 }
 
-.gallery-card-actions .gallery-rate-btn:hover {
-    color: var(--text-primary, #f2f2f2);
-    border-color: var(--color-accent, #4f8cff);
+.gallery-viewer-rate-value.is-love {
+    color: var(--color-success, #2ecc71);
 }
 
-.gallery-card-actions .gallery-rate-up.is-active {
+.gallery-viewer-rate-value.is-like {
+    color: rgba(46, 204, 113, 0.9);
+}
+
+.gallery-viewer-rate-value.is-dislike {
+    color: rgba(231, 76, 60, 0.9);
+}
+
+.gallery-viewer-rate-value.is-hate {
+    color: var(--color-error, #e74c3c);
+}
+
+.gallery-viewer-rate-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.gallery-viewer-rate-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 34px;
+    padding: 0 var(--space-2, 8px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: var(--radius-md, 8px);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.85);
+    font-family: inherit;
+    font-size: var(--text-sm, 13px);
+    font-weight: var(--weight-semibold, 600);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background var(--transition-fast, 150ms) ease,
+        border-color var(--transition-fast, 150ms) ease,
+        color var(--transition-fast, 150ms) ease,
+        transform var(--transition-fast, 150ms) ease;
+}
+
+.gallery-viewer-rate-btn:hover {
+    transform: translateY(-1px);
+    color: #fff;
+}
+
+.gallery-viewer-rate-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus, 0 0 0 2px var(--color-accent, #4f8cff));
+}
+
+.gallery-viewer-rate-btn.gallery-rate-like.is-active {
+    background: rgba(46, 204, 113, 0.22);
+    border-color: var(--color-success, #2ecc71);
+    color: var(--color-success, #2ecc71);
+}
+
+.gallery-viewer-rate-btn.gallery-rate-love.is-active {
     background: var(--color-success, #2ecc71);
     border-color: var(--color-success, #2ecc71);
-    color: #ffffff;
+    color: #06240f;
 }
 
-.gallery-card-actions .gallery-rate-down.is-active {
+.gallery-viewer-rate-btn.gallery-rate-dislike.is-active {
+    background: rgba(231, 76, 60, 0.22);
+    border-color: var(--color-error, #e74c3c);
+    color: var(--color-error, #e74c3c);
+}
+
+.gallery-viewer-rate-btn.gallery-rate-hate.is-active {
     background: var(--color-error, #e74c3c);
     border-color: var(--color-error, #e74c3c);
-    color: #ffffff;
+    color: #fff;
 }
+
+.gallery-viewer-rate-hint {
+    max-width: 34ch;
+    font-size: 11px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+@media (max-width: 720px) {
+    .gallery-viewer-rate {
+        flex-direction: column;
+        gap: var(--space-2, 8px);
+    }
+
+    .gallery-viewer-rate-hint {
+        display: none;
+    }
+}
+
 
 .gallery-card-body {
     display: flex;
@@ -1092,37 +1344,123 @@
     opacity: 0.75;
 }
 
-.gallery-col-net.is-positive {
+.gallery-col-score.is-positive {
     color: var(--color-success, #2ecc71);
     font-weight: var(--weight-semibold, 600);
 }
 
-.gallery-col-net.is-negative {
+.gallery-col-score.is-negative {
     color: var(--color-error, #e74c3c);
     font-weight: var(--weight-semibold, 600);
 }
 
-.gallery-col-ratio {
+/* Exact-level metrics: a tiny tag carries the level, the count follows. */
+.gallery-level-metric {
+    gap: 3px;
+    color: var(--text-primary, #f2f2f2);
+    font-weight: var(--weight-semibold, 600);
+}
+
+.gallery-level-tag {
+    font-size: 10px;
+    font-weight: var(--weight-bold, 700);
+    letter-spacing: 0.02em;
+    opacity: 0.85;
+}
+
+.gallery-level-metric.is-love .gallery-level-tag {
+    color: var(--color-success, #2ecc71);
+}
+
+.gallery-level-metric.is-like .gallery-level-tag {
+    color: rgba(46, 204, 113, 0.8);
+}
+
+.gallery-level-metric.is-dislike .gallery-level-tag {
+    color: rgba(231, 76, 60, 0.8);
+}
+
+.gallery-level-metric.is-hate .gallery-level-tag {
+    color: var(--color-error, #e74c3c);
+}
+
+.gallery-level-metric:hover .gallery-level-tag {
+    color: inherit;
+}
+
+/* Weighted score in the summary row follows the same sign colours. */
+.gallery-stats-card-value.is-positive {
+    color: var(--color-success, #2ecc71);
+}
+
+.gallery-stats-card-value.is-negative {
+    color: var(--color-error, #e74c3c);
+}
+
+/* The four level cards repeat the facet colours, so the summary row and the
+   sidebar read as the same scale. */
+.gallery-stats-card-value.is-level-love {
+    color: var(--color-success, #2ecc71);
+}
+
+.gallery-stats-card-value.is-level-like {
+    color: rgba(46, 204, 113, 0.85);
+}
+
+.gallery-stats-card-value.is-level-dislike {
+    color: rgba(231, 76, 60, 0.85);
+}
+
+.gallery-stats-card-value.is-level-hate {
+    color: var(--color-error, #e74c3c);
+}
+
+.gallery-col-levels {
     display: flex;
     align-items: center;
     gap: var(--space-2, 8px);
 }
 
-.gallery-ratio-track {
-    position: relative;
+/* Four-segment distribution of the exact levels: love/like left, dislike/hate
+   right, so a glance says which side dominates and how strongly. */
+.gallery-level-bar {
+    display: flex;
     flex: 1;
+    gap: 1px;
     height: 6px;
     overflow: hidden;
     border-radius: var(--radius-full, 9999px);
     background: var(--bg-hover, rgba(127, 127, 127, 0.18));
 }
 
-.gallery-ratio-fill {
-    position: absolute;
-    inset: 0 auto 0 0;
+.gallery-level-bar.is-empty {
+    background: repeating-linear-gradient(
+        90deg,
+        var(--bg-hover, rgba(127, 127, 127, 0.18)) 0 6px,
+        transparent 6px 12px
+    );
+}
+
+.gallery-level-seg {
     display: block;
-    border-radius: inherit;
-    background: linear-gradient(90deg, var(--color-success, #2ecc71), var(--color-accent, #4f8cff));
+    min-width: 2px;
+    border-radius: var(--radius-full, 9999px);
+}
+
+.gallery-level-seg.is-love {
+    background: var(--color-success, #2ecc71);
+}
+
+.gallery-level-seg.is-like {
+    background: rgba(46, 204, 113, 0.5);
+}
+
+.gallery-level-seg.is-dislike {
+    background: rgba(231, 76, 60, 0.5);
+}
+
+.gallery-level-seg.is-hate {
+    background: var(--color-error, #e74c3c);
 }
 
 .gallery-ratio-value {
@@ -1173,11 +1511,7 @@
         --gallery-card-min: 150px;
     }
 
-    .gallery-col-name {
-        max-width: 180px;
-    }
-
-    .gallery-col-ratio {
+    .gallery-col-levels {
         min-width: 110px;
     }
 }
@@ -1205,8 +1539,7 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .gallery-col-unrated,
-    .gallery-col-total {
+    .gallery-col-unrated {
         display: none;
     }
 }
@@ -1215,7 +1548,6 @@
 @media (prefers-reduced-motion: reduce) {
     .gallery-card,
     .gallery-card-image,
-    .gallery-card-overlay,
     .gallery-btn,
     .gallery-chip,
     .gallery-stats-row,

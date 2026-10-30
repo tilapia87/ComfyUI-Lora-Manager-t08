@@ -1,5 +1,6 @@
 // Gallery page: browses the ComfyUI output folder, lets the user rate every
-// image up/down, and aggregates those ratings per artist and per LoRA.
+// image on a four-level scale (+3 / +1 / -1 / -3), and aggregates those
+// ratings per artist and per LoRA.
 //
 // Artist names come from the Anima model's `@name` prompt syntax; the backend
 // parses them out of each image's embedded metadata together with the LoRAs it
@@ -15,6 +16,7 @@ import {
     fetchGalleryImages,
     fetchGalleryImagesForLora,
     setGalleryImageRating,
+    fetchGallerySummary,
     fetchGalleryStats,
     fetchArtistPreview,
     startGalleryIndex,
@@ -31,6 +33,9 @@ const STATS_PAGE_SIZE = 100;
 const SCAN_POLL_INTERVAL_MS = 800;
 const PROGRESS_HIDE_DELAY_MS = 8000;
 const SEARCH_DEBOUNCE_MS = 300;
+// Rating one card changes four facet counts and the distribution bar; a run of
+// keyboard votes must not fire one request per image.
+const SUMMARY_REFRESH_DEBOUNCE_MS = 400;
 
 // Thumbnail density is a viewing preference, not a gallery setting, so it is
 // remembered per browser instead of going through the settings API.
@@ -57,6 +62,66 @@ function formatBytes(bytes) {
 
 const ORDER_STORAGE_KEY = 'gallery_order';
 const ORDER_LEVELS = ['desc', 'asc'];
+
+// The four rating levels the backend accepts, strongest first. The magnitude is
+// the weight the preference statistics use: a +3 vote counts three +1 votes.
+const RATING_LEVELS = [3, 1, -1, -3];
+const RATING_LEVEL_CLASS = { 3: 'love', 1: 'like', '-1': 'dislike', '-3': 'hate' };
+// Tooltip/aria label per level; each one also names its keyboard shortcut.
+const RATING_HINT_KEYS = { 3: 'loveHint', 1: 'likeHint', '-1': 'dislikeHint', '-3': 'hateHint' };
+
+/**
+ * Signed display form of a rating value (+3, +1, -1, -3). Uses a real minus
+ * sign so the numbers line up in the card footer.
+ * @param {number} value - One of RATING_LEVELS.
+ * @returns {string}
+ */
+function formatRatingValue(value) {
+    const numeric = Number(value) || 0;
+    return numeric > 0 ? `+${numeric}` : `−${Math.abs(numeric)}`;
+}
+
+/**
+ * CSS modifier for a rating level, used by the buttons and the media badge.
+ * @param {number} value - Rating value.
+ * @returns {string} love|like|dislike|hate, or '' for unrated.
+ */
+function ratingLevelClass(value) {
+    const key = String(Number(value));
+    return RATING_LEVEL_CLASS[key] || '';
+}
+
+// Facet filters the sidebar offers, in display order. `all` is the catch-all and
+// `unrated` the not-yet-voted bucket; the four exact levels sit between them.
+const RATING_FILTERS = ['all', 'loved', 'like', 'dislike', 'hate', 'unrated'];
+// Facet filter -> rating value it keeps (0 = unrated).
+const RATING_FILTER_VALUES = { loved: 3, like: 1, dislike: -1, hate: -3, unrated: 0 };
+
+/**
+ * Whether a rating value passes the active facet filter.
+ *
+ * The backend filters the page, but a vote changes the value in place: a card
+ * that no longer matches has to leave the grid without a full reload.
+ * @param {number} rating - Current rating of the image.
+ * @param {string} filter - One of RATING_FILTERS.
+ * @returns {boolean}
+ */
+function ratingMatchesFilter(rating, filter) {
+    if (!filter || filter === 'all') return true;
+    const value = Number(rating) || 0;
+    if (filter === 'unrated') return value === 0;
+    return value === RATING_FILTER_VALUES[filter];
+}
+
+/**
+ * Signed number for a weighted score, with a leading + for positive values.
+ * @param {number} value - Weighted score.
+ * @returns {string}
+ */
+function formatScore(value) {
+    const numeric = Number(value) || 0;
+    return numeric > 0 ? `+${numeric.toLocaleString()}` : numeric.toLocaleString();
+}
 
 function readGalleryOrder() {
     try {
@@ -174,7 +239,7 @@ export class GalleryPage {
         this.lora = '';
 
         this.statsBy = 'artist';
-        this.statsSort = 'net';
+        this.statsSort = 'score';
         this.statsLoaded = false;
         this.statsPage = 1;
         this.statsTotalPages = 0;
@@ -198,6 +263,14 @@ export class GalleryPage {
         // other end without changing the chosen sort key.
         this.order = readGalleryOrder();
         this._sentinelObserver = null;
+
+        // Whole-gallery rating distribution, drawn by the sidebar facets. Null
+        // until the first fetch so the facets can tell "unknown" from "zero".
+        this.summary = null;
+        this.summaryTimer = null;
+        // The viewer's footer is re-rendered when a vote lands while it is open.
+        this._viewerFooter = null;
+        this._viewerItems = null;
     }
 
     /**
@@ -219,6 +292,7 @@ export class GalleryPage {
 
         await this._loadConfig();
         await this.loadImages();
+        await this.loadSummary();
         await this._resumeRunningScan();
     }
 
@@ -245,10 +319,13 @@ export class GalleryPage {
             sortSelect: byId('gallerySortSelect'),
             densitySwitch: byId('galleryDensitySwitch'),
             orderSwitch: byId('galleryOrderSwitch'),
-            ratingSelect: byId('galleryRatingSelect'),
+            ratingFacets: byId('galleryRatingFacets'),
+            ratingScore: byId('galleryRatingScore'),
+            ratingDistribution: byId('galleryRatingDistribution'),
             metadataSelect: byId('galleryMetadataSelect'),
             searchInput: byId('gallerySearchInput'),
             totalCount: byId('galleryTotalCount'),
+            ratedProgress: byId('galleryRatedProgress'),
             filterBanner: byId('galleryFilterBanner'),
             filterBannerText: byId('galleryFilterBannerText'),
             filterClearBtn: byId('galleryFilterClearBtn'),
@@ -326,10 +403,9 @@ export class GalleryPage {
             this.loadImages();
         });
 
-        el.ratingSelect?.addEventListener('change', () => {
-            this.ratingFilter = el.ratingSelect.value;
-            this.page = 1;
-            this.loadImages();
+        el.ratingFacets?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-rating-filter]');
+            if (button) this.setRatingFilter(button.dataset.ratingFilter);
         });
 
         el.metadataSelect?.addEventListener('change', () => {
@@ -659,31 +735,41 @@ export class GalleryPage {
                     <div class="gallery-card-name" title="${escapeHtml(item.image_path)}">${escapeHtml(fileName)}</div>
                     <div class="gallery-card-meta">${escapeHtml(metaParts.join(' · '))}</div>
                     ${this._renderChips(item)}
-                    <div class="gallery-card-actions">
-                        <button type="button" class="gallery-rate-btn gallery-rate-up${item.rating === 1 ? ' is-active' : ''}"
-                            data-rating="1" aria-pressed="${item.rating === 1}"
-                            title="${escapeHtml(translate('gallery.card.likeHint'))}">
-                            <i class="fas fa-thumbs-up"></i>
-                        </button>
-                        <button type="button" class="gallery-rate-btn gallery-rate-down${item.rating === -1 ? ' is-active' : ''}"
-                            data-rating="-1" aria-pressed="${item.rating === -1}"
-                            title="${escapeHtml(translate('gallery.card.dislikeHint'))}">
-                            <i class="fas fa-thumbs-down"></i>
-                        </button>
-                    </div>
+                    <div class="gallery-card-actions">${this._renderRatingButtons(item.rating)}</div>
                 </div>
             </article>
         `;
     }
 
+    /**
+     * The four rating buttons of one card.
+     *
+     * Each button shows its own value instead of an icon pair: with four levels
+     * a thumbs-up cannot say whether the vote is +1 or +3, and clicking the
+     * active button again clears the rating.
+     * @param {number} rating - Current rating value (0 when unrated).
+     * @returns {string} Button markup.
+     */
+    _renderRatingButtons(rating) {
+        const current = Number(rating) || 0;
+        return RATING_LEVELS.map((value) => {
+            const level = ratingLevelClass(value);
+            const active = current === value;
+            const hint = translate(`gallery.card.${RATING_HINT_KEYS[value]}`);
+            return `
+                <button type="button" class="gallery-rate-btn gallery-rate-${level}${active ? ' is-active' : ''}"
+                    data-rating="${value}" aria-pressed="${active}"
+                    aria-label="${escapeHtml(hint)}" title="${escapeHtml(hint)}">
+                    ${formatRatingValue(value)}
+                </button>`;
+        }).join('');
+    }
+
     _renderRatingBadge(rating) {
-        if (rating === 1) {
-            return '<span class="gallery-card-badge is-like"><i class="fas fa-thumbs-up"></i></span>';
-        }
-        if (rating === -1) {
-            return '<span class="gallery-card-badge is-dislike"><i class="fas fa-thumbs-down"></i></span>';
-        }
-        return '';
+        const value = Number(rating) || 0;
+        if (!value) return '';
+        const level = ratingLevelClass(value);
+        return `<span class="gallery-card-badge is-${level}">${formatRatingValue(value)}</span>`;
     }
 
     _renderChips(item) {
@@ -820,12 +906,21 @@ export class GalleryPage {
             return;
         }
 
+        // Two shortcuts per side: the plain key is the mild vote, Shift (or the
+        // letter next to it on the home row) is the strong one.
+        const strong = event.shiftKey;
         if (key === 'ArrowUp' || key === 'u' || key === 'U') {
             event.preventDefault();
-            this.toggleRating(item, 1);
+            this.toggleRating(item, strong ? 3 : 1);
         } else if (key === 'ArrowDown' || key === 'd' || key === 'D') {
             event.preventDefault();
-            this.toggleRating(item, -1);
+            this.toggleRating(item, strong ? -3 : -1);
+        } else if (key === 'i' || key === 'I') {
+            event.preventDefault();
+            this.toggleRating(item, 3);
+        } else if (key === 'k' || key === 'K') {
+            event.preventDefault();
+            this.toggleRating(item, -3);
         } else if (key === 'Enter' && event.target === card) {
             event.preventDefault();
             this.openViewerAt(index);
@@ -835,7 +930,7 @@ export class GalleryPage {
     /**
      * Apply (or clear) a rating for one image, optimistically.
      * @param {Object} item - Image record from the current page.
-     * @param {number} value - 1 for like, -1 for dislike.
+     * @param {number} value - One of +3, +1, -1, -3.
      * @returns {Promise<void>}
      */
     async toggleRating(item, value) {
@@ -845,16 +940,47 @@ export class GalleryPage {
 
         item.rating = next;
         this._updateCardRating(item);
+        this._refreshViewerFooter();
 
         try {
             await setGalleryImageRating(item.image_path, next);
-            // Statistics are now stale for this artist/LoRA.
+            // Statistics and the sidebar distribution are now stale.
             this.statsLoaded = false;
+            this._scheduleSummaryRefresh();
+            this._dropCardWhenFilteredOut(item);
         } catch (error) {
             // fetchGalleryImages/setGalleryImageRating already surfaced a toast.
             item.rating = previous;
             this._updateCardRating(item);
+            this._refreshViewerFooter();
         }
+    }
+
+    /**
+     * Remove a voted card that no longer passes the active facet.
+     *
+     * The grid is filtered on the server, so without this an "unrated" page
+     * would keep showing an image the user just rated. Reloading instead would
+     * throw away the scroll position and the focus.
+     * @param {Object} item - The image that was just voted on.
+     */
+    _dropCardWhenFilteredOut(item) {
+        if (ratingMatchesFilter(item.rating, this.ratingFilter)) return;
+        const card = this._findCard(item.image_path);
+        if (!card) return;
+
+        card.remove();
+        this.items = this.items.filter((entry) => entry !== item);
+        this.totalItems = Math.max(0, this.totalItems - 1);
+        this._updateTotalCount();
+        // `data-index` points into `this.items`; renumber so later clicks and
+        // keyboard navigation still address the right record.
+        this.el.grid
+            ?.querySelectorAll('.gallery-card')
+            .forEach((node, index) => {
+                node.dataset.index = String(index);
+            });
+        if (!this.items.length) this.renderImages();
     }
 
     _updateCardRating(item) {
@@ -883,14 +1009,110 @@ export class GalleryPage {
 
     /**
      * Open the shared media viewer with the whole page for prev/next navigation.
+     *
+     * The viewer reserves a footer for pages that need their own controls, which
+     * is where the four rating buttons live: judging a picture means looking at
+     * it full size, so rating must not require closing the viewer first.
      * @param {number} index - Index of the clicked image.
      */
     openViewerAt(index) {
         if (!this.items.length) return;
-        const items = this.items.map((item) => ({ url: item.image_url, type: 'image' }));
+        const items = this.items.map((item) => ({
+            url: item.image_url,
+            type: 'image',
+            // The record itself travels with the viewer item so the footer and
+            // the keyboard hook can vote on the exact row that is on screen.
+            record: item,
+        }));
         const safeIndex = index >= 0 && index < items.length ? index : 0;
+        this._viewerItems = items;
         this._preloadViewerNeighbours(safeIndex);
-        openMediaViewer(items, safeIndex, { title: this.items[safeIndex]?.file_name || '' });
+        openMediaViewer(items, safeIndex, {
+            title: this.items[safeIndex]?.file_name || '',
+            footer: (container, item) => this._renderViewerRating(container, item),
+            onKey: (event, viewerIndex) => this._onViewerKeydown(event, viewerIndex),
+        });
+    }
+
+    /**
+     * Fill the viewer's footer with the rating strip.
+     * @param {HTMLElement} container - Footer slot owned by the viewer.
+     * @param {Object} item - Viewer item being shown.
+     */
+    _renderViewerRating(container, item) {
+        const record = item?.record;
+        if (!record) return;
+
+        this._viewerFooter = { container, record };
+        const current = Number(record.rating) || 0;
+        const level = ratingLevelClass(current);
+        const buttons = RATING_LEVELS.map((value) => {
+            const buttonLevel = ratingLevelClass(value);
+            const active = current === value;
+            const hint = translate(`gallery.card.${RATING_HINT_KEYS[value]}`);
+            return `<button type="button" class="gallery-viewer-rate-btn gallery-rate-${buttonLevel}${
+                active ? ' is-active' : ''
+            }" data-rating="${value}" aria-pressed="${active}" aria-label="${escapeHtml(
+                hint
+            )}" title="${escapeHtml(hint)}">${formatRatingValue(value)}</button>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="gallery-viewer-rate" role="group" aria-label="${escapeHtml(
+                translate('gallery.rating.label')
+            )}">
+                <span class="gallery-viewer-rate-value${level ? ` is-${level}` : ''}">${
+                    current ? formatRatingValue(current) : escapeHtml(translate('gallery.rating.unrated'))
+                }</span>
+                <div class="gallery-viewer-rate-actions">${buttons}</div>
+                <span class="gallery-viewer-rate-hint">${escapeHtml(translate('gallery.viewer.hint'))}</span>
+            </div>`;
+
+        if (container.dataset.bound !== 'true') {
+            container.dataset.bound = 'true';
+            container.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-rating]');
+                const record = this._viewerFooter?.record;
+                if (!button || !record) return;
+                event.stopPropagation();
+                void this.toggleRating(record, Number(button.dataset.rating));
+            });
+        }
+    }
+
+    /**
+     * Re-render the open viewer footer after a vote landed.
+     */
+    _refreshViewerFooter() {
+        if (!this._viewerFooter || !isMediaViewerOpen()) return;
+        const { container, record } = this._viewerFooter;
+        this._renderViewerRating(container, { record });
+    }
+
+    /**
+     * Rating shortcuts while the viewer is open.
+     *
+     * The viewer calls this before its own shortcuts; Left/Right still page
+     * through the images. Returns true when the key was consumed.
+     * @param {KeyboardEvent} event - Key event.
+     * @param {number} viewerIndex - Index of the viewer item on screen.
+     * @returns {boolean}
+     */
+    _onViewerKeydown(event, viewerIndex) {
+        const record = this._viewerItems?.[viewerIndex]?.record;
+        if (!record) return false;
+
+        const key = event.key;
+        const strong = event.shiftKey;
+        let value = null;
+        if (key === 'ArrowUp' || key === 'u' || key === 'U') value = strong ? 3 : 1;
+        else if (key === 'ArrowDown' || key === 'd' || key === 'D') value = strong ? -3 : -1;
+        else if (key === 'i' || key === 'I') value = 3;
+        else if (key === 'k' || key === 'K') value = -3;
+
+        if (value === null) return false;
+        void this.toggleRating(record, value);
+        return true;
     }
 
     /**
@@ -941,6 +1163,150 @@ export class GalleryPage {
         this.lora = '';
         this.page = 1;
         this.loadImages();
+    }
+
+    /**
+     * Switch the rating facet.
+     *
+     * Clicking the facet that is already active clears the filter again, the
+     * same toggle behaviour as the card's rating buttons.
+     * @param {string} filter - all|loved|like|dislike|hate|unrated.
+     */
+    setRatingFilter(filter) {
+        if (!RATING_FILTERS.includes(filter)) return;
+        const next = filter === this.ratingFilter && filter !== 'all' ? 'all' : filter;
+        if (next === this.ratingFilter) return;
+        this.ratingFilter = next;
+        this.page = 1;
+        this._syncRatingFacets();
+        this.loadImages();
+    }
+
+    _syncRatingFacets() {
+        const group = this.el.ratingFacets;
+        if (!group) return;
+        for (const button of group.querySelectorAll('[data-rating-filter]')) {
+            const active = button.dataset.ratingFilter === this.ratingFilter;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', String(active));
+        }
+    }
+
+    // ── Rating distribution ───────────────────────────────────────────────
+
+    /**
+     * Fetch the whole-gallery rating distribution and paint the facets.
+     *
+     * A failure is not surfaced: the grid still works, the counts simply stay
+     * at "–" instead of claiming a number they do not know.
+     * @returns {Promise<void>}
+     */
+    async loadSummary() {
+        try {
+            this.summary = await fetchGallerySummary();
+        } catch (error) {
+            this.summary = null;
+        }
+        this._renderRatingFacets();
+    }
+
+    /**
+     * Re-fetch the summary after a vote, coalescing a run of keyboard votes into
+     * one request.
+     */
+    _scheduleSummaryRefresh() {
+        clearTimeout(this.summaryTimer);
+        this.summaryTimer = setTimeout(() => {
+            void this.loadSummary();
+        }, SUMMARY_REFRESH_DEBOUNCE_MS);
+    }
+
+    /**
+     * Paint the facet counts, the headline weighted score and the bar.
+     */
+    _renderRatingFacets() {
+        const summary = this.summary;
+        const counts = {
+            all: summary ? summary.images : null,
+            love: summary ? summary.levels.love : null,
+            like: summary ? summary.levels.like : null,
+            dislike: summary ? summary.levels.dislike : null,
+            hate: summary ? summary.levels.hate : null,
+            unrated: summary ? summary.unrated : null,
+        };
+
+        const group = this.el.ratingFacets;
+        if (group) {
+            for (const chip of group.querySelectorAll('[data-facet-count]')) {
+                const value = counts[chip.dataset.facetCount];
+                chip.textContent =
+                    value === null || value === undefined ? '–' : value.toLocaleString();
+            }
+        }
+
+        if (this.el.ratingScore) {
+            const score = summary ? Number(summary.score) || 0 : null;
+            this.el.ratingScore.textContent = score === null ? '' : formatScore(score);
+            this.el.ratingScore.classList.toggle('is-positive', Math.sign(score) > 0);
+            this.el.ratingScore.classList.toggle('is-negative', Math.sign(score) < 0);
+        }
+
+        // How much of the library is still unvoted: the single number that says
+        // whether the ranking can be trusted yet.
+        if (this.el.ratedProgress) {
+            this.el.ratedProgress.textContent = summary
+                ? translate('gallery.rating.progress', {
+                      rated: summary.rated.toLocaleString(),
+                      images: summary.images.toLocaleString(),
+                  })
+                : '';
+        }
+
+        this._renderRatingDistribution(summary);
+        this._syncRatingFacets();
+    }
+
+    /**
+     * Whole-gallery distribution bar: one segment per exact level, with the
+     * unrated remainder left as the bare track so the rated share stands out.
+     * @param {Object|null} summary - Gallery summary payload.
+     */
+    _renderRatingDistribution(summary) {
+        const bar = this.el.ratingDistribution;
+        if (!bar) return;
+        if (!summary || !summary.images) {
+            bar.innerHTML = '';
+            bar.removeAttribute('title');
+            bar.classList.add('is-empty');
+            return;
+        }
+
+        const levels = summary.levels;
+        const parts = [
+            ['love', levels.love],
+            ['like', levels.like],
+            ['dislike', levels.dislike],
+            ['hate', levels.hate],
+            ['unrated', summary.unrated],
+        ];
+        bar.classList.toggle(
+            'is-empty',
+            levels.love + levels.like + levels.dislike + levels.hate === 0
+        );
+        bar.innerHTML = parts
+            .filter(([, count]) => count > 0)
+            .map(
+                ([level, count]) =>
+                    `<span class="gallery-level-seg is-${level}" style="flex:${count} 1 0"></span>`
+            )
+            .join('');
+        bar.title = translate('gallery.rating.distribution', {
+            love: levels.love,
+            like: levels.like,
+            dislike: levels.dislike,
+            hate: levels.hate,
+            unrated: summary.unrated,
+        });
     }
 
     _updateFilterBanner() {
@@ -1088,16 +1454,37 @@ export class GalleryPage {
         const totals = data?.totals || {};
         const items = data?.items || [];
 
-        this.el.statsSummary.innerHTML = [
-            { key: 'images', value: totals.images || 0 },
-            { key: 'rated', value: totals.rated || 0 },
-            { key: 'liked', value: totals.liked || 0 },
-            { key: 'disliked', value: totals.disliked || 0 },
-        ]
+        // The headline is the weighted score, not the raw vote count: that is
+        // where the strong levels actually change the ranking. The four exact
+        // levels stay so the scale is never reduced to a single number.
+        const totalsLevels = {
+            love: Number(totals.levels?.love ?? totals.loved) || 0,
+            like: Number(totals.levels?.like) || 0,
+            dislike: Number(totals.levels?.dislike) || 0,
+            hate: Number(totals.levels?.hate ?? totals.hated) || 0,
+        };
+        // An older payload only carries the two side counts; split the mild
+        // levels out of them so the row still adds up.
+        if (!totals.levels) {
+            totalsLevels.like = Math.max(0, (Number(totals.liked) || 0) - totalsLevels.love);
+            totalsLevels.dislike = Math.max(0, (Number(totals.disliked) || 0) - totalsLevels.hate);
+        }
+
+        const summaryEntries = [
+            { key: 'images', value: Number(totals.images || 0).toLocaleString() },
+            { key: 'rated', value: Number(totals.rated || 0).toLocaleString() },
+            { key: 'love', value: totalsLevels.love.toLocaleString(), tone: ' is-level-love' },
+            { key: 'like', value: totalsLevels.like.toLocaleString(), tone: ' is-level-like' },
+            { key: 'dislike', value: totalsLevels.dislike.toLocaleString(), tone: ' is-level-dislike' },
+            { key: 'hate', value: totalsLevels.hate.toLocaleString(), tone: ' is-level-hate' },
+            { key: 'score', value: formatScore(totals.score), tone: this._scoreTone(totals.score) },
+        ];
+
+        this.el.statsSummary.innerHTML = summaryEntries
             .map(
                 (entry) => `
                 <div class="gallery-stats-card">
-                    <div class="gallery-stats-card-value">${Number(entry.value).toLocaleString()}</div>
+                    <div class="gallery-stats-card-value${entry.tone || ''}">${escapeHtml(entry.value)}</div>
                     <div class="gallery-stats-card-label">${escapeHtml(
                         translate(`gallery.stats.summary.${entry.key}`)
                     )}</div>
@@ -1121,8 +1508,8 @@ export class GalleryPage {
 
         this.el.statsBody.innerHTML = items
             .map((row, index) => {
-                const net = Number(row.net) || 0;
-                const netClass = net > 0 ? ' is-positive' : net < 0 ? ' is-negative' : '';
+                const score = Number(row.score) || 0;
+                const scoreClass = this._scoreTone(score);
                 const hasRatio = row.like_ratio !== null && row.like_ratio !== undefined;
                 const ratioPercent = hasRatio ? Math.round(Number(row.like_ratio) * 100) : null;
                 const ratio = hasRatio
@@ -1136,10 +1523,18 @@ export class GalleryPage {
                 // card can be judged without reading the metric row.
                 const sub = `${total} ${translate('gallery.stats.columns.total')}`;
                 const rank = rankOffset + index + 1;
-                const ratioBar = hasRatio
-                    ? `<span class="gallery-ratio-track"><span class="gallery-ratio-fill" style="width:${ratioPercent}%"></span></span>`
-                    : '';
+                const levelBar = this._levelBarMarkup(row.levels);
                 const tooltip = (key) => escapeHtml(translate(`gallery.stats.columns.${key}`));
+                const levelTitle = (key) => escapeHtml(translate(`gallery.rating.${key}`));
+                const levels = row.levels || {};
+                // With four levels the old thumbs-up/down pair no longer says
+                // enough, so each exact level is its own metric and its own
+                // sort control (clicking +3 ranks by the strong votes).
+                const levelMetric = (level, label, sortKey, titleKey) => `
+                    <span class="gallery-metric gallery-level-metric is-${level}" data-sort-metric="${sortKey}"
+                        title="${levelTitle(titleKey)}">
+                        <span class="gallery-level-tag">${label}</span>${Number(levels[level]) || 0}
+                    </span>`;
 
                 return `
                     <article class="gallery-rank-card${unknownClass}" data-key="${escapeHtml(row.key || label)}"${artistAttr}
@@ -1155,24 +1550,19 @@ export class GalleryPage {
                                 <div class="gallery-stat-sub">${escapeHtml(sub)}</div>
                             </div>
                             <div class="gallery-rank-metrics">
-                                <span class="gallery-metric gallery-col-liked" data-sort-metric="likes" title="${tooltip('likes')}">
-                                    <i class="fas fa-thumbs-up" aria-hidden="true"></i>${Number(row.likes) || 0}
-                                </span>
-                                <span class="gallery-metric gallery-col-disliked" data-sort-metric="dislikes" title="${tooltip('dislikes')}">
-                                    <i class="fas fa-thumbs-down" aria-hidden="true"></i>${Number(row.dislikes) || 0}
-                                </span>
-                                <span class="gallery-metric gallery-col-unrated" data-sort-metric="total" title="${tooltip('unrated')}">
+                                ${levelMetric('love', '+3', 'loved', 'loved')}
+                                ${levelMetric('like', '+1', 'liked', 'like')}
+                                ${levelMetric('dislike', '−1', 'disliked', 'dislike')}
+                                ${levelMetric('hate', '−3', 'hated', 'hated')}
+                                <span class="gallery-metric gallery-col-unrated" title="${tooltip('unrated')}">
                                     <i class="fas fa-minus" aria-hidden="true"></i>${Number(row.unrated) || 0}
                                 </span>
-                                <span class="gallery-metric gallery-col-total" data-sort-metric="total" title="${tooltip('total')}">
-                                    <i class="fas fa-layer-group" aria-hidden="true"></i>${total}
-                                </span>
-                                <span class="gallery-metric gallery-col-net${netClass}" title="${tooltip('net')}">
-                                    ${net > 0 ? `+${net}` : net}
+                                <span class="gallery-metric gallery-col-score${scoreClass}" data-sort-metric="score" title="${tooltip('score')}">
+                                    ${formatScore(score)}
                                 </span>
                             </div>
-                            <div class="gallery-col-ratio">
-                                ${ratioBar}
+                            <div class="gallery-col-levels">
+                                ${levelBar}
                                 <span class="gallery-ratio-value">${escapeHtml(ratio)}</span>
                             </div>
                         </div>
@@ -1184,6 +1574,51 @@ export class GalleryPage {
         this._wireThumbFallbacks();
         this._applyArtistPreviews(items);
         this._syncStatsSortPills();
+    }
+
+    /**
+     * CSS modifier for a signed value (weighted score or net).
+     * @param {number} value - Signed number.
+     * @returns {string} ' is-positive' | ' is-negative' | ''
+     */
+    _scoreTone(value) {
+        const numeric = Number(value) || 0;
+        if (numeric > 0) return ' is-positive';
+        if (numeric < 0) return ' is-negative';
+        return '';
+    }
+
+    /**
+     * Distribution bar of the four rating levels for one ranking row.
+     *
+     * The segments are proportional to the exact level counts, so a rank whose
+     * top-rated images dominate reads as a mostly-green bar without having to
+     * compare four separate numbers. The tooltip carries the exact counts.
+     * @param {{love?: number, like?: number, dislike?: number, hate?: number}} [levels]
+     * @returns {string} Bar markup.
+     */
+    _levelBarMarkup(levels) {
+        const counts = ['love', 'like', 'dislike', 'hate'].map(
+            (key) => Number(levels?.[key]) || 0
+        );
+        const voteTotal = counts.reduce((sum, count) => sum + count, 0);
+        const title = ['+3', '+1', '−1', '−3']
+            .map((label, index) => `${label} ${counts[index]}`)
+            .join(' · ');
+
+        if (!voteTotal) {
+            return `<span class="gallery-level-bar is-empty" title="${escapeHtml(title)}"></span>`;
+        }
+
+        const segments = ['love', 'like', 'dislike', 'hate']
+            .map((level, index) =>
+                counts[index]
+                    ? `<span class="gallery-level-seg is-${level}" style="flex:${counts[index]} 1 0"></span>`
+                    : ''
+            )
+            .join('');
+
+        return `<span class="gallery-level-bar" title="${escapeHtml(title)}">${segments}</span>`;
     }
 
     /**
@@ -1343,21 +1778,11 @@ export class GalleryPage {
     }
 
     /**
-     * The row's second, explicit affordance: open the LoRA on the LoRA page
-     * instead of filtering the grid by it.
-     *
-     * Only the LoRA grouping tracks models the library can open, and only a
-     * resolved LoRA has a page; an artist row gets nothing.
-     * @param {Object} row - Statistics row.
-     * @param {string} label - Displayed row name.
-     * @returns {string} Button markup, or '' when the row is not linkable.
-     */
-    /**
      * Sort the ranking by one metric.
-     * @param {string} sort - net|likes|dislikes|total|ratio.
+     * @param {string} sort - score|netted counts|exact levels|total|ratio.
      */
     setStatsSort(sort) {
-        const allowed = ['net', 'likes', 'dislikes', 'total', 'ratio'];
+        const allowed = ['score', 'loved', 'liked', 'disliked', 'hated', 'likes', 'dislikes', 'total', 'ratio'];
         if (!allowed.includes(sort) || sort === this.statsSort) return;
         this.statsSort = sort;
         this.statsPage = 1;
@@ -1454,6 +1879,16 @@ export class GalleryPage {
         }
     }
 
+    /**
+     * The row's second, explicit affordance: open the LoRA on the LoRA page
+     * instead of filtering the grid by it.
+     *
+     * Only the LoRA grouping tracks models the library can open, and only a
+     * resolved LoRA has a page; an artist row gets nothing.
+     * @param {Object} row - Statistics row.
+     * @param {string} label - Displayed row name.
+     * @returns {string} Button markup, or '' when the row is not linkable.
+     */
     _renderStatRowJump(row, label) {
         if (this.statsBy !== 'lora' || row.known === false) return '';
 
@@ -1629,6 +2064,7 @@ export class GalleryPage {
         await this._loadConfig();
         this.statsLoaded = false;
         await this.loadImages();
+        await this.loadSummary();
         if (this.view === 'stats') await this.loadStats();
     }
 
@@ -1759,6 +2195,7 @@ export class GalleryPage {
             showToast('toast.gallery.settingsSaved', {}, 'success');
             await this._loadConfig();
             await this.loadImages();
+            await this.loadSummary();
         } catch (error) {
             showToast('toast.gallery.settingsSaveFailed', { message: error.message }, 'error');
         }
@@ -1778,8 +2215,11 @@ export class GalleryPage {
         this._stopScanPolling();
         clearTimeout(this.searchTimer);
         clearTimeout(this.progressTimer);
+        clearTimeout(this.summaryTimer);
         this._sentinelObserver?.disconnect();
         this._sentinelObserver = null;
+        this._viewerFooter = null;
+        this._viewerItems = null;
     }
 }
 

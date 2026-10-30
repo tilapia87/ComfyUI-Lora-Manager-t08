@@ -112,14 +112,23 @@ function renderGallery(tabElement, result) {
     const summary = document.createElement('p');
     summary.className = 'recipes-header__description gallery-tab-summary';
     const counts = result?.summary || {};
+    // Exact four-level counts; an older payload only carries the two sides, so
+    // split the mild levels out of them instead of repeating a side count.
+    const levels = counts.levels || {
+        love: Number(counts.loved) || 0,
+        like: Math.max(0, (Number(counts.liked) || 0) - (Number(counts.loved) || 0)),
+        dislike: Math.max(0, (Number(counts.disliked) || 0) - (Number(counts.hated) || 0)),
+        hate: Number(counts.hated) || 0,
+    };
     summary.textContent = translate(
         'gallery.loraTab.summary',
         {
             total: Number(counts.total) || items.length,
-            liked: Number(counts.liked) || 0,
-            disliked: Number(counts.disliked) || 0,
+            loved: Number(levels.love) || 0,
+            like: Number(levels.like) || 0,
+            dislike: Number(levels.dislike) || 0,
+            hated: Number(levels.hate) || 0,
             unrated: Number(counts.unrated) || 0,
-            net: Number(counts.net) || 0,
         },
         ''
     );

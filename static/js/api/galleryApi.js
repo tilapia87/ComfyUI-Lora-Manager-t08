@@ -9,6 +9,7 @@ const GALLERY_ENDPOINTS = {
     images: '/api/lm/gallery/images',
     forLora: '/api/lm/gallery/for-lora',
     rating: '/api/lm/gallery/rating',
+    summary: '/api/lm/gallery/summary',
     stats: '/api/lm/gallery/stats',
     // Artist thumbnails are proxied through the backend (animadex.net lookup).
     artistPreview: '/api/lm/gallery/artist-preview',
@@ -75,7 +76,8 @@ async function requestJson(url, options = {}) {
  * @param {number} [params.page=1] - 1-based page number.
  * @param {number} [params.pageSize=40] - Items per page (max 200).
  * @param {string} [params.sort='newest'] - newest|oldest|rating_desc|rating_asc|name.
- * @param {string} [params.rating='all'] - all|liked|disliked|unrated.
+ * @param {string} [params.rating='all'] - all|loved|like|dislike|hate|unrated
+ *   (positive/negative, liked/disliked and hated remain accepted aliases).
  * @param {string} [params.metadata='all'] - all|with|without.
  * @param {string} [params.artist=''] - Exact artist name filter.
  * @param {string} [params.lora=''] - Exact LoRA name filter.
@@ -194,13 +196,24 @@ function emptyForLoraResult(page, pageSize, key) {
 }
 
 function emptyForLoraSummary() {
-    return { total: 0, liked: 0, disliked: 0, unrated: 0, net: 0 };
+    return {
+        total: 0,
+        liked: 0,
+        disliked: 0,
+        unrated: 0,
+        net: 0,
+        loved: 0,
+        hated: 0,
+        score: 0,
+        levels: { love: 0, like: 0, dislike: 0, hate: 0 },
+    };
 }
 
 /**
  * Persist a single image rating.
  * @param {string} imagePath - Absolute path of the image.
- * @param {number} rating - 1 (liked), -1 (disliked) or 0 (unrated).
+ * @param {number} rating - +3 (loved), +1 (liked), -1 (disliked), -3 (hated)
+ *   or 0 (unrated).
  * @returns {Promise<{image_path: string, rating: number}>}
  */
 export async function setGalleryImageRating(imagePath, rating) {
@@ -222,10 +235,42 @@ export async function setGalleryImageRating(imagePath, rating) {
 }
 
 /**
- * Fetch the aggregated like/dislike statistics.
+ * Fetch the whole-gallery rating distribution.
+ *
+ * The four-level scale needs its own numbers (each level, plus how many images
+ * are still unrated) to drive the sidebar facets; the statistics endpoint only
+ * carries per-artist/LoRA rows.
+ * @returns {Promise<{images: number, rated: number, unrated: number, liked: number, disliked: number, loved: number, hated: number, score: number, net: number, levels: {love: number, like: number, dislike: number, hate: number}, like_ratio: number|null}>}
+ */
+export async function fetchGallerySummary() {
+    const data = await requestJson(GALLERY_ENDPOINTS.summary);
+    const levels = data?.levels || {};
+    const images = Number(data?.images) || 0;
+    return {
+        images,
+        rated: Number(data?.rated) || 0,
+        unrated: Number(data?.unrated) || 0,
+        liked: Number(data?.liked) || 0,
+        disliked: Number(data?.disliked) || 0,
+        loved: Number(data?.loved) || 0,
+        hated: Number(data?.hated) || 0,
+        score: Number(data?.score) || 0,
+        net: Number(data?.net) || 0,
+        levels: {
+            love: Number(levels.love) || 0,
+            like: Number(levels.like) || 0,
+            dislike: Number(levels.dislike) || 0,
+            hate: Number(levels.hate) || 0,
+        },
+        like_ratio: typeof data?.like_ratio === 'number' ? data.like_ratio : null,
+    };
+}
+
+/**
+ * Fetch the aggregated four-level rating statistics.
  * @param {Object} [params] - Query parameters.
  * @param {string} [params.by='artist'] - artist|lora.
- * @param {string} [params.sort='net'] - net|likes|dislikes|total|ratio.
+ * @param {string} [params.sort='score'] - score|loved|liked|disliked|hated|net|likes|dislikes|total|ratio.
  * @param {number} [params.limit=200] - Maximum number of rows.
  * @param {number} [params.offset=0] - Number of ranked rows to skip (paging).
  * @param {number} [params.minTotal=1] - Minimum rated+unrated total per row.
@@ -233,7 +278,7 @@ export async function setGalleryImageRating(imagePath, rating) {
  * @returns {Promise<{by: string, totals: Object, total: number, offset: number, items: Array}>}
  */
 export async function fetchGalleryStats(params = {}) {
-    const { by = 'artist', sort = 'net', limit = 200, offset = 0, minTotal = 1, order = 'desc' } = params;
+    const { by = 'artist', sort = 'score', limit = 200, offset = 0, minTotal = 1, order = 'desc' } = params;
 
     const query = new URLSearchParams({
         by,
@@ -249,7 +294,9 @@ export async function fetchGalleryStats(params = {}) {
         const items = Array.isArray(data?.items) ? data.items : [];
         return {
             by: data?.by || by,
-            totals: data?.totals || { images: 0, rated: 0, liked: 0, disliked: 0 },
+            totals:
+                data?.totals ||
+                { images: 0, rated: 0, liked: 0, disliked: 0, loved: 0, hated: 0, score: 0 },
             total: Number.isFinite(Number(data?.total)) ? Number(data.total) : items.length,
             offset: Number.isFinite(Number(data?.offset)) ? Number(data.offset) : offset,
             items,

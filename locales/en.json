@@ -3137,10 +3137,14 @@
     },
     "rating": {
       "label": "Rating",
-      "all": "All images",
-      "liked": "Liked",
-      "disliked": "Disliked",
-      "unrated": "Unrated"
+      "all": "All",
+      "loved": "Loved (+3)",
+      "like": "Liked (+1)",
+      "dislike": "Disliked (-1)",
+      "hated": "Hated (-3)",
+      "unrated": "Unrated",
+      "distribution": "+3 {love} · +1 {like} · -1 {dislike} · -3 {hate} · unrated {unrated}",
+      "progress": "{rated} of {images} rated"
     },
     "metadata": {
       "label": "Metadata",
@@ -3161,14 +3165,19 @@
     },
     "card": {
       "unknownSize": "Unknown size",
+      "loveHint": "Love it (+3, Shift+ArrowUp or I)",
       "likeHint": "Like (ArrowUp or U)",
       "dislikeHint": "Dislike (ArrowDown or D)",
+      "hateHint": "Hate it (-3, Shift+ArrowDown or K)",
       "artistHint": "@{name} - from your artist list",
       "unknownArtistHint": "@{name} - not found in your artist list",
       "loraHint": "Show images that use {name}",
       "loraMissingHint": "{name} - this LoRA is not in your local library",
       "noMetadata": "No metadata",
       "noMetadataHint": "This image has no readable generation metadata, so its artists and LoRAs are unknown."
+    },
+    "viewer": {
+      "hint": "Click the active level again to clear · ↑/U +1 · Shift+↑/I +3 · ↓/D -1 · Shift+↓/K -3"
     },
     "progress": {
       "stage": {
@@ -3231,26 +3240,23 @@
       },
       "sort": {
         "label": "Sort",
-        "net": "Net score",
-        "likes": "Likes",
-        "dislikes": "Dislikes",
+        "score": "Weighted score",
         "total": "Total",
         "ratio": "Like ratio"
       },
       "summary": {
         "images": "Images",
         "rated": "Rated",
-        "liked": "Liked",
-        "disliked": "Disliked"
+        "love": "+3 Loved",
+        "like": "+1 Liked",
+        "dislike": "-1 Disliked",
+        "hate": "-3 Hated",
+        "score": "Score"
       },
       "columns": {
-        "rank": "#",
-        "name": "Name",
-        "likes": "Likes",
-        "dislikes": "Dislikes",
         "unrated": "Unrated",
         "total": "Total",
-        "net": "Net",
+        "score": "Weighted score",
         "ratio": "Ratio"
       },
       "noRatio": "n/a",
@@ -3259,7 +3265,7 @@
     },
     "loraTab": {
       "title": "Gallery",
-      "summary": "{total} images · {liked} liked · {disliked} disliked · {unrated} unrated · net {net}",
+      "summary": "{total} images · +3 {loved} · +1 {like} · -1 {dislike} · -3 {hated} · unrated {unrated}",
       "empty": "No gallery images use this LoRA yet.",
       "loadFailed": "Failed to load the gallery images. Please try again later."
     }

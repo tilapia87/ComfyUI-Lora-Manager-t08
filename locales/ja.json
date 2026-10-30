@@ -3137,10 +3137,14 @@
         },
         "rating": {
             "label": "評価",
-            "all": "すべての画像",
-            "liked": "いいね",
-            "disliked": "よくないね",
-            "unrated": "未評価"
+            "all": "[TODO: Translate] All",
+            "loved": "[TODO: Translate] Loved (+3)",
+            "like": "[TODO: Translate] Liked (+1)",
+            "dislike": "[TODO: Translate] Disliked (-1)",
+            "hated": "[TODO: Translate] Hated (-3)",
+            "unrated": "未評価",
+            "distribution": "[TODO: Translate] +3 {love} · +1 {like} · -1 {dislike} · -3 {hate} · unrated {unrated}",
+            "progress": "[TODO: Translate] {rated} of {images} rated"
         },
         "metadata": {
             "label": "メタデータ",
@@ -3161,14 +3165,19 @@
         },
         "card": {
             "unknownSize": "サイズ不明",
+            "loveHint": "[TODO: Translate] Love it (+3, Shift+ArrowUp or I)",
             "likeHint": "いいね（↑ または U）",
             "dislikeHint": "よくないね（↓ または D）",
+            "hateHint": "[TODO: Translate] Hate it (-3, Shift+ArrowDown or K)",
             "artistHint": "@{name} - 絵師リストから",
             "unknownArtistHint": "@{name} - 絵師リストに見つかりません",
             "loraHint": "{name} を使用した画像を表示",
             "loraMissingHint": "{name} - この LoRA はローカルライブラリにありません",
             "noMetadata": "メタデータなし",
             "noMetadataHint": "この画像には読み取り可能な生成メタデータがないため、使用された絵師と LoRA は不明です。"
+        },
+        "viewer": {
+            "hint": "[TODO: Translate] Click the active level again to clear · ↑/U +1 · Shift+↑/I +3 · ↓/D -1 · Shift+↓/K -3"
         },
         "progress": {
             "stage": {
@@ -3231,26 +3240,23 @@
             },
             "sort": {
                 "label": "並び順",
-                "net": "ネットスコア",
-                "likes": "いいね",
-                "dislikes": "よくないね",
+                "score": "[TODO: Translate] Weighted score",
                 "total": "合計",
                 "ratio": "いいね率"
             },
             "summary": {
                 "images": "画像",
                 "rated": "評価済み",
-                "liked": "いいね",
-                "disliked": "よくないね"
+                "love": "[TODO: Translate] +3 Loved",
+                "like": "[TODO: Translate] +1 Liked",
+                "dislike": "[TODO: Translate] -1 Disliked",
+                "hate": "[TODO: Translate] -3 Hated",
+                "score": "[TODO: Translate] Score"
             },
             "columns": {
-                "rank": "#",
-                "name": "名前",
-                "likes": "いいね",
-                "dislikes": "よくないね",
                 "unrated": "未評価",
                 "total": "合計",
-                "net": "ネットスコア",
+                "score": "[TODO: Translate] Weighted score",
                 "ratio": "比率"
             },
             "noRatio": "なし",
@@ -3259,7 +3265,7 @@
         },
         "loraTab": {
             "title": "ギャラリー",
-            "summary": "画像：{total} · いいね：{liked} · よくないね：{disliked} · 未評価：{unrated} · ネットスコア：{net}",
+            "summary": "[TODO: Translate] {total} images · +3 {loved} · +1 {like} · -1 {dislike} · -3 {hated} · unrated {unrated}",
             "empty": "この LoRA を使用したギャラリーの画像はまだありません。",
             "loadFailed": "ギャラリー画像の読み込みに失敗しました。しばらくしてからもう一度お試しください。"
         }

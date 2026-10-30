@@ -3137,10 +3137,14 @@
         },
         "rating": {
             "label": "Bewertung",
-            "all": "Alle Bilder",
-            "liked": "Gefällt mir",
-            "disliked": "Gefällt mir nicht",
-            "unrated": "Nicht bewertet"
+            "all": "[TODO: Translate] All",
+            "loved": "[TODO: Translate] Loved (+3)",
+            "like": "[TODO: Translate] Liked (+1)",
+            "dislike": "[TODO: Translate] Disliked (-1)",
+            "hated": "[TODO: Translate] Hated (-3)",
+            "unrated": "Nicht bewertet",
+            "distribution": "[TODO: Translate] +3 {love} · +1 {like} · -1 {dislike} · -3 {hate} · unrated {unrated}",
+            "progress": "[TODO: Translate] {rated} of {images} rated"
         },
         "metadata": {
             "label": "Metadaten",
@@ -3161,14 +3165,19 @@
         },
         "card": {
             "unknownSize": "Unbekannte Größe",
+            "loveHint": "[TODO: Translate] Love it (+3, Shift+ArrowUp or I)",
             "likeHint": "Gefällt mir (↑ oder U)",
             "dislikeHint": "Gefällt mir nicht (↓ oder D)",
+            "hateHint": "[TODO: Translate] Hate it (-3, Shift+ArrowDown or K)",
             "artistHint": "@{name} - aus Ihrer Künstlerliste",
             "unknownArtistHint": "@{name} - nicht in Ihrer Künstlerliste gefunden",
             "loraHint": "Bilder anzeigen, die {name} verwenden",
             "loraMissingHint": "{name} - dieses LoRA ist nicht in Ihrer lokalen Bibliothek",
             "noMetadata": "Keine Metadaten",
             "noMetadataHint": "Dieses Bild hat keine lesbaren Generierungsmetadaten, daher sind seine Künstler und LoRAs unbekannt."
+        },
+        "viewer": {
+            "hint": "[TODO: Translate] Click the active level again to clear · ↑/U +1 · Shift+↑/I +3 · ↓/D -1 · Shift+↓/K -3"
         },
         "progress": {
             "stage": {
@@ -3231,26 +3240,23 @@
             },
             "sort": {
                 "label": "Sortieren nach",
-                "net": "Netto-Bewertung",
-                "likes": "Gefällt mir",
-                "dislikes": "Gefällt mir nicht",
+                "score": "[TODO: Translate] Weighted score",
                 "total": "Gesamt",
                 "ratio": "Anteil Gefällt mir"
             },
             "summary": {
                 "images": "Bilder",
                 "rated": "Bewertet",
-                "liked": "Gefällt mir",
-                "disliked": "Gefällt mir nicht"
+                "love": "[TODO: Translate] +3 Loved",
+                "like": "[TODO: Translate] +1 Liked",
+                "dislike": "[TODO: Translate] -1 Disliked",
+                "hate": "[TODO: Translate] -3 Hated",
+                "score": "[TODO: Translate] Score"
             },
             "columns": {
-                "rank": "#",
-                "name": "Name",
-                "likes": "Gefällt mir",
-                "dislikes": "Gefällt mir nicht",
                 "unrated": "Nicht bewertet",
                 "total": "Gesamt",
-                "net": "Netto",
+                "score": "[TODO: Translate] Weighted score",
                 "ratio": "Anteil"
             },
             "noRatio": "k. A.",
@@ -3259,7 +3265,7 @@
         },
         "loraTab": {
             "title": "Galerie",
-            "summary": "Bilder: {total} · Gefällt mir: {liked} · Gefällt mir nicht: {disliked} · Nicht bewertet: {unrated} · Netto: {net}",
+            "summary": "[TODO: Translate] {total} images · +3 {loved} · +1 {like} · -1 {dislike} · -3 {hated} · unrated {unrated}",
             "empty": "Noch keine Galerie-Bilder verwenden dieses LoRA.",
             "loadFailed": "Galeriebilder konnten nicht geladen werden. Versuchen Sie es später erneut."
         }

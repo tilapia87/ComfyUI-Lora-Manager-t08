@@ -3137,10 +3137,14 @@
         },
         "rating": {
             "label": "הערכה",
-            "all": "כל התמונות",
-            "liked": "אהבתי",
-            "disliked": "לא אהבתי",
-            "unrated": "ללא הערכה"
+            "all": "[TODO: Translate] All",
+            "loved": "[TODO: Translate] Loved (+3)",
+            "like": "[TODO: Translate] Liked (+1)",
+            "dislike": "[TODO: Translate] Disliked (-1)",
+            "hated": "[TODO: Translate] Hated (-3)",
+            "unrated": "ללא הערכה",
+            "distribution": "[TODO: Translate] +3 {love} · +1 {like} · -1 {dislike} · -3 {hate} · unrated {unrated}",
+            "progress": "[TODO: Translate] {rated} of {images} rated"
         },
         "metadata": {
             "label": "מטא-נתונים",
@@ -3161,14 +3165,19 @@
         },
         "card": {
             "unknownSize": "גודל לא ידוע",
+            "loveHint": "[TODO: Translate] Love it (+3, Shift+ArrowUp or I)",
             "likeHint": "אהבתי (↑ או U)",
             "dislikeHint": "לא אהבתי (↓ או D)",
+            "hateHint": "[TODO: Translate] Hate it (-3, Shift+ArrowDown or K)",
             "artistHint": "@{name} - מרשימת האמנים שלך",
             "unknownArtistHint": "@{name} - לא נמצא ברשימת האמנים שלך",
             "loraHint": "הצג תמונות שמשתמשות ב-{name}",
             "loraMissingHint": "{name} - ה-LoRA הזה אינו בספרייה המקומית שלך",
             "noMetadata": "אין מטא-נתונים",
             "noMetadataHint": "לתמונה זו אין מטא-נתוני יצירה קריאים, ולכן האמנים וה-LoRA שלה אינם ידועים."
+        },
+        "viewer": {
+            "hint": "[TODO: Translate] Click the active level again to clear · ↑/U +1 · Shift+↑/I +3 · ↓/D -1 · Shift+↓/K -3"
         },
         "progress": {
             "stage": {
@@ -3231,26 +3240,23 @@
             },
             "sort": {
                 "label": "מיון לפי",
-                "net": "ניקוד נטו",
-                "likes": "לייקים",
-                "dislikes": "דיסלייקים",
+                "score": "[TODO: Translate] Weighted score",
                 "total": "סה\"כ",
                 "ratio": "יחס לייקים"
             },
             "summary": {
                 "images": "תמונות",
                 "rated": "הוערכו",
-                "liked": "אהבתי",
-                "disliked": "לא אהבתי"
+                "love": "[TODO: Translate] +3 Loved",
+                "like": "[TODO: Translate] +1 Liked",
+                "dislike": "[TODO: Translate] -1 Disliked",
+                "hate": "[TODO: Translate] -3 Hated",
+                "score": "[TODO: Translate] Score"
             },
             "columns": {
-                "rank": "#",
-                "name": "שם",
-                "likes": "לייקים",
-                "dislikes": "דיסלייקים",
                 "unrated": "ללא הערכה",
                 "total": "סה\"כ",
-                "net": "נטו",
+                "score": "[TODO: Translate] Weighted score",
                 "ratio": "יחס"
             },
             "noRatio": "לא זמין",
@@ -3259,7 +3265,7 @@
         },
         "loraTab": {
             "title": "גלריה",
-            "summary": "תמונות: {total} · לייקים: {liked} · דיסלייקים: {disliked} · ללא הערכה: {unrated} · נטו: {net}",
+            "summary": "[TODO: Translate] {total} images · +3 {loved} · +1 {like} · -1 {dislike} · -3 {hated} · unrated {unrated}",
             "empty": "עדיין אין תמונות בגלריה שמשתמשות ב-LoRA הזה.",
             "loadFailed": "טעינת תמונות הגלריה נכשלה. נסו שוב מאוחר יותר."
         }
