@@ -159,6 +159,7 @@ class GalleryHandlerSet:
                 offset=_parse_int(query.get("offset"), 0, minimum=0, maximum=10_000_000),
                 min_total=_parse_int(query.get("min_total"), 1, minimum=1, maximum=1000),
                 order="asc" if (query.get("order") or "").lower() == "asc" else "desc",
+                animadex_only=(query.get("animadex_only") or "").lower() in ("1", "true", "yes", "on"),
             )
             return web.json_response({"success": True, "data": data})
         except Exception as exc:

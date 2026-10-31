@@ -532,6 +532,36 @@ async def test_stats_endpoint_forwards_the_order(service, monkeypatch):
     assert captured["order"] == "asc"
 
 
+async def test_stats_endpoint_forwards_the_animadex_filter(service, monkeypatch):
+    captured = {}
+
+    async def _stats(**kwargs):
+        captured.update(kwargs)
+        return {
+            "by": "artist",
+            "totals": {},
+            "total": 0,
+            "offset": 0,
+            "limit": 200,
+            "items": [],
+            "animadex": {"ready": True, "loading": False, "count": 15879, "error": ""},
+        }
+
+    monkeypatch.setattr(service, "stats", _stats)
+    handler = GalleryHandlerSet()
+
+    body = _payload(await handler.get_stats(FakeRequest(query={"animadex_only": "true"})))
+    assert captured["animadex_only"] is True
+    assert body["data"]["animadex"]["count"] == 15879
+
+    await handler.get_stats(FakeRequest(query={}))
+    assert captured["animadex_only"] is False
+
+    # The frontend sends "1"; anything unrecognised stays off.
+    await handler.get_stats(FakeRequest(query={"animadex_only": "bogus"}))
+    assert captured["animadex_only"] is False
+
+
 def test_thumbnail_cache_routes_are_registered():
     paths = {(definition.method, definition.path) for definition in ROUTE_DEFINITIONS}
     assert ("GET", "/api/lm/gallery/thumbnail-cache") in paths

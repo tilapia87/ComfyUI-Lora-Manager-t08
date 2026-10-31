@@ -3244,6 +3244,14 @@
         "total": "Total",
         "ratio": "Like ratio"
       },
+      "animadex": {
+        "group": "Catalogue",
+        "label": "animadex only",
+        "hint": "Rank only the artists listed on animadex.net. The catalogue is downloaded once and cached for a week.",
+        "loading": "Loading the animadex artist catalogue… {done}/{total}",
+        "failed": "The animadex artist catalogue is unavailable right now.",
+        "noMatch": "No artist ranked here is listed on animadex."
+      },
       "summary": {
         "images": "Images",
         "rated": "Rated",

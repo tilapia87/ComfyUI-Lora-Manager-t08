@@ -200,7 +200,8 @@ gallery_meta(key PK, value)
 ```bash
 # 后端（本机沙箱需先钉住设置目录，否则导入期 Config() 会去写真实用户目录）
 export LORA_MANAGER_SETTINGS_DIR=/tmp/lm-settings     # Windows: $env:LORA_MANAGER_SETTINGS_DIR="..."
-pytest tests/utils/test_artist_tags.py tests/services/test_gallery_service.py \
+pytest tests/utils/test_artist_tags.py tests/services/test_animadex_artists.py \
+       tests/services/test_gallery_service.py \
        tests/routes/test_gallery_handlers.py tests/routes/test_gallery_integration.py
 
 # 前端（画廊页面 / LoRA 弹窗 Gallery 标签 / 共享查看器 / 深链）
@@ -236,3 +237,25 @@ ComfyUI 图与 A1111 文本两种来源、`LoraLoaderModelOnly` 的 LoRA 抓取�
   一个 LoRA 名在本机匹配到**多个**文件时不猜，按"无法确定"处理，不给跳转入口。
 - **侧栏分数刷新是去抖的**：评分后 400ms 才重新拉 `/summary`，极端情况下快速连评的计数会比
   卡片晚一拍；这是刻意的取舍（避免键盘连评打出一串请求）。
+
+## 9. 画师排行只看 animadex
+
+艺术家排行本身只统计本地评过分的画师。统计页工具栏多了一个 **animadex only** 开关，打开后只保留
+animadex.net 画师目录里也有同名条目的画师，用来看自己常用的画师里哪些已被 animadex 收录。
+
+- **目录镜像**（`py/services/gallery/animadex_artists.py`）：animadex 的画师搜索接口
+  `GET https://animadex.net/api/artists/search?q=&page=N` 是公开的、不需要 token，固定 36 条/页
+  （当前约 15.9k 位画师、442 页）。第一次启用时在后台抓全部页（8 并发）建进程内单例索引，
+  结果写到 `<缓存目录>/gallery/animadex_artists.json`，TTL 7 天；刷新失败但有旧缓存时继续用旧索引
+  （`error` 里记原因），完全没有数据时下一轮可重试。名字先经 `fold_artist_name`
+  （`py/utils/artist_tags.py`，与画师表同一套折叠）再比较，大小写、下划线、空格写法差异不影响命中。
+- **API**：`GET /api/lm/gallery/stats?by=artist&...&animadex_only=1`。只在 `by=artist` 时生效；
+  目录尚未就绪时返回空列表，并带 `animadex: {ready, loading, count, fetched_at, progress: {done, total}, error}`，
+  前端据此显示下载进度。
+- **前端**：`#galleryStatsAnimadexToggle`（`templates/gallery.html` / `static/js/gallery.js`）。
+  打开后从第一页重新加载；目录构建中表格暂时为空，但显示「正在加载 animadex 画师目录… x/y」并每 1.5s
+  自动重试，而不是显示「还没有评分」的空态；构建完但没有命中时单独提示「排行榜里没有 animadex 收录的画师」。
+  分组切到 LoRA 时开关隐藏并自动关闭（目录只覆盖画师），避免留下看不见的过滤状态。
+
+已知取舍：首次启用要抓 400+ 页，通常十几秒到半分钟，期间以进度文案代替表格；名字只做折叠匹配，
+不做模糊/别名匹配，animadex 用不同写法的同名画师可能命中不上。

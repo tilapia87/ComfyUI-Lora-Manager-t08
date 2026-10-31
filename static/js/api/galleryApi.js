@@ -275,10 +275,11 @@ export async function fetchGallerySummary() {
  * @param {number} [params.offset=0] - Number of ranked rows to skip (paging).
  * @param {number} [params.minTotal=1] - Minimum rated+unrated total per row.
  * @param {string} [params.order='desc'] - desc (default) or asc (reversed).
- * @returns {Promise<{by: string, totals: Object, total: number, offset: number, items: Array}>}
+ * @param {boolean} [params.animadexOnly=false] - Only rank artists the animadex catalogue lists.
+ * @returns {Promise<{by: string, totals: Object, total: number, offset: number, items: Array, animadex: Object|null}>}
  */
 export async function fetchGalleryStats(params = {}) {
-    const { by = 'artist', sort = 'score', limit = 200, offset = 0, minTotal = 1, order = 'desc' } = params;
+    const { by = 'artist', sort = 'score', limit = 200, offset = 0, minTotal = 1, order = 'desc', animadexOnly = false } = params;
 
     const query = new URLSearchParams({
         by,
@@ -287,6 +288,7 @@ export async function fetchGalleryStats(params = {}) {
         offset: String(offset),
         min_total: String(minTotal),
         order,
+        animadex_only: animadexOnly ? '1' : '0',
     });
 
     try {
@@ -300,6 +302,9 @@ export async function fetchGalleryStats(params = {}) {
             total: Number.isFinite(Number(data?.total)) ? Number(data.total) : items.length,
             offset: Number.isFinite(Number(data?.offset)) ? Number(data.offset) : offset,
             items,
+            // The animadex mirror state: the table is empty while the catalogue
+            // is being fetched, and the panel polls until it is ready.
+            animadex: data?.animadex || null,
         };
     } catch (error) {
         console.error('Error fetching gallery statistics:', error);

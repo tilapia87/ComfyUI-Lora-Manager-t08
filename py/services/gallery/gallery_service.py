@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 from ...utils.artist_tags import load_gallery_artist_index
 from ..settings_manager import get_settings_manager
 from ..websocket_manager import ws_manager
+from .animadex_artists import AnimadexArtistIndex
 from .artist_previews import ArtistPreviewService
 from .gallery_cache import GalleryCache, VALID_RATINGS
 from .gallery_indexer import (
@@ -41,6 +42,11 @@ _PROGRESS_INTERVAL_SECONDS = 0.5
 # The LoRA ranking asks for previews on every page, so the hash -> preview map
 # is reused for a short while instead of re-walking the scanner cache.
 _LORA_PREVIEW_TTL_SECONDS = 30.0
+
+# How long a ranking request waits for a cold animadex index build before it
+# answers with the "loading" state; the UI polls while the build continues in
+# the background, so this only controls the first click's latency.
+_ANIMADEX_INDEX_WAIT_SECONDS = 1.5
 
 # Rankings can be sorted by the weighted score of the four-level ratings, or by
 # the plain vote counts. `net` stays a valid key for older clients; `score` is
@@ -370,8 +376,30 @@ class GalleryService:
         offset: int = 0,
         min_total: int = 1,
         order: str = "desc",
+        animadex_only: bool = False,
     ) -> Dict[str, Any]:
         rows = self.cache.stats_by_lora() if by == "lora" else self.cache.stats_by_artist()
+
+        # The animadex artist catalogue is an optional filter on the artist
+        # ranking: the index mirrors the public artist list once and answers
+        # membership locally, while the first build reports its progress so the
+        # UI can show a loading note instead of an empty table.
+        animadex_index: Optional[AnimadexArtistIndex] = None
+        animadex_status: Dict[str, Any] = {}
+        if by != "lora":
+            animadex_index = AnimadexArtistIndex.get_instance()
+            if animadex_only:
+                await animadex_index.ensure_loaded(wait_seconds=_ANIMADEX_INDEX_WAIT_SECONDS)
+            animadex_status = animadex_index.status()
+            if animadex_only:
+                # Until the first build lands the ranking has nothing valid to
+                # show: answer empty and let the UI display the build progress.
+                rows = (
+                    [row for row in rows if animadex_index.contains(str(row.get("key") or ""))]
+                    if animadex_index.ready
+                    else []
+                )
+
         rows = [row for row in rows if row["total"] >= max(1, min_total)]
         key = _STATS_SORT_KEYS.get(sort, _STATS_SORT_KEYS["score"])
         # Secondary key keeps equal scores in a stable, human-sensible order.
@@ -422,6 +450,9 @@ class GalleryService:
             "offset": offset,
             "limit": limit,
             "items": page_rows,
+            # Present for the artist ranking only; the UI uses it to show the
+            # animadex filter state and to poll while the first build runs.
+            "animadex": animadex_status,
         }
 
     async def summary(self) -> Dict[str, Any]:

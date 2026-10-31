@@ -30,6 +30,9 @@ const GALLERY_PAGE_SIZE = 40;
 // The statistics ranking can be far longer than one screen (a large library has
 // thousands of LoRAs), so it is paged independently of the image grid.
 const STATS_PAGE_SIZE = 100;
+// The animadex catalogue is mirrored in the background on first use, so the
+// ranking polls until the size settles or the fetch gives up.
+const ANIMADEX_RETRY_INTERVAL_MS = 1500;
 const SCAN_POLL_INTERVAL_MS = 800;
 const PROGRESS_HIDE_DELAY_MS = 8000;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -243,6 +246,11 @@ export class GalleryPage {
         this.statsLoaded = false;
         this.statsPage = 1;
         this.statsTotalPages = 0;
+        // The animadex catalogue only covers artists, so the filter is offered
+        // next to the "Artist" grouping and reset when the view switches to LoRAs.
+        this.statsAnimadexOnly = false;
+        this._animadexRetryTimer = null;
+        this._animadexBusy = false;
         // Artist thumbnails come from animadex.net one lookup at a time; the
         // cache keeps a page change from asking again for the same artist.
         this.artistPreviews = new Map();
@@ -288,6 +296,7 @@ export class GalleryPage {
         this._bindEvents();
         this._applyDensity();
         this._syncOrderSwitch();
+        this._syncStatsAnimadexToggle();
         this._setupInfiniteScroll();
 
         await this._loadConfig();
@@ -358,6 +367,9 @@ export class GalleryPage {
             statsPageInfo: byId('galleryStatsPageInfo'),
             statsPrevPage: byId('galleryStatsPrevPage'),
             statsNextPage: byId('galleryStatsNextPage'),
+            statsAnimadexControl: byId('galleryStatsAnimadexControl'),
+            statsAnimadexToggle: byId('galleryStatsAnimadexToggle'),
+            statsAnimadexNote: byId('galleryStatsAnimadexNote'),
             thumbnailSizeSelect: byId('galleryThumbnailSizeSelect'),
             thumbnailCacheInfo: byId('galleryThumbnailCacheInfo'),
             thumbnailCacheClear: byId('galleryThumbnailCacheClear'),
@@ -441,6 +453,9 @@ export class GalleryPage {
             this.statsBy = button.dataset.by;
             this.statsLoaded = false;
             this.statsPage = 1;
+            // The animadex catalogue only knows artists: leaving the artist
+            // grouping drops the filter instead of keeping a hidden state.
+            if (this.statsBy !== 'artist') this.statsAnimadexOnly = false;
             this._syncStatsBySwitch();
             this.loadStats();
         });
@@ -449,6 +464,14 @@ export class GalleryPage {
             const button = event.target.closest('[data-sort]');
             if (!button) return;
             this.setStatsSort(button.dataset.sort);
+        });
+
+        el.statsAnimadexToggle?.addEventListener('click', () => {
+            this.statsAnimadexOnly = !this.statsAnimadexOnly;
+            this.statsLoaded = false;
+            this.statsPage = 1;
+            this._syncStatsAnimadexToggle();
+            this.loadStats();
         });
 
         el.statsPrevPage?.addEventListener('click', () => this.goToStatsPage(this.statsPage - 1));
@@ -1407,6 +1430,7 @@ export class GalleryPage {
      * @returns {Promise<void>}
      */
     async loadStats() {
+        this._clearAnimadexRetry();
         this._show(this.el.statsStatus);
         this._hide(this.el.statsEmpty);
 
@@ -1418,8 +1442,10 @@ export class GalleryPage {
                 limit: STATS_PAGE_SIZE,
                 offset,
                 order: this.order,
+                animadexOnly: this.statsBy === 'artist' && this.statsAnimadexOnly,
             });
             this.statsLoaded = true;
+            this._renderAnimadexNote(data.animadex);
 
             // ``total`` is the number of ranked rows, so a library with more
             // than one page of LoRAs can be browsed end to end.
@@ -1436,6 +1462,7 @@ export class GalleryPage {
 
             this.renderStats(data);
             this.renderStatsPagination();
+            this._scheduleAnimadexRetry(data.animadex);
         } catch (error) {
             this.el.statsBody.innerHTML = '';
             this._hide(this.el.statsTableWrap);
@@ -1496,7 +1523,14 @@ export class GalleryPage {
             this.el.statsBody.innerHTML = '';
             this._hide(this.el.statsTableWrap);
             this._hide(this.el.statsPagination);
-            this._show(this.el.statsEmpty);
+            if (this.statsBy === 'artist' && this.statsAnimadexOnly) {
+                // The generic "nothing rated yet" copy would be wrong here: the
+                // filter, not an empty library, is why the table is empty.
+                this._hide(this.el.statsEmpty);
+                this._renderAnimadexNoMatch();
+            } else {
+                this._show(this.el.statsEmpty);
+            }
             return;
         }
 
@@ -1950,6 +1984,82 @@ export class GalleryPage {
         this.el.statsBySwitch?.querySelectorAll('[data-by]').forEach((button) => {
             button.classList.toggle('active', button.dataset.by === this.statsBy);
         });
+        this._syncStatsAnimadexToggle();
+    }
+
+    /**
+     * Reflect the animadex filter state on its toggle, and hide the control
+     * while ranking LoRAs (the catalogue only lists artists).
+     */
+    _syncStatsAnimadexToggle() {
+        const available = this.statsBy === 'artist';
+        const control = this.el.statsAnimadexControl;
+        const toggle = this.el.statsAnimadexToggle;
+        if (control) control.classList.toggle('hidden', !available);
+        if (!toggle) return;
+        const active = available && this.statsAnimadexOnly;
+        toggle.setAttribute('aria-pressed', String(active));
+        toggle.classList.toggle('is-on', active);
+        if (!active) this._hide(this.el.statsAnimadexNote);
+    }
+
+    /**
+     * Explain the state of the animadex catalogue mirror above the table.
+     * @param {Object|null} status - The `animadex` block of the stats payload.
+     */
+    _renderAnimadexNote(status) {
+        const note = this.el.statsAnimadexNote;
+        const active = this.statsBy === 'artist' && this.statsAnimadexOnly;
+        this._animadexBusy = Boolean(active && status && !status.ready && (status.loading || status.error));
+        if (!note) return;
+        if (!active || !status || status.ready) {
+            note.textContent = '';
+            this._hide(note);
+            return;
+        }
+        const failed = Boolean(status.error);
+        note.classList.toggle('is-error', failed);
+        if (failed) {
+            note.textContent = translate('gallery.stats.animadex.failed');
+        } else {
+            const done = Number(status.progress?.done) || 0;
+            const total = Number(status.progress?.total) || 0;
+            note.textContent = translate('gallery.stats.animadex.loading', { done, total });
+        }
+        this._show(note);
+    }
+
+    /**
+     * Once the catalogue is ready the filtered table may legitimately have no
+     * row: say so instead of falling back to the library-wide empty state.
+     */
+    _renderAnimadexNoMatch() {
+        if (this._animadexBusy) return;
+        const note = this.el.statsAnimadexNote;
+        if (!note) return;
+        note.classList.remove('is-error');
+        note.textContent = translate('gallery.stats.animadex.noMatch');
+        this._show(note);
+    }
+
+    /**
+     * Poll the stats endpoint while the catalogue mirror is still being built.
+     * @param {Object|null} status - The `animadex` block of the stats payload.
+     */
+    _scheduleAnimadexRetry(status) {
+        this._clearAnimadexRetry();
+        if (this.statsBy !== 'artist' || !this.statsAnimadexOnly) return;
+        if (!status || status.ready || !status.loading) return;
+        this._animadexRetryTimer = window.setTimeout(() => {
+            this._animadexRetryTimer = null;
+            if (this.view === 'stats' && this.statsAnimadexOnly) this.loadStats();
+        }, ANIMADEX_RETRY_INTERVAL_MS);
+    }
+
+    _clearAnimadexRetry() {
+        if (this._animadexRetryTimer === null) return;
+        window.clearTimeout(this._animadexRetryTimer);
+        this._animadexRetryTimer = null;
     }
 
     _filterByStatRow(key) {
@@ -1987,6 +2097,7 @@ export class GalleryPage {
             this._show(this.el.statsPanel);
             if (!this.statsLoaded) this.loadStats();
         } else {
+            this._clearAnimadexRetry();
             this._hide(this.el.statsPanel);
             this._show(this.el.imagesPanel);
         }
@@ -2223,6 +2334,7 @@ export class GalleryPage {
 
     destroy() {
         this._stopScanPolling();
+        this._clearAnimadexRetry();
         clearTimeout(this.searchTimer);
         clearTimeout(this.progressTimer);
         clearTimeout(this.summaryTimer);

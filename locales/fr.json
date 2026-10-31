@@ -3244,6 +3244,14 @@
                 "total": "Total",
                 "ratio": "Ratio de J'aime"
             },
+            "animadex": {
+                "group": "[TODO: Translate] Catalogue",
+                "label": "[TODO: Translate] animadex only",
+                "hint": "[TODO: Translate] Rank only the artists listed on animadex.net. The catalogue is downloaded once and cached for a week.",
+                "loading": "[TODO: Translate] Loading the animadex artist catalogue… {done}/{total}",
+                "failed": "[TODO: Translate] The animadex artist catalogue is unavailable right now.",
+                "noMatch": "[TODO: Translate] No artist ranked here is listed on animadex."
+            },
             "summary": {
                 "images": "Images",
                 "rated": "Évaluées",

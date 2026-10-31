@@ -793,6 +793,155 @@ describe('GalleryPage', () => {
     expect(document.getElementById('galleryImagesPanel').classList.contains('hidden')).toBe(true);
   });
 
+  it('ranks only animadex artists and explains the catalogue download', async () => {
+    fetchStub.setRoute('/api/lm/gallery/stats', {
+      success: true,
+      data: {
+        ...STATS_PAYLOAD,
+        total: 0,
+        items: [],
+        animadex: { ready: false, loading: true, count: 0, progress: { done: 2, total: 5 }, error: '' },
+      },
+    });
+
+    await boot();
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    const control = document.getElementById('galleryStatsAnimadexControl');
+    const toggle = document.getElementById('galleryStatsAnimadexToggle');
+    expect(control.classList.contains('hidden')).toBe(false);
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(statsCalls(fetchStub.calls)[0].url).toContain('animadex_only=0');
+
+    toggle.click();
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('galleryStatsAnimadexNote').textContent).toBe(
+        'gallery.stats.animadex.loading|2,5'
+      )
+    );
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(toggle.classList.contains('is-on')).toBe(true);
+    expect(document.getElementById('galleryStatsAnimadexNote').classList.contains('hidden')).toBe(false);
+
+    // The filtered request is a fresh first page, not the current offset.
+    const filtered = statsCalls(fetchStub.calls).at(-1);
+    expect(filtered.url).toContain('animadex_only=1');
+    expect(filtered.url).toContain('offset=0');
+    // While the catalogue loads the generic "nothing rated yet" state is wrong.
+    expect(document.getElementById('galleryStatsEmpty').classList.contains('hidden')).toBe(true);
+  });
+
+  it('polls until the animadex catalogue is ready, then renders the filtered ranking', async () => {
+    fetchStub.setRoute('/api/lm/gallery/stats', {
+      success: true,
+      data: {
+        ...STATS_PAYLOAD,
+        total: 0,
+        items: [],
+        animadex: { ready: false, loading: true, count: 0, progress: { done: 1, total: 4 }, error: '' },
+      },
+    });
+
+    await boot();
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    document.getElementById('galleryStatsAnimadexToggle').click();
+    await vi.waitFor(() =>
+      expect(document.getElementById('galleryStatsAnimadexNote').textContent).toBe(
+        'gallery.stats.animadex.loading|1,4'
+      )
+    );
+
+    fetchStub.setRoute('/api/lm/gallery/stats', {
+      success: true,
+      data: {
+        ...STATS_PAYLOAD,
+        animadex: { ready: true, loading: false, count: 2, progress: { done: 4, total: 4 }, error: '' },
+      },
+    });
+
+    await vi.waitFor(
+      () => expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(3),
+      { timeout: 5000 }
+    );
+    expect(document.getElementById('galleryStatsAnimadexNote').classList.contains('hidden')).toBe(true);
+    expect(statsCalls(fetchStub.calls).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('says no listed artist matches instead of showing the library-wide empty state', async () => {
+    fetchStub.setRoute('/api/lm/gallery/stats', {
+      success: true,
+      data: {
+        ...STATS_PAYLOAD,
+        total: 0,
+        items: [],
+        animadex: { ready: true, loading: false, count: 120, progress: { done: 442, total: 442 }, error: '' },
+      },
+    });
+
+    await boot();
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    document.getElementById('galleryStatsAnimadexToggle').click();
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('galleryStatsAnimadexNote').textContent).toBe(
+        'gallery.stats.animadex.noMatch'
+      )
+    );
+    expect(document.getElementById('galleryStatsAnimadexNote').classList.contains('is-error')).toBe(false);
+    expect(document.getElementById('galleryStatsEmpty').classList.contains('hidden')).toBe(true);
+  });
+
+  it('shows the failure note when the animadex catalogue cannot be fetched', async () => {
+    fetchStub.setRoute('/api/lm/gallery/stats', {
+      success: true,
+      data: {
+        ...STATS_PAYLOAD,
+        total: 0,
+        items: [],
+        animadex: { ready: false, loading: false, count: 0, progress: { done: 0, total: 0 }, error: 'boom' },
+      },
+    });
+
+    await boot();
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    document.getElementById('galleryStatsAnimadexToggle').click();
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('galleryStatsAnimadexNote').textContent).toBe(
+        'gallery.stats.animadex.failed'
+      )
+    );
+    expect(document.getElementById('galleryStatsAnimadexNote').classList.contains('is-error')).toBe(true);
+  });
+
+  it('hides the animadex filter when grouping by LoRA and drops it', async () => {
+    await boot();
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    document.getElementById('galleryStatsAnimadexToggle').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(2));
+    expect(statsCalls(fetchStub.calls).at(-1).url).toContain('animadex_only=1');
+
+    document.querySelector('#galleryStatsBySwitch [data-by="lora"]').click();
+
+    expect(document.getElementById('galleryStatsAnimadexControl').classList.contains('hidden')).toBe(true);
+    expect(document.getElementById('galleryStatsAnimadexToggle').getAttribute('aria-pressed')).toBe('false');
+    await vi.waitFor(() => {
+      const last = statsCalls(fetchStub.calls).at(-1);
+      expect(last.url).toContain('by=lora');
+      expect(last.url).toContain('animadex_only=0');
+    });
+  });
+
   it('pages through a statistics ranking that is longer than one page', async () => {
     const TOTAL_ROWS = 250;
     const statRow = (rank) => ({

@@ -84,6 +84,17 @@ def _fold(name: str) -> str:
     return re.sub(r"\s+", " ", normalized).strip().lower()
 
 
+def fold_artist_name(name: str) -> str:
+    """Public spelling of :func:`_fold`, for name-set membership checks.
+
+    Some callers compare a gallery artist name against an external catalogue
+    (e.g. the animadex artist index) where the same person is spelled with
+    underscores or spaces; keeping the normalization in one place guarantees
+    both sides fold the same way.
+    """
+    return _fold(name or "")
+
+
 def _split_top_level(text: str, separator: str = ",") -> List[str]:
     """Split on *separator* at bracket depth zero.
 

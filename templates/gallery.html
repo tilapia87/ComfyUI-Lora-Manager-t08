@@ -348,9 +348,22 @@
                                 </button>
                             </div>
                         </div>
+
+                        <div class="gallery-control" id="galleryStatsAnimadexControl">
+                            <span class="gallery-control-label">{{ t('gallery.stats.animadex.group') }}</span>
+                            <button type="button" class="gallery-btn gallery-btn-small gallery-stats-animadex-toggle"
+                                id="galleryStatsAnimadexToggle" aria-pressed="false"
+                                title="{{ t('gallery.stats.animadex.hint') }}">
+                                <i class="fas fa-filter" aria-hidden="true"></i>
+                                {{ t('gallery.stats.animadex.label') }}
+                            </button>
+                        </div>
                     </div>
 
                     <div class="gallery-stats-summary" id="galleryStatsSummary"></div>
+
+                    <div class="gallery-status gallery-stats-animadex-note hidden" id="galleryStatsAnimadexNote"
+                        role="status" aria-live="polite"></div>
 
                     <div class="gallery-rank-grid-wrap" id="galleryStatsTableWrap">
                         <div class="gallery-rank-grid" id="galleryStatsBody"></div>

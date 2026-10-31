@@ -9,6 +9,7 @@ import os
 import pytest
 from PIL import Image, PngImagePlugin
 
+from py.services.gallery import gallery_service as gallery_service_module
 from py.services.gallery.gallery_cache import GalleryCache
 from py.services.gallery.gallery_indexer import (
     detect_parser,
@@ -17,6 +18,7 @@ from py.services.gallery.gallery_indexer import (
 )
 from py.services.gallery.gallery_service import GalleryService, _is_within_root
 from py.services.settings_manager import get_settings_manager
+from py.utils.artist_tags import fold_artist_name
 
 # A ComfyUI API graph shaped like a real Anima workflow: checkpoint, a LoraLoader,
 # a LoraLoaderModelOnly (which the recipe parser does NOT handle), a positive
@@ -1107,3 +1109,91 @@ def test_detect_parser_names_the_metadata_flavour():
     assert detect_parser({"prompt": None, "workflow": '{"nodes":[]}'}) == "comfy_workflow"
     assert detect_parser({"prompt": None, "workflow": None, "parameters": "Steps: 20"}) == "automatic"
     assert detect_parser({"prompt": None, "workflow": None, "parameters": None, "comment": None}) == "unknown"
+
+
+# ------------------------------------------------- animadex artist filter
+
+
+class _FakeAnimadexIndex:
+    """Stand-in for the mirrored animadex artist catalogue."""
+
+    def __init__(self, names=(), *, ready=True, loading=False):
+        self._names = {fold_artist_name(name) for name in names}
+        self.ready = ready
+        self.loading = loading
+        self.ensure_loaded_calls = []
+
+    async def ensure_loaded(self, *, wait_seconds=0.0):
+        self.ensure_loaded_calls.append(wait_seconds)
+        return self.ready
+
+    def contains(self, artist):
+        folded = fold_artist_name(artist)
+        return bool(folded) and folded in self._names
+
+    def status(self):
+        return {
+            "ready": self.ready,
+            "loading": self.loading,
+            "count": len(self._names),
+            "fetched_at": 0.0,
+            "progress": {"done": 0, "total": 0},
+            "error": "",
+        }
+
+
+def _use_animadex_index(monkeypatch, index):
+    monkeypatch.setattr(
+        gallery_service_module.AnimadexArtistIndex,
+        "get_instance",
+        classmethod(lambda cls: index),
+    )
+    return index
+
+
+async def test_statistics_can_be_limited_to_animadex_artists(service, monkeypatch):
+    await _scan(service)
+    index = _use_animadex_index(monkeypatch, _FakeAnimadexIndex(["nnn yryr"]))
+
+    stats = await service.stats(by="artist", animadex_only=True)
+
+    assert [row["key"] for row in stats["items"]] == ["nnn yryr"]
+    assert stats["total"] == 1
+    assert stats["animadex"]["ready"] is True
+    assert index.ensure_loaded_calls == [1.5]
+
+
+async def test_statistics_report_the_animadex_loading_state(service, monkeypatch):
+    await _scan(service)
+    _use_animadex_index(monkeypatch, _FakeAnimadexIndex(ready=False, loading=True))
+
+    stats = await service.stats(by="artist", animadex_only=True)
+
+    # The catalogue is still being mirrored: show the progress note, not rows
+    # filtered against an empty/partial list.
+    assert stats["items"] == []
+    assert stats["total"] == 0
+    assert stats["animadex"]["loading"] is True
+    assert stats["animadex"]["ready"] is False
+
+
+async def test_statistics_do_not_wait_for_animadex_unless_requested(service, monkeypatch):
+    await _scan(service)
+    index = _use_animadex_index(monkeypatch, _FakeAnimadexIndex(ready=False))
+
+    stats = await service.stats(by="artist")
+
+    assert len(stats["items"]) == 2
+    assert stats["animadex"]["ready"] is False
+    assert index.ensure_loaded_calls == []
+
+
+async def test_lora_statistics_ignore_the_animadex_filter(service, monkeypatch):
+    await _scan(service)
+    index = _use_animadex_index(monkeypatch, _FakeAnimadexIndex(["nnn yryr"]))
+
+    stats = await service.stats(by="lora", animadex_only=True)
+
+    assert stats["animadex"] == {}
+    assert {row["key"] for row in stats["items"]} == {"style_a.safetensors", "style_b.safetensors"}
+    assert index.ensure_loaded_calls == []

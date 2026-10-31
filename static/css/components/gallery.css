@@ -1696,6 +1696,22 @@
     flex-wrap: wrap;
 }
 
+/* animadex filter: the toggle stays filled while the ranking is restricted to
+   the artists the online catalogue lists. */
+.gallery-stats-animadex-toggle.is-on {
+    background: var(--color-accent, #4f8cff);
+    border-color: var(--color-accent, #4f8cff);
+    color: var(--color-accent-contrast, #fff);
+}
+
+.gallery-stats-animadex-note {
+    padding-top: 0;
+}
+
+.gallery-stats-animadex-note.is-error {
+    color: var(--color-danger, #ff6b6b);
+}
+
 /* Card skeleton, shown while the first page is in flight. */
 .gallery-card-skeleton {
     pointer-events: none;
