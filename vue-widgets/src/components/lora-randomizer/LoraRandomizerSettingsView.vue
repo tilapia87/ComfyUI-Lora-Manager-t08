@@ -110,6 +110,55 @@
       </div>
     </div>
 
+    <!-- New LoRA Boost -->
+    <div class="setting-section">
+      <div class="section-header-with-toggle">
+        <label class="setting-label">
+          New LoRA Boost
+        </label>
+        <button
+          type="button"
+          class="toggle-switch"
+          :class="{ 'toggle-switch--active': useNewLoraBoost }"
+          @click="$emit('update:useNewLoraBoost', !useNewLoraBoost)"
+          role="switch"
+          :aria-checked="useNewLoraBoost"
+          title="Bias random rolls towards recently added LoRAs"
+        >
+          <span class="toggle-switch__track"></span>
+          <span class="toggle-switch__thumb"></span>
+        </button>
+      </div>
+      <div class="slider-container" :class="{ 'slider-container--disabled': !useNewLoraBoost }">
+        <SingleSlider
+          :min="1"
+          :max="10"
+          :value="newLoraBoostStrength"
+          :step="0.5"
+          :default-range="{ min: 1, max: 3 }"
+          :disabled="!useNewLoraBoost"
+          @update:value="$emit('update:newLoraBoostStrength', $event)"
+        />
+        <div class="boost-hint">
+          Weight ×{{ formatBoost(newLoraBoostStrength) }} for the newest LoRA
+        </div>
+      </div>
+      <div class="slider-container boost-window" :class="{ 'slider-container--disabled': !useNewLoraBoost }">
+        <SingleSlider
+          :min="1"
+          :max="90"
+          :value="newLoraBoostDays"
+          :step="1"
+          :default-range="{ min: 3, max: 14 }"
+          :disabled="!useNewLoraBoost"
+          @update:value="$emit('update:newLoraBoostDays', $event)"
+        />
+        <div class="boost-hint">
+          Fades out over {{ newLoraBoostDays }} day{{ newLoraBoostDays === 1 ? '' : 's' }}
+        </div>
+      </div>
+    </div>
+
     <!-- Clip Strength Range -->
     <div class="setting-section">
       <div class="section-header-with-toggle">
@@ -241,6 +290,9 @@ defineProps<{
   useRecommendedStrength: boolean
   recommendedStrengthScaleMin: number
   recommendedStrengthScaleMax: number
+  useNewLoraBoost: boolean
+  newLoraBoostStrength: number
+  newLoraBoostDays: number
 }>()
 
 defineEmits<{
@@ -257,12 +309,17 @@ defineEmits<{
   'update:useRecommendedStrength': [value: boolean]
   'update:recommendedStrengthScaleMin': [value: number]
   'update:recommendedStrengthScaleMax': [value: number]
+  'update:useNewLoraBoost': [value: boolean]
+  'update:newLoraBoostStrength': [value: number]
+  'update:newLoraBoostDays': [value: number]
   'generate-fixed': []
   'always-randomize': []
   'reuse-last': []
 }>()
 
 const showTooltip = ref(false)
+
+const formatBoost = (value: number): string => value.toFixed(1)
 
 const areLorasEqual = (a: LoraEntry[] | null, b: LoraEntry[] | null): boolean => {
   if (!a || !b) return false
@@ -388,6 +445,17 @@ const areLorasEqual = (a: LoraEntry[] | null, b: LoraEntry[] | null): boolean =>
 .slider-container--disabled {
   opacity: 0.5;
   pointer-events: none;
+}
+
+.boost-window {
+  margin-top: 6px;
+}
+
+.boost-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(226, 232, 240, 0.55);
+  text-align: center;
 }
 
 /* Toggle Switch (same style as LicenseSection) */

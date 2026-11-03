@@ -201,6 +201,9 @@ function createLoraRandomizerWidget(node) {
     use_recommended_strength: false,
     recommended_strength_scale_min: 0.5,
     recommended_strength_scale_max: 1.0,
+    use_new_lora_boost: false,
+    new_lora_boost_strength: 3.0,
+    new_lora_boost_days: 7,
   }
   let internalValue: RandomizerConfig = defaultConfig
 

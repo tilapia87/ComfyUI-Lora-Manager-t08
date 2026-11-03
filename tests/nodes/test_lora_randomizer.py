@@ -403,3 +403,77 @@ async def test_recommended_strength_config_passed_to_service(
             assert call_kwargs["use_recommended_strength"] is True
             assert call_kwargs["recommended_strength_scale_min"] == 0.6
             assert call_kwargs["recommended_strength_scale_max"] == 0.8
+
+
+@pytest.fixture
+def randomizer_config_with_new_lora_boost():
+    return {
+        "count_mode": "fixed",
+        "count_fixed": 2,
+        "count_min": 1,
+        "count_max": 3,
+        "model_strength_min": 0.5,
+        "model_strength_max": 1.0,
+        "use_same_clip_strength": True,
+        "clip_strength_min": 0.5,
+        "clip_strength_max": 1.0,
+        "roll_mode": "always",
+        "use_new_lora_boost": True,
+        "new_lora_boost_strength": 6.0,
+        "new_lora_boost_days": 21,
+    }
+
+
+@pytest.mark.asyncio
+async def test_new_lora_boost_config_passed_to_service(
+    randomizer_node,
+    sample_loras,
+    randomizer_config_with_new_lora_boost,
+    mock_scanner,
+    monkeypatch,
+):
+    """Test that new LoRA boost config is passed to service"""
+    from py.services.lora_service import LoraService
+    from unittest.mock import AsyncMock, patch
+
+    mock_get_random_loras = AsyncMock(
+        return_value=[
+            {
+                "name": "new_lora.safetensors",
+                "strength": 0.7,
+                "clipStrength": 0.7,
+                "active": True,
+                "expanded": False,
+                "locked": False,
+            }
+        ]
+    )
+
+    with patch.object(LoraService, "__init__", return_value=None):
+        with patch.object(LoraService, "get_random_loras", mock_get_random_loras):
+            monkeypatch.setattr(
+                service_registry.ServiceRegistry,
+                "get_lora_scanner",
+                AsyncMock(return_value=mock_scanner),
+            )
+
+            mock_scanner._cache.raw_data = [
+                {
+                    "file_name": "new_lora.safetensors",
+                    "file_path": "/path/to/new_lora.safetensors",
+                    "folder": "",
+                }
+            ]
+
+            await randomizer_node.randomize(
+                randomizer_config_with_new_lora_boost,
+                sample_loras,
+                pool_config=None,
+            )
+
+            assert mock_get_random_loras.called
+
+            call_kwargs = mock_get_random_loras.call_args[1]
+            assert call_kwargs["use_new_lora_boost"] is True
+            assert call_kwargs["new_lora_boost_strength"] == 6.0
+            assert call_kwargs["new_lora_boost_days"] == 21.0

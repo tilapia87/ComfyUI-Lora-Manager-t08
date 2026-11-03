@@ -183,6 +183,11 @@ class LoraRandomizerLM:
         recommended_strength_scale_max = float(
             randomizer_config.get("recommended_strength_scale_max", 1.0)
         )
+        use_new_lora_boost = randomizer_config.get("use_new_lora_boost", False)
+        new_lora_boost_strength = float(
+            randomizer_config.get("new_lora_boost_strength", 1.0)
+        )
+        new_lora_boost_days = float(randomizer_config.get("new_lora_boost_days", 7.0))
 
         # Extract locked LoRAs from input
         locked_loras = [lora for lora in input_loras if lora.get("locked", False)]
@@ -204,6 +209,9 @@ class LoraRandomizerLM:
             use_recommended_strength=use_recommended_strength,
             recommended_strength_scale_min=recommended_strength_scale_min,
             recommended_strength_scale_max=recommended_strength_scale_max,
+            use_new_lora_boost=use_new_lora_boost,
+            new_lora_boost_strength=new_lora_boost_strength,
+            new_lora_boost_days=new_lora_boost_days,
             seed=seed,
         )
 

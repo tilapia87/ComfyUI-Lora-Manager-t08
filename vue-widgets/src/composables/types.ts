@@ -59,6 +59,9 @@ export interface RandomizerConfig {
   use_recommended_strength: boolean
   recommended_strength_scale_min: number
   recommended_strength_scale_max: number
+  use_new_lora_boost?: boolean          // Bias sampling towards recently added LoRAs
+  new_lora_boost_strength?: number      // Weight multiplier for the newest LoRA (1 = off)
+  new_lora_boost_days?: number          // Length of the "new" window in days
   execution_seed?: number | null  // Seed for execution_stack (previous next_seed)
   next_seed?: number | null       // Seed for ui_loras (current)
 }

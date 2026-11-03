@@ -172,6 +172,11 @@ class LoraRoutes(BaseModelRoutes):
             recommended_strength_scale_max = float(
                 json_data.get("recommended_strength_scale_max", 1.0)
             )
+            use_new_lora_boost = bool(json_data.get("use_new_lora_boost", False))
+            new_lora_boost_strength = float(
+                json_data.get("new_lora_boost_strength", 1.0)
+            )
+            new_lora_boost_days = float(json_data.get("new_lora_boost_days", 7.0))
 
             # Determine target count
             if count_min is not None and count_max is not None:
@@ -197,6 +202,24 @@ class LoraRoutes(BaseModelRoutes):
                     status=400,
                 )
 
+            if new_lora_boost_days < 0:
+                return web.json_response(
+                    {
+                        "success": False,
+                        "error": "New LoRA boost window must be 0 or greater",
+                    },
+                    status=400,
+                )
+
+            if new_lora_boost_strength < 1 or new_lora_boost_strength > 50:
+                return web.json_response(
+                    {
+                        "success": False,
+                        "error": "New LoRA boost strength must be between 1 and 50",
+                    },
+                    status=400,
+                )
+
             # Get random LoRAs from service
             result_loras = await self.service.get_random_loras(
                 count=target_count,
@@ -210,6 +233,9 @@ class LoraRoutes(BaseModelRoutes):
                 use_recommended_strength=use_recommended_strength,
                 recommended_strength_scale_min=recommended_strength_scale_min,
                 recommended_strength_scale_max=recommended_strength_scale_max,
+                use_new_lora_boost=use_new_lora_boost,
+                new_lora_boost_strength=new_lora_boost_strength,
+                new_lora_boost_days=new_lora_boost_days,
             )
 
             return web.json_response(

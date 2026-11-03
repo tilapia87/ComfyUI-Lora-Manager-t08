@@ -256,3 +256,85 @@ async def test_get_random_loras_with_recommended_strength_disabled(routes):
     assert kwargs["use_recommended_strength"] is False
     assert kwargs["recommended_strength_scale_min"] == 0.5
     assert kwargs["recommended_strength_scale_max"] == 1.0
+
+
+async def test_get_random_loras_with_new_lora_boost_enabled(routes):
+    """Test that new LoRA boost parameters are forwarded to the service"""
+    request = DummyRequest(
+        json_data={
+            "count": 5,
+            "model_strength_min": 0.5,
+            "model_strength_max": 1.0,
+            "use_same_clip_strength": True,
+            "use_new_lora_boost": True,
+            "new_lora_boost_strength": 4.0,
+            "new_lora_boost_days": 14,
+            "locked_loras": [],
+        }
+    )
+
+    response = await routes.get_random_loras(request)
+    payload = json.loads(response.text)
+
+    assert response.status == 200
+    assert payload["success"] is True
+
+    kwargs = routes.service.last_get_random_loras_kwargs
+    assert kwargs["use_new_lora_boost"] is True
+    assert kwargs["new_lora_boost_strength"] == 4.0
+    assert kwargs["new_lora_boost_days"] == 14.0
+
+
+async def test_get_random_loras_with_new_lora_boost_disabled(routes):
+    """Test that new LoRA boost defaults are forwarded when omitted"""
+    request = DummyRequest(
+        json_data={
+            "count": 3,
+            "model_strength_min": 0.0,
+            "model_strength_max": 1.0,
+            "locked_loras": [],
+        }
+    )
+
+    response = await routes.get_random_loras(request)
+    assert response.status == 200
+
+    kwargs = routes.service.last_get_random_loras_kwargs
+    assert kwargs["use_new_lora_boost"] is False
+    assert kwargs["new_lora_boost_strength"] == 1.0
+    assert kwargs["new_lora_boost_days"] == 7.0
+
+
+async def test_get_random_loras_invalid_new_lora_boost_strength(routes):
+    """Boost strength outside 1..50 should be rejected"""
+    request = DummyRequest(
+        json_data={
+            "count": 3,
+            "new_lora_boost_strength": 0.5,
+            "locked_loras": [],
+        }
+    )
+
+    response = await routes.get_random_loras(request)
+    payload = json.loads(response.text)
+
+    assert response.status == 400
+    assert payload["success"] is False
+    assert "boost" in payload["error"].lower()
+
+
+async def test_get_random_loras_invalid_new_lora_boost_days(routes):
+    """Negative boost window should be rejected"""
+    request = DummyRequest(
+        json_data={
+            "count": 3,
+            "new_lora_boost_days": -1,
+            "locked_loras": [],
+        }
+    )
+
+    response = await routes.get_random_loras(request)
+    payload = json.loads(response.text)
+
+    assert response.status == 400
+    assert payload["success"] is False

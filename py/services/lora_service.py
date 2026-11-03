@@ -1,6 +1,8 @@
 import logging
 import json
 import os
+import random
+import time
 from typing import Any, Dict, List, Optional
 
 from .base_model_service import BaseModelService
@@ -387,6 +389,9 @@ class LoraService(BaseModelService):
         use_recommended_strength: bool = False,
         recommended_strength_scale_min: float = 0.5,
         recommended_strength_scale_max: float = 1.0,
+        use_new_lora_boost: bool = False,
+        new_lora_boost_strength: float = 1.0,
+        new_lora_boost_days: float = 7.0,
         seed: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -407,6 +412,12 @@ class LoraService(BaseModelService):
             use_recommended_strength: Whether to use recommended strength from usage_tips
             recommended_strength_scale_min: Minimum scale factor for recommended strength
             recommended_strength_scale_max: Maximum scale factor for recommended strength
+            use_new_lora_boost: Whether to bias sampling towards recently added LoRAs
+            new_lora_boost_strength: Maximum weight multiplier for a brand new LoRA
+                (1.0 disables the effect, values > 1 favour newer entries)
+            new_lora_boost_days: Length of the "new" window in days; the boost
+                fades linearly from new_lora_boost_strength at age 0 down to 1.0
+                at the end of the window
             seed: Optional random seed for reproducible/unique randomization per execution
 
         Returns:
@@ -461,7 +472,17 @@ class LoraService(BaseModelService):
         # Random sample
         selected = []
         if slots_needed > 0:
-            selected = rng.sample(available_pool, slots_needed)
+            weights = None
+            if use_new_lora_boost and new_lora_boost_strength > 1.0:
+                weights = self._build_new_lora_weights(
+                    available_pool, new_lora_boost_strength, new_lora_boost_days
+                )
+            if weights is None:
+                selected = rng.sample(available_pool, slots_needed)
+            else:
+                selected = self._weighted_sample_without_replacement(
+                    available_pool, weights, slots_needed, rng
+                )
 
         # Generate random strengths for selected LoRAs
         result_loras = []
@@ -517,6 +538,110 @@ class LoraService(BaseModelService):
         result_loras.extend(locked_loras)
 
         return result_loras
+
+    def _build_new_lora_weights(
+        self,
+        loras: List[Dict[str, Any]],
+        boost_strength: float,
+        boost_days: float,
+        now: Optional[float] = None,
+    ) -> List[float]:
+        """Compute sampling weights that favour recently added LoRAs.
+
+        A LoRA that was added right now gets ``boost_strength`` weight, older
+        LoRAs keep weight ``1.0``. In between the weight decays linearly across
+        the configured window, so the boost fades out instead of dropping off a
+        cliff at the window boundary.
+
+        Args:
+            loras: Candidate LoRA dicts (must expose ``modified`` when known)
+            boost_strength: Weight multiplier for the newest LoRA (>= 1.0)
+            boost_days: Length of the "new" window in days
+            now: Optional reference timestamp (defaults to current time)
+
+        Returns:
+            List of weights aligned with ``loras``
+        """
+        if not loras:
+            return []
+
+        if boost_strength <= 1.0 or boost_days <= 0:
+            return [1.0] * len(loras)
+
+        reference_time = time.time() if now is None else now
+        window_seconds = boost_days * 86400.0
+
+        weights: List[float] = []
+        for lora in loras:
+            modified = lora.get("modified")
+            try:
+                modified_time = float(modified)
+            except (TypeError, ValueError):
+                modified_time = 0.0
+
+            if modified_time <= 0:
+                # Unknown age: treat as fully settled so unknown entries are
+                # never accidentally boosted.
+                weights.append(1.0)
+                continue
+
+            age_seconds = reference_time - modified_time
+            if age_seconds <= 0:
+                fresh_ratio = 1.0
+            elif age_seconds >= window_seconds:
+                fresh_ratio = 0.0
+            else:
+                fresh_ratio = 1.0 - (age_seconds / window_seconds)
+
+            weights.append(1.0 + (boost_strength - 1.0) * fresh_ratio)
+
+        return weights
+
+    def _weighted_sample_without_replacement(
+        self,
+        items: List[Dict[str, Any]],
+        weights: List[float],
+        count: int,
+        rng: "random.Random",
+    ) -> List[Dict[str, Any]]:
+        """Pick ``count`` items without replacement using the given weights.
+
+        Uses the sequential (cumulative weight) method: repeatedly draw one item
+        with probability proportional to its remaining weight, then remove it.
+        This keeps the original ``rng.sample`` semantics of unique selections
+        while letting the boost favour newer entries.
+        """
+        if count >= len(items):
+            return list(items)
+
+        remaining = list(zip(items, weights))
+        selected: List[Dict[str, Any]] = []
+
+        for _ in range(count):
+            if not remaining:
+                break
+
+            total = 0.0
+            for _, weight in remaining:
+                total += max(weight, 0.0)
+
+            if total <= 0:
+                # Degenerate weights: fall back to uniform picking from what is left
+                index = rng.randrange(len(remaining))
+            else:
+                threshold = rng.random() * total
+                cumulative = 0.0
+                index = len(remaining) - 1
+                for i, (_, weight) in enumerate(remaining):
+                    cumulative += max(weight, 0.0)
+                    if threshold < cumulative:
+                        index = i
+                        break
+
+            item, _ = remaining.pop(index)
+            selected.append(item)
+
+        return selected
 
     async def _apply_pool_filters(
         self, available_loras: List[Dict[str, Any]], pool_config: Dict[str, Any]

@@ -22,6 +22,9 @@ export function useLoraRandomizerState(widget: ComponentWidget<RandomizerConfig>
   const useRecommendedStrength = ref(false)
   const recommendedStrengthScaleMin = ref(0.5)
   const recommendedStrengthScaleMax = ref(1.0)
+  const useNewLoraBoost = ref(false)
+  const newLoraBoostStrength = ref(3.0)
+  const newLoraBoostDays = ref(7)
 
   // Track last used combination (for backend roll mode)
   const lastUsed = ref<LoraEntry[] | null>(null)
@@ -51,6 +54,9 @@ export function useLoraRandomizerState(widget: ComponentWidget<RandomizerConfig>
         use_recommended_strength: useRecommendedStrength.value,
         recommended_strength_scale_min: recommendedStrengthScaleMin.value,
         recommended_strength_scale_max: recommendedStrengthScaleMax.value,
+        use_new_lora_boost: useNewLoraBoost.value,
+        new_lora_boost_strength: newLoraBoostStrength.value,
+        new_lora_boost_days: newLoraBoostDays.value,
         execution_seed: executionSeed.value,
         next_seed: nextSeed.value,
       }
@@ -70,6 +76,9 @@ export function useLoraRandomizerState(widget: ComponentWidget<RandomizerConfig>
     use_recommended_strength: useRecommendedStrength.value,
     recommended_strength_scale_min: recommendedStrengthScaleMin.value,
     recommended_strength_scale_max: recommendedStrengthScaleMax.value,
+    use_new_lora_boost: useNewLoraBoost.value,
+    new_lora_boost_strength: newLoraBoostStrength.value,
+    new_lora_boost_days: newLoraBoostDays.value,
     execution_seed: executionSeed.value,
     next_seed: nextSeed.value,
     }
@@ -119,6 +128,9 @@ export function useLoraRandomizerState(widget: ComponentWidget<RandomizerConfig>
       useRecommendedStrength.value = config.use_recommended_strength ?? false
       recommendedStrengthScaleMin.value = config.recommended_strength_scale_min ?? 0.5
       recommendedStrengthScaleMax.value = config.recommended_strength_scale_max ?? 1.0
+      useNewLoraBoost.value = config.use_new_lora_boost ?? false
+      newLoraBoostStrength.value = config.new_lora_boost_strength ?? 3.0
+      newLoraBoostDays.value = config.new_lora_boost_days ?? 7
     } finally {
       isRestoring = false
     }
@@ -145,6 +157,9 @@ export function useLoraRandomizerState(widget: ComponentWidget<RandomizerConfig>
         use_recommended_strength: config.use_recommended_strength,
         recommended_strength_scale_min: config.recommended_strength_scale_min,
         recommended_strength_scale_max: config.recommended_strength_scale_max,
+        use_new_lora_boost: config.use_new_lora_boost ?? false,
+        new_lora_boost_strength: config.new_lora_boost_strength ?? 3.0,
+        new_lora_boost_days: config.new_lora_boost_days ?? 7,
       }
 
       // Add count parameters
@@ -216,6 +231,9 @@ export function useLoraRandomizerState(widget: ComponentWidget<RandomizerConfig>
     useRecommendedStrength,
     recommendedStrengthScaleMin,
     recommendedStrengthScaleMax,
+    useNewLoraBoost,
+    newLoraBoostStrength,
+    newLoraBoostDays,
   ], () => {
     widget.value = buildConfig()
   }, { deep: true })
@@ -237,6 +255,9 @@ export function useLoraRandomizerState(widget: ComponentWidget<RandomizerConfig>
     useRecommendedStrength,
     recommendedStrengthScaleMin,
     recommendedStrengthScaleMax,
+    useNewLoraBoost,
+    newLoraBoostStrength,
+    newLoraBoostDays,
     executionSeed,
     nextSeed,
 
