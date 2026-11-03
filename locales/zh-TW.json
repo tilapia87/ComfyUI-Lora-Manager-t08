@@ -3261,13 +3261,15 @@
                 "like": "+1 按讚",
                 "dislike": "-1 倒讚",
                 "hate": "-3 特別討厭",
-                "score": "得分"
+                "score": "得分",
+                "strength": "提示詞權重"
             },
             "columns": {
                 "unrated": "未評分",
                 "total": "總數",
                 "score": "加權得分",
                 "strength": "強度加權得分",
+                "strengthWithAverage": "每票按提示詞裡給的強度折算 · 平均 {average}×",
                 "ratio": "按讚率"
             },
             "noRatio": "無",

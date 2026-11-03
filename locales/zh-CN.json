@@ -3261,13 +3261,15 @@
                 "like": "+1 点赞",
                 "dislike": "-1 点踩",
                 "hate": "-3 特别讨厌",
-                "score": "得分"
+                "score": "得分",
+                "strength": "提示词权重"
             },
             "columns": {
                 "unrated": "未评分",
                 "total": "总数",
                 "score": "加权得分",
                 "strength": "强度加权得分",
+                "strengthWithAverage": "每票按提示词里给的强度折算 · 平均 {average}×",
                 "ratio": "点赞率"
             },
             "noRatio": "无",

@@ -1210,6 +1210,7 @@ describe('GalleryPage', () => {
             net: 3,
             score: 9,
             weighted_score: 1.8,
+            average_strength: 0.2,
             levels: { love: 3, like: 0, dislike: 0, hate: 0 },
             like_ratio: 1,
           },
@@ -1227,11 +1228,29 @@ describe('GalleryPage', () => {
     await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(1));
 
     const card = document.querySelector('#galleryStatsBody .gallery-rank-card');
+
+    // Both scores are headline blocks side by side: the plain one and the
+    // prompt-weighted one, each with its own label so they cannot be confused.
+    const scores = card.querySelector('.gallery-rank-scores');
+    const blocks = scores.querySelectorAll('.gallery-rank-score');
+    expect(blocks.length).toBe(2);
+    expect(blocks[0].querySelector('.gallery-rank-score-label').textContent.trim()).toBe(
+      'gallery.stats.summary.score'
+    );
+    expect(blocks[1].querySelector('.gallery-rank-score-label').textContent.trim()).toBe(
+      'gallery.stats.summary.strength'
+    );
+
+    const plain = card.querySelector('[data-sort-metric="score"]');
+    expect(plain.textContent.trim()).toBe('+9');
+
     const strength = card.querySelector('[data-sort-metric="strength"]');
     expect(strength.textContent.trim()).toBe('+1.8');
-    expect(strength.title).toBe('gallery.stats.columns.strength');
-    // The plain score stays the headline: the weight only refines the ranking.
-    expect(card.querySelector('.gallery-rank-head .gallery-col-score').textContent.trim()).toBe('+9');
+    // The average multiplier is what explains why the two numbers differ; the
+    // i18n double appends the interpolation values after a pipe.
+    expect(strength.title).toBe('gallery.stats.columns.strengthWithAverage|0.20');
+    // It is no longer buried in the metric row with the vote counts.
+    expect(card.querySelector('.gallery-rank-metrics [data-sort-metric="strength"]')).toBeNull();
 
     strength.click();
     await vi.waitFor(() => expect(statsCalls(fetchStub.calls).at(-1).url).toContain('sort=strength'));

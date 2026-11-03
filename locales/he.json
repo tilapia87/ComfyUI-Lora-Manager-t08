@@ -3261,13 +3261,15 @@
                 "like": "[TODO: Translate] +1 Liked",
                 "dislike": "[TODO: Translate] -1 Disliked",
                 "hate": "[TODO: Translate] -3 Hated",
-                "score": "[TODO: Translate] Score"
+                "score": "[TODO: Translate] Score",
+                "strength": "[TODO: Translate] Prompt weight"
             },
             "columns": {
                 "unrated": "ללא הערכה",
                 "total": "סה\"כ",
                 "score": "[TODO: Translate] Weighted score",
                 "strength": "[TODO: Translate] Prompt-weighted score",
+                "strengthWithAverage": "[TODO: Translate] Each vote counts at the strength the prompt gave it · average {average}×",
                 "ratio": "יחס"
             },
             "noRatio": "לא זמין",

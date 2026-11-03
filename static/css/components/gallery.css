@@ -1280,15 +1280,24 @@
     min-width: 0;
 }
 
-/* Name + sample size on the left, the weighted score on the right: the score
-   is what a leaderboard is read by, so it gets its own large, tinted block
-   instead of sharing the small metric row. */
+/* Name + sample size on the left, the score block(s) on the right: the scores
+   are what a leaderboard is read by, so they get their own large, tinted blocks
+   instead of sharing the small metric row. The LoRA table shows two of them —
+   the plain score and the prompt-weighted one — so they share a right-aligned
+   group that keeps the title on the left. */
 .gallery-rank-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-2, 8px);
     min-width: 0;
+}
+
+.gallery-rank-scores {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-1, 4px);
+    flex: 0 0 auto;
 }
 
 .gallery-rank-title {
@@ -1308,6 +1317,16 @@
     border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.2));
     border-radius: var(--radius-md, 8px);
     background: var(--bg-hover, rgba(127, 127, 127, 0.12));
+}
+
+/* The prompt-weighted block is the secondary reading of the same row: it keeps
+   the tone of its own sign but stays visually behind the plain score. */
+.gallery-rank-score--strength {
+    border-style: dashed;
+}
+
+.gallery-rank-score--strength .gallery-rank-score-label {
+    opacity: 0.75;
 }
 
 .gallery-rank-score.is-positive {
@@ -1425,13 +1444,31 @@
     font-weight: var(--weight-semibold, 600);
 }
 
-/* The prompt-weighted score sits beside the level counts: same size, but
-   toned like the score it competes with so the two are comparable at a
-   glance. */
+/* The prompt-weighted score is the second headline of a LoRA ranking card, so
+   it reads at the same size as the plain score beside it — the whole point is
+   comparing the two. */
 .gallery-col-strength {
+    font-size: var(--text-lg, 16px);
+    font-weight: var(--weight-bold, 700);
+    line-height: 1.1;
     font-variant-numeric: tabular-nums;
-    font-weight: var(--weight-semibold, 600);
-    color: var(--text-secondary, #b8b8b8);
+    color: var(--text-primary, #f2f2f2);
+}
+
+/* It is a sort control too, exactly like the plain score. */
+.gallery-col-strength[data-sort-metric] {
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    transition: opacity var(--transition-fast, 150ms) ease;
+}
+
+.gallery-col-strength[data-sort-metric]:hover {
+    opacity: 0.78;
+}
+
+.gallery-col-strength:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus, 0 0 0 2px var(--color-accent, #4f8cff));
 }
 
 .gallery-col-strength.is-positive {

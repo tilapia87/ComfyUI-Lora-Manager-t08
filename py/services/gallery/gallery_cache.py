@@ -584,6 +584,7 @@ class GalleryCache:
                            SUM(CASE WHEN i.rating = {RATING_HATED} THEN 1 ELSE 0 END) AS hated,
                            SUM(i.rating) AS score,
                            COALESCE(SUM(i.rating * {strength_expression}), 0) AS weighted_score,
+                           AVG(CASE WHEN i.rating <> 0 THEN {strength_expression} END) AS average_strength,
                            COUNT(*) AS total
                            {label_sql}
                     FROM {table} c
@@ -619,6 +620,15 @@ class GalleryCache:
                 # equals ``score``; for LoRAs it answers "did the picture that
                 # ran this LoRA at 0.4 love it as much as the one at 1.0".
                 "weighted_score": round(float(row["weighted_score"] or 0.0), 3),
+                # Mean multiplier over the *rated* pictures only. It is how the
+                # UI explains the gap between the two scores: an average of 1.0
+                # means every rating was cast at full strength, so the weighted
+                # score can only equal the plain one.
+                "average_strength": (
+                    round(float(row["average_strength"]), 3)
+                    if row["average_strength"] is not None
+                    else None
+                ),
                 # Exact distribution of the four levels, for the card's bar.
                 "levels": {
                     "love": int(row["loved"] or 0),

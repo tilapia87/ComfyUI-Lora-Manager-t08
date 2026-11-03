@@ -1232,6 +1232,8 @@ async def test_lora_statistics_scale_each_vote_by_the_prompt_weight(tmp_path):
     strong_rows = {row["key"]: row for row in (await strong.stats(by="lora"))["items"]}
     assert strong_rows["style_x.safetensors"]["score"] == 3
     assert strong_rows["style_x.safetensors"]["weighted_score"] == 3
+    # The average multiplier is what the UI shows to explain the two numbers.
+    assert strong_rows["style_x.safetensors"]["average_strength"] == 1.0
 
     faint = _seed_lora_weights(
         tmp_path / "faint", [(3, 0.2), (3, 0.2), (3, 0.2)]
@@ -1240,6 +1242,61 @@ async def test_lora_statistics_scale_each_vote_by_the_prompt_weight(tmp_path):
     # The ranking the user sees is unchanged: all three votes still count.
     assert faint_rows["style_x.safetensors"]["score"] == 9
     assert faint_rows["style_x.safetensors"]["weighted_score"] == pytest.approx(1.8)
+    assert faint_rows["style_x.safetensors"]["average_strength"] == pytest.approx(0.2)
+
+
+async def test_lora_statistics_average_the_strength_of_rated_images_only(tmp_path):
+    # Unrated pictures are part of the sample size but not of the verdict: they
+    # must not drag the average multiplier towards their own weight, otherwise
+    # the hint that explains the two scores would lie about the rated ones.
+    cache = GalleryCache(str(tmp_path / "gallery.sqlite"))
+    entries = [("rated.png", 3, 1.0, 3), ("unrated.png", 0, 0.1, None)]
+    cache.upsert_images(
+        [
+            {
+                "image_path": str(tmp_path / "output" / name),
+                "file_name": name,
+                "mtime": float(index),
+                "size": 10,
+                "width": 8,
+                "height": 8,
+                "has_metadata": False,
+                "artists": [],
+                "loras": [{"name": "style_x.safetensors", "weight": weight, "exists_locally": False}],
+            }
+            for index, (name, _rating, weight, _expected) in enumerate(entries)
+        ]
+    )
+    for name, rating, _weight, _expected in entries:
+        if rating:
+            assert cache.set_rating(str(tmp_path / "output" / name), rating) is True
+    service = GalleryService(cache=cache)
+
+    row = (await service.stats(by="lora"))["items"][0]
+    assert row["total"] == 2
+    assert row["unrated"] == 1
+    assert row["average_strength"] == 1.0
+    # No rated image at all: nothing to average, so the hint falls back to the
+    # plain label instead of inventing a multiplier.
+    empty = GalleryCache(str(tmp_path / "empty" / "gallery.sqlite"))
+    path = str(tmp_path / "empty" / "output" / "plain.png")
+    empty.upsert_images(
+        [
+            {
+                "image_path": path,
+                "file_name": "plain.png",
+                "mtime": 1.0,
+                "size": 10,
+                "width": 8,
+                "height": 8,
+                "has_metadata": False,
+                "artists": [],
+                "loras": [{"name": "style_x.safetensors", "weight": 0.5, "exists_locally": False}],
+            }
+        ]
+    )
+    empty_rows = (await GalleryService(cache=empty).stats(by="lora"))["items"]
+    assert empty_rows[0]["average_strength"] is None
 
 
 async def test_lora_statistics_sort_by_prompt_strength(tmp_path):

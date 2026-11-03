@@ -3261,13 +3261,15 @@
                 "like": "[TODO: Translate] +1 Liked",
                 "dislike": "[TODO: Translate] -1 Disliked",
                 "hate": "[TODO: Translate] -3 Hated",
-                "score": "[TODO: Translate] Score"
+                "score": "[TODO: Translate] Score",
+                "strength": "[TODO: Translate] Prompt weight"
             },
             "columns": {
                 "unrated": "미평가",
                 "total": "전체",
                 "score": "[TODO: Translate] Weighted score",
                 "strength": "[TODO: Translate] Prompt-weighted score",
+                "strengthWithAverage": "[TODO: Translate] Each vote counts at the strength the prompt gave it · average {average}×",
                 "ratio": "비율"
             },
             "noRatio": "없음",

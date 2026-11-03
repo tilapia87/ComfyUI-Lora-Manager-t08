@@ -3261,13 +3261,15 @@
         "like": "+1 Liked",
         "dislike": "-1 Disliked",
         "hate": "-3 Hated",
-        "score": "Score"
+        "score": "Score",
+        "strength": "Prompt weight"
       },
       "columns": {
         "unrated": "Unrated",
         "total": "Total",
         "score": "Weighted score",
         "strength": "Prompt-weighted score",
+        "strengthWithAverage": "Each vote counts at the strength the prompt gave it · average {average}×",
         "ratio": "Ratio"
       },
       "noRatio": "n/a",

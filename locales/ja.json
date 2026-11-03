@@ -3261,13 +3261,15 @@
                 "like": "+1 いいね",
                 "dislike": "-1 よくない",
                 "hate": "-3 嫌い",
-                "score": "スコア"
+                "score": "スコア",
+                "strength": "プロンプト強度"
             },
             "columns": {
                 "unrated": "未評価",
                 "total": "合計",
                 "score": "重み付きスコア",
                 "strength": "強度加重スコア",
+                "strengthWithAverage": "各評価はプロンプトで指定された強度で数えます · 平均 {average}×",
                 "ratio": "比率"
             },
             "noRatio": "なし",

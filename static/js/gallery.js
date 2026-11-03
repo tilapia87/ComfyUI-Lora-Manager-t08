@@ -1589,16 +1589,32 @@ export class GalleryPage {
                 // Only the LoRA table has a second score: the prompt weight
                 // each picture actually gave the LoRA scales its vote, so a
                 // barely-present LoRA cannot rank as if it were the subject.
-                const strengthMetric =
+                // It sits beside the plain score instead of in the metric row:
+                // the two numbers answer different questions and the user asked
+                // to read them together.
+                const weighted = Number(row.weighted_score ?? score) || 0;
+                const averageStrength =
+                    row.average_strength === null || row.average_strength === undefined
+                        ? null
+                        : Number(row.average_strength);
+                const strengthHint =
+                    averageStrength === null
+                        ? translate('gallery.stats.columns.strength')
+                        : translate('gallery.stats.columns.strengthWithAverage', {
+                              average: averageStrength.toFixed(2),
+                          });
+                const strengthScore =
                     this.statsBy === 'lora'
-                        ? (() => {
-                              const weighted = Number(row.weighted_score ?? score) || 0;
-                              return `
-                    <span class="gallery-metric gallery-col-strength${this._scoreTone(weighted)}"
-                        data-sort-metric="strength" title="${tooltip('strength')}">
-                        <i class="fas fa-scale-balanced" aria-hidden="true"></i>${formatScore(weighted)}
-                    </span>`;
-                          })()
+                        ? `
+                                <span class="gallery-rank-score gallery-rank-score--strength${this._scoreTone(weighted)}"
+                                    title="${escapeHtml(strengthHint)}">
+                                    <b class="gallery-col-strength${this._scoreTone(weighted)}"
+                                        data-sort-metric="strength"
+                                        title="${escapeHtml(strengthHint)}">${formatScore(weighted)}</b>
+                                    <span class="gallery-rank-score-label">${escapeHtml(
+                                        translate('gallery.stats.summary.strength')
+                                    )}</span>
+                                </span>`
                         : '';
 
                 return `
@@ -1615,17 +1631,23 @@ export class GalleryPage {
                                     <div class="gallery-stat-label" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
                                     <div class="gallery-stat-sub">${escapeHtml(sub)}</div>
                                 </div>
-                                <!-- The weighted score is the headline of the
-                                     ranking, so it gets its own large, tinted
-                                     block instead of sharing the small metric
-                                     row: a leaderboard is read by this number. -->
-                                <span class="gallery-rank-score${scoreClass}" title="${tooltip('score')}">
-                                    <b class="gallery-col-score${scoreClass}" data-sort-metric="score"
-                                        title="${tooltip('score')}">${formatScore(score)}</b>
-                                    <span class="gallery-rank-score-label">${escapeHtml(
-                                        translate('gallery.stats.summary.score')
-                                    )}</span>
-                                </span>
+                                <!-- The plain score and, for LoRAs, the
+                                     prompt-weighted one are the headline of the
+                                     ranking: a leaderboard is read by these
+                                     numbers, so each gets a large tinted block
+                                     rather than a small metric row. They sit in
+                                     one group so the title keeps the space on the
+                                     left no matter how many blocks there are. -->
+                                <div class="gallery-rank-scores">
+                                    <span class="gallery-rank-score${scoreClass}" title="${tooltip('score')}">
+                                        <b class="gallery-col-score${scoreClass}" data-sort-metric="score"
+                                            title="${tooltip('score')}">${formatScore(score)}</b>
+                                        <span class="gallery-rank-score-label">${escapeHtml(
+                                            translate('gallery.stats.summary.score')
+                                        )}</span>
+                                    </span>
+                                    ${strengthScore}
+                                </div>
                             </div>
                             <div class="gallery-rank-metrics">
                                 ${levelMetric('love', '+3', 'loved', 'loved')}
@@ -1635,7 +1657,6 @@ export class GalleryPage {
                                 <span class="gallery-metric gallery-col-unrated" title="${tooltip('unrated')}">
                                     <i class="fas fa-minus" aria-hidden="true"></i>${Number(row.unrated) || 0}
                                 </span>
-                                ${strengthMetric}
                             </div>
                             <div class="gallery-col-levels">
                                 ${levelBar}
