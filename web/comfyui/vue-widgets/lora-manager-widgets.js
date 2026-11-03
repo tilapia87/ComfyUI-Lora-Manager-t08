@@ -15875,10 +15875,8 @@ function createWidgetAutoHeight(options) {
   };
   if (typeof ResizeObserver !== "undefined") {
     observer = new ResizeObserver(schedule);
-    const host = resolveHost();
-    if (host) observer.observe(host);
     const content = resolveContent();
-    if (content && content !== host) observer.observe(content);
+    if (content) observer.observe(content);
   }
   schedule();
   return {

@@ -80,7 +80,6 @@ export function createWidgetAutoHeight(
   options: WidgetAutoHeightOptions
 ): WidgetAutoHeightController {
   const { node, container, minHeight, contentSelector } = options
-
   let height = minHeight
   let disposed = false
   let observer: ResizeObserver | null = null
@@ -132,11 +131,12 @@ export function createWidgetAutoHeight(
   }
 
   if (typeof ResizeObserver !== 'undefined') {
+    // Only the content element is observed: the host is stretched to whatever
+    // height the node allocated, so watching it would turn every grow into
+    // another grow.
     observer = new ResizeObserver(schedule)
-    const host = resolveHost()
-    if (host) observer.observe(host)
     const content = resolveContent()
-    if (content && content !== host) observer.observe(content)
+    if (content) observer.observe(content)
   }
 
   // Content is rendered by the Vue app mounted into `container` right after
