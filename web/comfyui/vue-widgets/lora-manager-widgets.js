@@ -1586,7 +1586,7 @@ to { transform: rotate(360deg);
   transform: translateY(4px);
 }\r
 
-.lora-randomizer-widget[data-v-113bea34] {\r
+.lora-randomizer-widget[data-v-b3eafa9c] {\r
   padding: 6px;\r
   background: rgba(40, 44, 52, 0.6);\r
   border-radius: 6px;\r
@@ -1595,6 +1595,12 @@ to { transform: rotate(360deg);
   flex-direction: column;\r
   overflow: hidden;\r
   box-sizing: border-box;
+}\r
+\r
+/* Keep the settings form at its natural height so it drives the node height\r
+   instead of being squashed into whatever space the node currently has. */
+.lora-randomizer-widget[data-v-b3eafa9c] >  .randomizer-settings {\r
+  flex: 0 0 auto;
 }\r
 
 .cycler-settings[data-v-c9fa2d1c] {\r
@@ -13941,7 +13947,7 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const LoraRandomizerWidget = /* @__PURE__ */ _export_sfc(_sfc_main$6, [["__scopeId", "data-v-113bea34"]]);
+const LoraRandomizerWidget = /* @__PURE__ */ _export_sfc(_sfc_main$6, [["__scopeId", "data-v-b3eafa9c"]]);
 const _hoisted_1$4 = { class: "cycler-settings" };
 const _hoisted_2$4 = { class: "setting-section progress-section" };
 const _hoisted_3$3 = { class: "progress-label" };
@@ -15804,6 +15810,91 @@ function createVueWidgetCleanup(vueApp, onCleanup) {
     onCleanup == null ? void 0 : onCleanup();
   };
 }
+const HEIGHT_TOLERANCE = 1;
+function verticalPadding(element) {
+  var _a2;
+  const view = (_a2 = element.ownerDocument) == null ? void 0 : _a2.defaultView;
+  if (!view || typeof view.getComputedStyle !== "function") return 0;
+  const style2 = view.getComputedStyle(element);
+  const top = Number.parseFloat(style2.paddingTop) || 0;
+  const bottom = Number.parseFloat(style2.paddingBottom) || 0;
+  return top + bottom;
+}
+function measureContentHeight(host, content, minHeight) {
+  if (!content) return minHeight;
+  const contentHeight = Math.max(
+    Math.ceil(content.scrollHeight || 0),
+    Math.ceil(content.offsetHeight || 0)
+  );
+  return Math.max(minHeight, contentHeight + (host ? verticalPadding(host) : 0));
+}
+function createWidgetAutoHeight(options) {
+  const { node, container, minHeight, contentSelector } = options;
+  let height = minHeight;
+  let disposed = false;
+  let observer = null;
+  let frame = 0;
+  const resolveHost = () => container.firstElementChild ?? null;
+  const resolveContent = () => {
+    const host = resolveHost();
+    if (!host) return null;
+    return host.querySelector(contentSelector) ?? null;
+  };
+  const applyNodeSize = () => {
+    var _a2;
+    if (typeof node.computeSize !== "function" || typeof node.setSize !== "function") return;
+    const size = node.computeSize();
+    if (!Array.isArray(size)) return;
+    const current = Array.isArray(node.size) ? node.size : [];
+    const width = Math.max(Number(size[0]) || 0, Number(current[0]) || 0);
+    const targetHeight = Math.max(Number(size[1]) || 0, Number(current[1]) || 0);
+    node.setSize([width, targetHeight]);
+    (_a2 = node.setDirtyCanvas) == null ? void 0 : _a2.call(node, true, true);
+  };
+  const sync = () => {
+    if (disposed) return height;
+    const host = resolveHost();
+    const next = measureContentHeight(host, resolveContent(), minHeight);
+    if (next <= height + HEIGHT_TOLERANCE) return height;
+    height = next;
+    if (host) host.style.minHeight = `${height}px`;
+    applyNodeSize();
+    return height;
+  };
+  const schedule = () => {
+    if (disposed) return;
+    if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+      sync();
+      return;
+    }
+    if (frame) return;
+    frame = window.requestAnimationFrame(() => {
+      frame = 0;
+      sync();
+    });
+  };
+  if (typeof ResizeObserver !== "undefined") {
+    observer = new ResizeObserver(schedule);
+    const host = resolveHost();
+    if (host) observer.observe(host);
+    const content = resolveContent();
+    if (content && content !== host) observer.observe(content);
+  }
+  schedule();
+  return {
+    getHeight: () => height,
+    sync,
+    dispose: () => {
+      disposed = true;
+      observer == null ? void 0 : observer.disconnect();
+      observer = null;
+      if (frame && typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
+        window.cancelAnimationFrame(frame);
+      }
+      frame = 0;
+    }
+  };
+}
 let _loraSyntaxFormatCache = null;
 let _loraSyntaxFormatRefreshPromise = null;
 async function _fetchLoraSyntaxFormat() {
@@ -16289,7 +16380,7 @@ const LORA_POOL_WIDGET_MIN_WIDTH = 500;
 const LORA_POOL_WIDGET_MIN_HEIGHT = 520;
 const LORA_RANDOMIZER_WIDGET_MIN_WIDTH = 500;
 const LORA_RANDOMIZER_WIDGET_MIN_HEIGHT = 448;
-const LORA_RANDOMIZER_WIDGET_MAX_HEIGHT = LORA_RANDOMIZER_WIDGET_MIN_HEIGHT;
+const LORA_RANDOMIZER_WIDGET_CONTENT_SELECTOR = ".randomizer-settings";
 const LORA_CYCLER_WIDGET_MIN_WIDTH = 380;
 const LORA_CYCLER_WIDGET_MIN_HEIGHT = 408;
 const LORA_CYCLER_WIDGET_MAX_HEIGHT = LORA_CYCLER_WIDGET_MIN_HEIGHT;
@@ -16464,13 +16555,19 @@ function createLoraRandomizerWidget(node) {
   });
   vueApp.mount(container);
   vueApps.set(node.id + 1e4, vueApp);
+  const autoHeight = createWidgetAutoHeight({
+    node,
+    container,
+    minHeight: LORA_RANDOMIZER_WIDGET_MIN_HEIGHT,
+    contentSelector: LORA_RANDOMIZER_WIDGET_CONTENT_SELECTOR
+  });
   widget.computeLayoutSize = () => {
     const minWidth = LORA_RANDOMIZER_WIDGET_MIN_WIDTH;
-    const minHeight = LORA_RANDOMIZER_WIDGET_MIN_HEIGHT;
-    const maxHeight = LORA_RANDOMIZER_WIDGET_MAX_HEIGHT;
-    return { minHeight, minWidth, maxHeight };
+    const minHeight = Math.max(LORA_RANDOMIZER_WIDGET_MIN_HEIGHT, autoHeight.getHeight());
+    return { minHeight, minWidth };
   };
   widget.onRemove = () => {
+    autoHeight.dispose();
     const vueApp2 = vueApps.get(node.id + 1e4);
     if (vueApp2) {
       vueApp2.unmount();

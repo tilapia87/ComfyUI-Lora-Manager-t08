@@ -38,6 +38,25 @@ Existing examples: `.lm-loras-container.lm-vue-node` and `.comfy-tags-container.
 
 **Do NOT** fix height issues with `maxHeight`, `getMaxHeight()`, or inline `max-height` — these prevent the user from resizing the node.
 
+## Content-Driven Height
+
+Form-like widgets (the LoRA Randomizer settings) must fit every section they render. A fixed `maxHeight` clips the last rows and, because the widget container has `overflow: hidden`, the loss is silent — no scrollbar, no warning.
+
+`vue-widgets/src/utils/widgetAutoHeight.ts` handles this:
+
+- it measures the *content* element (`.randomizer-settings`), never the host box — the host is stretched to the allocated height, so observing it would feed an endless grow-loop back into the observer;
+- the measured height becomes `computeLayoutSize().minHeight`, so `minHeight` follows the content;
+- when the content no longer fits, it runs the §4.4 sequence (`node.computeSize()` → `node.setSize()` → `node.setDirtyCanvas(true, true)`);
+- growth is one-way: a node the user enlarged is never shrunk, and collapsing a section leaves the previous height in place.
+
+The Vue root must not stretch its content vertically, or the content would never report a natural height:
+
+```css
+.lora-randomizer-widget > :deep(.randomizer-settings) {
+  flex: 0 0 auto;
+}
+```
+
 ## Scroll Wheel Isolation
 
 Both modes need to distinguish "user wants to scroll widget content" from "user wants to zoom canvas".

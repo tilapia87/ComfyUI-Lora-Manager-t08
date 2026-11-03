@@ -7,6 +7,7 @@ import JsonDisplayWidget from '@/components/JsonDisplayWidget.vue'
 import AutocompleteTextWidget from '@/components/AutocompleteTextWidget.vue'
 import LoraInfoWidget from '@/components/LoraInfoWidget.vue'
 import { createVueWidgetCleanup } from './vue-widget-cleanup'
+import { createWidgetAutoHeight } from './utils/widgetAutoHeight'
 import type { LoraPoolConfig, RandomizerConfig, CyclerConfig } from './composables/types'
 import {
   setupModeChangeHandler,
@@ -18,7 +19,7 @@ const LORA_POOL_WIDGET_MIN_WIDTH = 500
 const LORA_POOL_WIDGET_MIN_HEIGHT = 520
 const LORA_RANDOMIZER_WIDGET_MIN_WIDTH = 500
 const LORA_RANDOMIZER_WIDGET_MIN_HEIGHT = 448
-const LORA_RANDOMIZER_WIDGET_MAX_HEIGHT = LORA_RANDOMIZER_WIDGET_MIN_HEIGHT
+const LORA_RANDOMIZER_WIDGET_CONTENT_SELECTOR = '.randomizer-settings'
 const LORA_CYCLER_WIDGET_MIN_WIDTH = 380
 const LORA_CYCLER_WIDGET_MIN_HEIGHT = 408
 const LORA_CYCLER_WIDGET_MAX_HEIGHT = LORA_CYCLER_WIDGET_MIN_HEIGHT
@@ -254,15 +255,25 @@ function createLoraRandomizerWidget(node) {
   vueApp.mount(container)
   vueApps.set(node.id + 10000, vueApp) // Offset to avoid collision with pool widget
 
+  // The settings view is a form: its height follows the visible sections
+  // (Boost / Clip / Preset rows expand and collapse), so the node has to grow
+  // with it instead of clipping whatever falls below a fixed layout height.
+  const autoHeight = createWidgetAutoHeight({
+    node,
+    container,
+    minHeight: LORA_RANDOMIZER_WIDGET_MIN_HEIGHT,
+    contentSelector: LORA_RANDOMIZER_WIDGET_CONTENT_SELECTOR
+  })
+
   widget.computeLayoutSize = () => {
     const minWidth = LORA_RANDOMIZER_WIDGET_MIN_WIDTH
-    const minHeight = LORA_RANDOMIZER_WIDGET_MIN_HEIGHT
-    const maxHeight = LORA_RANDOMIZER_WIDGET_MAX_HEIGHT
+    const minHeight = Math.max(LORA_RANDOMIZER_WIDGET_MIN_HEIGHT, autoHeight.getHeight())
 
-    return { minHeight, minWidth, maxHeight }
+    return { minHeight, minWidth }
   }
 
   widget.onRemove = () => {
+    autoHeight.dispose()
     const vueApp = vueApps.get(node.id + 10000)
     if (vueApp) {
       vueApp.unmount()

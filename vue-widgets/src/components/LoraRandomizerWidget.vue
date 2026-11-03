@@ -352,4 +352,10 @@ onMounted(async () => {
   overflow: hidden;
   box-sizing: border-box;
 }
+
+/* Keep the settings form at its natural height so it drives the node height
+   instead of being squashed into whatever space the node currently has. */
+.lora-randomizer-widget > :deep(.randomizer-settings) {
+  flex: 0 0 auto;
+}
 </style>
