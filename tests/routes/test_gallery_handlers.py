@@ -532,6 +532,21 @@ async def test_stats_endpoint_forwards_the_order(service, monkeypatch):
     assert captured["order"] == "asc"
 
 
+async def test_stats_endpoint_forwards_the_prompt_strength_sort(service, monkeypatch):
+    captured = {}
+
+    async def _stats(**kwargs):
+        captured.update(kwargs)
+        return {"by": "lora", "totals": {}, "total": 0, "offset": 0, "limit": 200, "items": []}
+
+    monkeypatch.setattr(service, "stats", _stats)
+
+    await GalleryHandlerSet().get_stats(FakeRequest(query={"by": "lora", "sort": "strength"}))
+
+    assert captured["by"] == "lora"
+    assert captured["sort"] == "strength"
+
+
 async def test_stats_endpoint_forwards_the_animadex_filter(service, monkeypatch):
     captured = {}
 

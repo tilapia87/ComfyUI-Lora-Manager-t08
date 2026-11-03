@@ -346,6 +346,14 @@
                                 <button type="button" class="gallery-segmented-btn" data-sort="ratio">
                                     {{ t('gallery.stats.columns.ratio') }}
                                 </button>
+                                <!-- Only meaningful when ranking LoRAs: the plain
+                                     score counts every vote at full value, this
+                                     one scales it by the strength the prompt
+                                     actually gave the LoRA. -->
+                                <button type="button" class="gallery-segmented-btn hidden" data-sort="strength"
+                                    id="galleryStatsStrengthPill" title="{{ t('gallery.stats.sort.strengthHint') }}">
+                                    {{ t('gallery.stats.sort.strength') }}
+                                </button>
                             </div>
                         </div>
 

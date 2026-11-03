@@ -555,7 +555,16 @@ class GalleryCache:
         *,
         group_extra: Optional[str] = None,
         preview_limit: int = 3,
+        strength_expression: str = "1.0",
     ) -> List[Dict[str, Any]]:
+        """Ranking rows for one grouping column.
+
+        ``strength_expression`` is the per-row multiplier applied to the rating
+        before summing. Every ranking keeps the plain ``score`` (one vote counts
+        its face value); the multiplier only feeds ``weighted_score``, so the LoRA
+        ranking can scale a vote by the strength the LoRA was actually run with
+        while the artist ranking leaves it at ``1.0``.
+        """
         self._ensure_schema()
         label_sql = f", {extra_label}" if extra_label else ""
         if group_extra is None:
@@ -574,6 +583,7 @@ class GalleryCache:
                            SUM(CASE WHEN i.rating = {RATING_DISLIKED} THEN 1 ELSE 0 END) AS disliked_mild,
                            SUM(CASE WHEN i.rating = {RATING_HATED} THEN 1 ELSE 0 END) AS hated,
                            SUM(i.rating) AS score,
+                           COALESCE(SUM(i.rating * {strength_expression}), 0) AS weighted_score,
                            COUNT(*) AS total
                            {label_sql}
                     FROM {table} c
@@ -604,6 +614,11 @@ class GalleryCache:
                 # stay so the card can still say how many images agreed.
                 "net": likes - dislikes,
                 "score": int(row["score"] or 0),
+                # The same votes scaled by how strongly each image used the
+                # ranked thing. For artists the multiplier is 1.0, so this
+                # equals ``score``; for LoRAs it answers "did the picture that
+                # ran this LoRA at 0.4 love it as much as the one at 1.0".
+                "weighted_score": round(float(row["weighted_score"] or 0.0), 3),
                 # Exact distribution of the four levels, for the card's bar.
                 "levels": {
                     "love": int(row["loved"] or 0),
@@ -782,7 +797,13 @@ class GalleryCache:
         )
 
     def stats_by_lora(self) -> List[Dict[str, Any]]:
-        """Per-LoRA vote counts and weighted scores, with the hash the scan resolved."""
+        """Per-LoRA vote counts and weighted scores, with the hash the scan resolved.
+
+        ``weighted_score`` scales each vote by the strength the LoRA ran at, so a
+        picture that barely used the LoRA cannot outvote one that leaned on it.
+        ``score`` stays the plain sum of the ratings, so both readings are
+        available and the ranking can be sorted by either.
+        """
         return self._aggregate(
             "gallery_image_loras",
             "lora_name",
@@ -790,6 +811,9 @@ class GalleryCache:
             # One row per name: the hash is only needed for the thumbnail link,
             # so the aggregate above is enough and must not split the group.
             group_extra="",
+            # A NULL weight means the scan could not recover the strength; count
+            # it at full value like the old behaviour instead of dropping it.
+            strength_expression="ABS(COALESCE(c.weight, 1.0))",
         )
 
     def rating_totals(self) -> Dict[str, Any]:

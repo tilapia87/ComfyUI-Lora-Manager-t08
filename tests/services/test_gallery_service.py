@@ -1197,3 +1197,113 @@ async def test_lora_statistics_ignore_the_animadex_filter(service, monkeypatch):
     assert stats["animadex"] == {}
     assert {row["key"] for row in stats["items"]} == {"style_a.safetensors", "style_b.safetensors"}
     assert index.ensure_loaded_calls == []
+
+
+def _seed_lora_weights(tmp_path, entries) -> GalleryService:
+    """One image per (rating, prompt weight) pair, all sharing one LoRA."""
+    cache = GalleryCache(str(tmp_path / "gallery.sqlite"))
+    paths = [str(tmp_path / "output" / f"{index}.png") for index in range(len(entries))]
+    cache.upsert_images(
+        [
+            {
+                "image_path": path,
+                "file_name": os.path.basename(path),
+                "mtime": float(index),
+                "size": 10,
+                "width": 8,
+                "height": 8,
+                "has_metadata": False,
+                "artists": [],
+                "loras": [{"name": "style_x.safetensors", "weight": weight, "exists_locally": False}],
+            }
+            for index, (path, (_rating, weight)) in enumerate(zip(paths, entries))
+        ]
+    )
+    for path, (rating, _weight) in zip(paths, entries):
+        assert cache.set_rating(path, rating) is True
+    return GalleryService(cache=cache)
+
+
+async def test_lora_statistics_scale_each_vote_by_the_prompt_weight(tmp_path):
+    # A +3 at full strength must outweigh three +3 votes at 0.2: the plain
+    # score counts votes, the prompt-weighted score counts how much of the
+    # prompt the LoRA actually owned.
+    strong = _seed_lora_weights(tmp_path, [(3, 1.0)])
+    strong_rows = {row["key"]: row for row in (await strong.stats(by="lora"))["items"]}
+    assert strong_rows["style_x.safetensors"]["score"] == 3
+    assert strong_rows["style_x.safetensors"]["weighted_score"] == 3
+
+    faint = _seed_lora_weights(
+        tmp_path / "faint", [(3, 0.2), (3, 0.2), (3, 0.2)]
+    )
+    faint_rows = {row["key"]: row for row in (await faint.stats(by="lora"))["items"]}
+    # The ranking the user sees is unchanged: all three votes still count.
+    assert faint_rows["style_x.safetensors"]["score"] == 9
+    assert faint_rows["style_x.safetensors"]["weighted_score"] == pytest.approx(1.8)
+
+
+async def test_lora_statistics_sort_by_prompt_strength(tmp_path):
+    # style_x is rated once at full weight, style_y three times at 0.1: the
+    # plain score ranks style_y first, the strength ranking flips it.
+    cache = GalleryCache(str(tmp_path / "gallery.sqlite"))
+    entries = [("a.png", "style_x.safetensors", 3, 1.0)] + [
+        (f"b{index}.png", "style_y.safetensors", 3, 0.1) for index in range(3)
+    ]
+    cache.upsert_images(
+        [
+            {
+                "image_path": str(tmp_path / "output" / name),
+                "file_name": name,
+                "mtime": float(index),
+                "size": 10,
+                "width": 8,
+                "height": 8,
+                "has_metadata": False,
+                "artists": [],
+                "loras": [{"name": lora, "weight": weight, "exists_locally": False}],
+            }
+            for index, (name, lora, _rating, weight) in enumerate(entries)
+        ]
+    )
+    for name, _lora, rating, _weight in entries:
+        assert cache.set_rating(str(tmp_path / "output" / name), rating) is True
+    service = GalleryService(cache=cache)
+
+    by_score = await service.stats(by="lora", sort="score")
+    assert [row["key"] for row in by_score["items"]][0] == "style_y.safetensors"
+
+    by_strength = await service.stats(by="lora", sort="strength")
+    assert [row["key"] for row in by_strength["items"]][0] == "style_x.safetensors"
+    # The strength sort must not hide the plain score from the payload.
+    assert {row["key"]: row["score"] for row in by_strength["items"]} == {
+        "style_x.safetensors": 3,
+        "style_y.safetensors": 9,
+    }
+
+
+async def test_artist_statistics_carry_a_neutral_prompt_weight(tmp_path):
+    # Artists have no prompt weight, so their weighted score must equal the
+    # plain score instead of silently scaling everything to zero.
+    cache = GalleryCache(str(tmp_path / "gallery.sqlite"))
+    path = str(tmp_path / "output" / "one.png")
+    cache.upsert_images(
+        [
+            {
+                "image_path": path,
+                "file_name": "one.png",
+                "mtime": 1.0,
+                "size": 10,
+                "width": 8,
+                "height": 8,
+                "has_metadata": False,
+                "artists": [{"name": "nnn yryr", "canonical": "nnn yryr", "known": True}],
+                "loras": [],
+            }
+        ]
+    )
+    assert cache.set_rating(path, 3) is True
+    service = GalleryService(cache=cache)
+
+    rows = {row["key"]: row for row in (await service.stats(by="artist"))["items"]}
+    assert rows["nnn yryr"]["score"] == 3
+    assert rows["nnn yryr"]["weighted_score"] == 3

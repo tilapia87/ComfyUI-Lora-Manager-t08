@@ -1425,6 +1425,23 @@
     font-weight: var(--weight-semibold, 600);
 }
 
+/* The prompt-weighted score sits beside the level counts: same size, but
+   toned like the score it competes with so the two are comparable at a
+   glance. */
+.gallery-col-strength {
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--weight-semibold, 600);
+    color: var(--text-secondary, #b8b8b8);
+}
+
+.gallery-col-strength.is-positive {
+    color: var(--color-success, #2ecc71);
+}
+
+.gallery-col-strength.is-negative {
+    color: var(--color-error, #e74c3c);
+}
+
 .gallery-level-tag {
     font-size: 10px;
     font-weight: var(--weight-bold, 700);

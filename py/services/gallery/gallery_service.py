@@ -55,6 +55,9 @@ _ANIMADEX_INDEX_WAIT_SECONDS = 1.5
 # and "most hated" are answerable without the weighted score blurring them.
 _STATS_SORT_KEYS = {
     "score": lambda item: item["score"],
+    # Same votes, each scaled by the strength the ranked LoRA ran at. For
+    # artists the multiplier is 1.0, so this sort matches "score" there.
+    "strength": lambda item: item.get("weighted_score", item["score"]),
     "net": lambda item: item["net"],
     "likes": lambda item: item["likes"],
     "dislikes": lambda item: item["dislikes"],

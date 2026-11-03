@@ -3241,6 +3241,8 @@
             "sort": {
                 "label": "מיון לפי",
                 "score": "[TODO: Translate] Weighted score",
+                "strength": "[TODO: Translate] Prompt weight",
+                "strengthHint": "[TODO: Translate] Count each vote at the strength the prompt gave the LoRA, so a LoRA a picture barely used cannot outrank one it leaned on.",
                 "total": "סה\"כ",
                 "ratio": "יחס לייקים"
             },
@@ -3265,6 +3267,7 @@
                 "unrated": "ללא הערכה",
                 "total": "סה\"כ",
                 "score": "[TODO: Translate] Weighted score",
+                "strength": "[TODO: Translate] Prompt-weighted score",
                 "ratio": "יחס"
             },
             "noRatio": "לא זמין",

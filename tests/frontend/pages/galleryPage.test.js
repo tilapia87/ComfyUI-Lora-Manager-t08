@@ -1143,6 +1143,100 @@ describe('GalleryPage', () => {
     }
   });
 
+  it('lands on the 2pass search and keeps the box in sync with it', async () => {
+    await boot();
+
+    const searchInput = document.getElementById('gallerySearchInput');
+    expect(searchInput.value).toBe('2pass');
+    // The first page is already filtered, not the whole output folder.
+    expect(imageCalls(fetchStub.calls)[0].url).toContain('q=2pass');
+
+    // Clearing the box still shows everything.
+    searchInput.value = '';
+    searchInput.dispatchEvent(new Event('input'));
+
+    await vi.waitFor(() => expect(imageCalls(fetchStub.calls).length).toBe(2));
+    expect(imageCalls(fetchStub.calls)[1].url).not.toContain('q=2pass');
+  });
+
+  it('offers the prompt-weight ranking only for the LoRA table', async () => {
+    await boot();
+
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    // Artists carry no prompt weight, so the pill stays out of their table.
+    const pill = document.getElementById('galleryStatsStrengthPill');
+    expect(pill.classList.contains('hidden')).toBe(true);
+
+    document.querySelector('#galleryStatsBySwitch [data-by="lora"]').click();
+    await vi.waitFor(() =>
+      expect(document.getElementById('galleryStatsStrengthPill').classList.contains('hidden')).toBe(false)
+    );
+
+    document.getElementById('galleryStatsStrengthPill').click();
+
+    await vi.waitFor(() => {
+      const last = statsCalls(fetchStub.calls).at(-1);
+      expect(last.url).toContain('by=lora');
+      expect(last.url).toContain('sort=strength');
+    });
+    expect(document.getElementById('galleryStatsStrengthPill').classList.contains('active')).toBe(true);
+
+    // Switching back to artists drops the unusable ranking instead of
+    // silently keeping a sort the visible rows cannot honour.
+    document.querySelector('#galleryStatsBySwitch [data-by="artist"]').click();
+    await vi.waitFor(() => expect(document.getElementById('galleryStatsStrengthPill').classList.contains('hidden')).toBe(true));
+    expect(statsCalls(fetchStub.calls).at(-1).url).toContain('sort=score');
+  });
+
+  it('shows the prompt-weighted score per LoRA row', async () => {
+    fetchStub.setRoute('/api/lm/gallery/stats', {
+      success: true,
+      data: {
+        by: 'lora',
+        totals: { images: 2, rated: 2, score: 9, levels: { love: 3, like: 0, dislike: 0, hate: 0 } },
+        total: 1,
+        offset: 0,
+        items: [
+          {
+            key: 'style_a.safetensors',
+            label: 'style_a.safetensors',
+            known: true,
+            likes: 3,
+            dislikes: 0,
+            unrated: 0,
+            total: 3,
+            net: 3,
+            score: 9,
+            weighted_score: 1.8,
+            levels: { love: 3, like: 0, dislike: 0, hate: 0 },
+            like_ratio: 1,
+          },
+        ],
+      },
+    });
+
+    await boot();
+
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    // The weighted column is a LoRA-only view.
+    document.querySelector('#galleryStatsBySwitch [data-by="lora"]').click();
+    await vi.waitFor(() => expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(1));
+
+    const card = document.querySelector('#galleryStatsBody .gallery-rank-card');
+    const strength = card.querySelector('[data-sort-metric="strength"]');
+    expect(strength.textContent.trim()).toBe('+1.8');
+    expect(strength.title).toBe('gallery.stats.columns.strength');
+    // The plain score stays the headline: the weight only refines the ranking.
+    expect(card.querySelector('.gallery-rank-head .gallery-col-score').textContent.trim()).toBe('+9');
+
+    strength.click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).at(-1).url).toContain('sort=strength'));
+  });
+
   it('ranks by an exact level when its metric is clicked', async () => {
     await boot();
 

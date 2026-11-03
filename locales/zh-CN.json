@@ -3241,16 +3241,18 @@
             "sort": {
                 "label": "排序",
                 "score": "加权得分",
+                "strength": "提示词权重",
+                "strengthHint": "按提示词中给该 LoRA 的强度给每票加权，几乎没用到的 LoRA 无法压过真正主打的 LoRA。",
                 "total": "总数",
                 "ratio": "点赞率"
             },
             "animadex": {
-                "group": "[TODO: Translate] Catalogue",
-                "label": "[TODO: Translate] animadex only",
-                "hint": "[TODO: Translate] Rank only the artists listed on animadex.net. The catalogue is downloaded once and cached for a week.",
-                "loading": "[TODO: Translate] Loading the animadex artist catalogue… {done}/{total}",
-                "failed": "[TODO: Translate] The animadex artist catalogue is unavailable right now.",
-                "noMatch": "[TODO: Translate] No artist ranked here is listed on animadex."
+                "group": "目录",
+                "label": "仅 animadex",
+                "hint": "只对 animadex.net 收录的画师排名。目录只需下载一次，缓存一周。",
+                "loading": "正在加载 animadex 画师目录… {done}/{total}",
+                "failed": "animadex 画师目录暂时不可用。",
+                "noMatch": "这里排名靠前的画师都不在 animadex 收录之中。"
             },
             "summary": {
                 "images": "图片",
@@ -3265,6 +3267,7 @@
                 "unrated": "未评分",
                 "total": "总数",
                 "score": "加权得分",
+                "strength": "强度加权得分",
                 "ratio": "点赞率"
             },
             "noRatio": "无",

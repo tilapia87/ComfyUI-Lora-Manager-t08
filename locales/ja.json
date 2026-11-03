@@ -2971,8 +2971,8 @@
             "settingsSaved": "ギャラリー設定を保存しました",
             "settingsSaveFailed": "ギャラリー設定の保存に失敗しました：{message}",
             "loraLinkFailed": "LoRA ページで {name} を開けませんでした",
-            "cacheCleared": "[TODO: Translate] Removed {count} cached thumbnails",
-            "cacheClearFailed": "[TODO: Translate] Could not clear the thumbnail cache: {message}"
+            "cacheCleared": "キャッシュ済みサムネイルを {count} 件削除しました",
+            "cacheClearFailed": "サムネイルキャッシュを削除できませんでした: {message}"
         },
         "agent": {
             "llmNotConfigured": "AIプロバイダーが設定されていません。設定 → AIプロバイダーで有効にしてください。",
@@ -3100,23 +3100,23 @@
             "statistics": "統計"
         },
         "density": {
-            "label": "[TODO: Translate] Thumbnail size",
-            "compact": "[TODO: Translate] Compact thumbnails",
-            "comfortable": "[TODO: Translate] Standard thumbnails",
-            "large": "[TODO: Translate] Large thumbnails"
+            "label": "サムネイルサイズ",
+            "compact": "コンパクト",
+            "comfortable": "標準",
+            "large": "大"
         },
         "filters": {
-            "label": "[TODO: Translate] Filters"
+            "label": "フィルター"
         },
         "order": {
-            "label": "[TODO: Translate] Order",
-            "desc": "[TODO: Translate] Default",
-            "asc": "[TODO: Translate] Reversed"
+            "label": "並び順",
+            "desc": "既定",
+            "asc": "逆順"
         },
         "actions": {
             "scan": "出力フォルダをスキャン",
-            "loadMore": "[TODO: Translate] Load more images",
-            "loadingMore": "[TODO: Translate] Loading more...",
+            "loadMore": "さらに読み込む",
+            "loadingMore": "読み込み中...",
             "scanNow": "今すぐスキャン",
             "settings": "ギャラリー設定",
             "setOutputFolder": "出力フォルダを設定",
@@ -3137,14 +3137,14 @@
         },
         "rating": {
             "label": "評価",
-            "all": "[TODO: Translate] All",
-            "loved": "[TODO: Translate] Loved (+3)",
-            "like": "[TODO: Translate] Liked (+1)",
-            "dislike": "[TODO: Translate] Disliked (-1)",
-            "hated": "[TODO: Translate] Hated (-3)",
+            "all": "すべて",
+            "loved": "お気に入り (+3)",
+            "like": "いいね (+1)",
+            "dislike": "よくない (-1)",
+            "hated": "嫌い (-3)",
             "unrated": "未評価",
-            "distribution": "[TODO: Translate] +3 {love} · +1 {like} · -1 {dislike} · -3 {hate} · unrated {unrated}",
-            "progress": "[TODO: Translate] {rated} of {images} rated"
+            "distribution": "+3 {love} · +1 {like} · -1 {dislike} · -3 {hate} · 未評価 {unrated}",
+            "progress": "{images} 件中 {rated} 件を評価済み"
         },
         "metadata": {
             "label": "メタデータ",
@@ -3165,10 +3165,10 @@
         },
         "card": {
             "unknownSize": "サイズ不明",
-            "loveHint": "[TODO: Translate] Love it (+3, Shift+ArrowUp or I)",
+            "loveHint": "お気に入り (+3、Shift+↑ または I)",
             "likeHint": "いいね（↑ または U）",
             "dislikeHint": "よくないね（↓ または D）",
-            "hateHint": "[TODO: Translate] Hate it (-3, Shift+ArrowDown or K)",
+            "hateHint": "嫌い (-3、Shift+↓ または K)",
             "artistHint": "@{name} - 絵師リストから",
             "unknownArtistHint": "@{name} - 絵師リストに見つかりません",
             "loraHint": "{name} を使用した画像を表示",
@@ -3177,7 +3177,7 @@
             "noMetadataHint": "この画像には読み取り可能な生成メタデータがないため、使用された絵師と LoRA は不明です。"
         },
         "viewer": {
-            "hint": "[TODO: Translate] Click the active level again to clear · ↑/U +1 · Shift+↑/I +3 · ↓/D -1 · Shift+↓/K -3"
+            "hint": "選択中の段階をもう一度クリックで解除 · ↑/U +1 · Shift+↑/I +3 · ↓/D -1 · Shift+↓/K -3"
         },
         "progress": {
             "stage": {
@@ -3219,13 +3219,13 @@
             "recursiveHint": "出力フォルダのサブフォルダもスキャンします。",
             "effectivePath": "有効なフォルダ：{path}（{source}）",
             "effectivePathUnset": "出力フォルダを検出できませんでした。",
-            "thumbnailSize": "[TODO: Translate] Thumbnail size",
-            "thumbnailSizeHint": "[TODO: Translate] Used by the grid and the statistics previews.",
-            "thumbnailCache": "[TODO: Translate] Thumbnail cache",
-            "thumbnailCacheHint": "[TODO: Translate] Thumbnails are generated on demand and safe to delete.",
-            "thumbnailCacheValue": "[TODO: Translate] {count} thumbnails · {size}",
-            "thumbnailCacheUnavailable": "[TODO: Translate] Cache information unavailable",
-            "clearCache": "[TODO: Translate] Clear cache",
+            "thumbnailSize": "サムネイルサイズ",
+            "thumbnailSizeHint": "グリッドと統計のプレビューで使用します。",
+            "thumbnailCache": "サムネイルキャッシュ",
+            "thumbnailCacheHint": "サムネイルは必要に応じて生成されるため、削除しても問題ありません。",
+            "thumbnailCacheValue": "{count} 件 · {size}",
+            "thumbnailCacheUnavailable": "キャッシュ情報を取得できません",
+            "clearCache": "キャッシュを削除",
             "source": {
                 "comfyui": "自動検出",
                 "setting": "設定から",
@@ -3240,31 +3240,34 @@
             },
             "sort": {
                 "label": "並び順",
-                "score": "[TODO: Translate] Weighted score",
+                "score": "重み付きスコア",
+                "strength": "プロンプト強度",
+                "strengthHint": "投票を、プロンプトでその LoRA に指定した強度で重み付けます。ほとんど使っていない LoRA が主役の LoRA より上位に来ることはありません。",
                 "total": "合計",
                 "ratio": "いいね率"
             },
             "animadex": {
-                "group": "[TODO: Translate] Catalogue",
-                "label": "[TODO: Translate] animadex only",
-                "hint": "[TODO: Translate] Rank only the artists listed on animadex.net. The catalogue is downloaded once and cached for a week.",
-                "loading": "[TODO: Translate] Loading the animadex artist catalogue… {done}/{total}",
-                "failed": "[TODO: Translate] The animadex artist catalogue is unavailable right now.",
-                "noMatch": "[TODO: Translate] No artist ranked here is listed on animadex."
+                "group": "カタログ",
+                "label": "animadex のみ",
+                "hint": "animadex.net に登録されている絵師だけをランキングします。カタログは一度だけダウンロードされ、1 週間キャッシュされます。",
+                "loading": "animadex の絵師カタログを読み込み中… {done}/{total}",
+                "failed": "animadex の絵師カタログは現在利用できません。",
+                "noMatch": "ここにランクインした絵師は animadex に登録されていません。"
             },
             "summary": {
                 "images": "画像",
                 "rated": "評価済み",
-                "love": "[TODO: Translate] +3 Loved",
-                "like": "[TODO: Translate] +1 Liked",
-                "dislike": "[TODO: Translate] -1 Disliked",
-                "hate": "[TODO: Translate] -3 Hated",
-                "score": "[TODO: Translate] Score"
+                "love": "+3 お気に入り",
+                "like": "+1 いいね",
+                "dislike": "-1 よくない",
+                "hate": "-3 嫌い",
+                "score": "スコア"
             },
             "columns": {
                 "unrated": "未評価",
                 "total": "合計",
-                "score": "[TODO: Translate] Weighted score",
+                "score": "重み付きスコア",
+                "strength": "強度加重スコア",
                 "ratio": "比率"
             },
             "noRatio": "なし",
@@ -3273,7 +3276,7 @@
         },
         "loraTab": {
             "title": "ギャラリー",
-            "summary": "[TODO: Translate] {total} images · +3 {loved} · +1 {like} · -1 {dislike} · -3 {hated} · unrated {unrated}",
+            "summary": "{total} 件 · +3 {loved} · +1 {like} · -1 {dislike} · -3 {hated} · 未評価 {unrated}",
             "empty": "この LoRA を使用したギャラリーの画像はまだありません。",
             "loadFailed": "ギャラリー画像の読み込みに失敗しました。しばらくしてからもう一度お試しください。"
         }

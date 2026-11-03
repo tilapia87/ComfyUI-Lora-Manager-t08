@@ -36,6 +36,12 @@ const ANIMADEX_RETRY_INTERVAL_MS = 1500;
 const SCAN_POLL_INTERVAL_MS = 800;
 const PROGRESS_HIDE_DELAY_MS = 8000;
 const SEARCH_DEBOUNCE_MS = 300;
+
+// The gallery opens on a search that is already in effect: the box is filled
+// with this term and the first page is fetched with it, so the landing state is
+// the filtered grid rather than everything the output folder holds. Clearing the
+// box still shows the whole gallery.
+const DEFAULT_GALLERY_SEARCH = '2pass';
 // Rating one card changes four facet counts and the distribution bar; a run of
 // keyboard votes must not fire one request per image.
 const SUMMARY_REFRESH_DEBOUNCE_MS = 400;
@@ -237,7 +243,7 @@ export class GalleryPage {
         this.sort = 'newest';
         this.ratingFilter = 'all';
         this.metadataFilter = 'all';
-        this.search = '';
+        this.search = DEFAULT_GALLERY_SEARCH;
         this.artist = '';
         this.lora = '';
 
@@ -358,6 +364,7 @@ export class GalleryPage {
             nextPage: byId('galleryNextPage'),
             statsBySwitch: byId('galleryStatsBySwitch'),
             statsSortPills: byId('galleryStatsSortPills'),
+            statsStrengthPill: byId('galleryStatsStrengthPill'),
             statsSummary: byId('galleryStatsSummary'),
             statsTableWrap: byId('galleryStatsTableWrap'),
             statsBody: byId('galleryStatsBody'),
@@ -456,7 +463,12 @@ export class GalleryPage {
             // The animadex catalogue only knows artists: leaving the artist
             // grouping drops the filter instead of keeping a hidden state.
             if (this.statsBy !== 'artist') this.statsAnimadexOnly = false;
+            // The strength ranking only exists for LoRAs (it scales the votes
+            // by the weight the prompt gave the LoRA), so fall back to the
+            // plain score instead of leaving a hidden sort active.
+            if (this.statsBy !== 'lora' && this.statsSort === 'strength') this.statsSort = 'score';
             this._syncStatsBySwitch();
+            this._syncStatsSortPills();
             this.loadStats();
         });
 
@@ -1385,7 +1397,11 @@ export class GalleryPage {
         const el = this.el;
         this._hide(el.errorState);
 
-        const filtersActive = Boolean(this.artist || this.lora || this.search) ||
+        // The search box starts pre-filled, so the default term must not read
+        // as a filter the user applied: otherwise an untouched gallery would
+        // claim "no matches" instead of explaining that it is still empty.
+        const searchFiltered = Boolean(this.search) && this.search !== DEFAULT_GALLERY_SEARCH;
+        const filtersActive = Boolean(this.artist || this.lora || searchFiltered) ||
             this.ratingFilter !== 'all' ||
             this.metadataFilter !== 'all';
         const outputUnset = !this.config || this.config.output_path_source === 'unset' || !this.config.output_path;
@@ -1570,6 +1586,21 @@ export class GalleryPage {
                         <span class="gallery-level-tag">${label}</span>${Number(levels[level]) || 0}
                     </span>`;
 
+                // Only the LoRA table has a second score: the prompt weight
+                // each picture actually gave the LoRA scales its vote, so a
+                // barely-present LoRA cannot rank as if it were the subject.
+                const strengthMetric =
+                    this.statsBy === 'lora'
+                        ? (() => {
+                              const weighted = Number(row.weighted_score ?? score) || 0;
+                              return `
+                    <span class="gallery-metric gallery-col-strength${this._scoreTone(weighted)}"
+                        data-sort-metric="strength" title="${tooltip('strength')}">
+                        <i class="fas fa-scale-balanced" aria-hidden="true"></i>${formatScore(weighted)}
+                    </span>`;
+                          })()
+                        : '';
+
                 return `
                     <article class="gallery-rank-card${unknownClass}" data-key="${escapeHtml(row.key || label)}"${artistAttr}
                         tabindex="0" title="${escapeHtml(translate('gallery.stats.rowHint'))}">
@@ -1604,6 +1635,7 @@ export class GalleryPage {
                                 <span class="gallery-metric gallery-col-unrated" title="${tooltip('unrated')}">
                                     <i class="fas fa-minus" aria-hidden="true"></i>${Number(row.unrated) || 0}
                                 </span>
+                                ${strengthMetric}
                             </div>
                             <div class="gallery-col-levels">
                                 ${levelBar}
@@ -1826,7 +1858,18 @@ export class GalleryPage {
      * @param {string} sort - score|netted counts|exact levels|total|ratio.
      */
     setStatsSort(sort) {
-        const allowed = ['score', 'loved', 'liked', 'disliked', 'hated', 'likes', 'dislikes', 'total', 'ratio'];
+        const allowed = [
+            'score',
+            'strength',
+            'loved',
+            'liked',
+            'disliked',
+            'hated',
+            'likes',
+            'dislikes',
+            'total',
+            'ratio',
+        ];
         if (!allowed.includes(sort) || sort === this.statsSort) return;
         this.statsSort = sort;
         this.statsPage = 1;
@@ -1863,6 +1906,11 @@ export class GalleryPage {
     _syncStatsSortPills() {
         const pills = this.el.statsSortPills;
         if (!pills) return;
+        // The strength ranking is a LoRA-only metric: show its pill there and
+        // hide it for the artist table so the control always matches the
+        // visible rows.
+        const strengthAvailable = this.statsBy === 'lora';
+        this.el.statsStrengthPill?.classList.toggle('hidden', !strengthAvailable);
         for (const button of pills.querySelectorAll('[data-sort]')) {
             const active = button.dataset.sort === this.statsSort;
             button.classList.toggle('active', active);
@@ -2273,6 +2321,12 @@ export class GalleryPage {
         if (this.el.artistListInput) this.el.artistListInput.value = settings.artistListPath;
         if (this.el.recursiveToggle) this.el.recursiveToggle.checked = settings.recursive;
         if (this.el.thumbnailSizeSelect) this.el.thumbnailSizeSelect.value = String(settings.thumbnailSize);
+        // The default search is part of the landing state, so the box shows it
+        // before the first fetch instead of looking empty while results are
+        // already filtered.
+        if (this.el.searchInput && this.search) {
+            this.el.searchInput.value = this.search;
+        }
     }
 
     toggleSettings() {
