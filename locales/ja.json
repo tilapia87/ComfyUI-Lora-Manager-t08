@@ -3161,7 +3161,8 @@
         },
         "filter": {
             "artist": "絵師：{name}",
-            "lora": "LoRA：{name}"
+            "lora": "LoRA：{name}",
+            "loraPair": "LoRA 組み合わせ: {first} + {second}"
         },
         "card": {
             "unknownSize": "サイズ不明",
@@ -3236,7 +3237,8 @@
             "by": {
                 "label": "グループ化",
                 "artist": "絵師",
-                "lora": "LoRA"
+                "lora": "LoRA",
+                "combo": "LoRA 組み合わせ"
             },
             "sort": {
                 "label": "並び順",
@@ -3244,7 +3246,9 @@
                 "strength": "プロンプト強度",
                 "strengthHint": "投票を、プロンプトでその LoRA に指定した強度で重み付けます。ほとんど使っていない LoRA が主役の LoRA より上位に来ることはありません。",
                 "total": "合計",
-                "ratio": "いいね率"
+                "ratio": "いいね率",
+                "average": "平均点",
+                "averageHint": "評価済み画像数で得点を割ります。出現回数が多いだけの項目が上位に来ないようにするための並び替えです。"
             },
             "animadex": {
                 "group": "カタログ",
@@ -3270,7 +3274,9 @@
                 "score": "重み付きスコア",
                 "strength": "強度加重スコア",
                 "strengthWithAverage": "各評価はプロンプトで指定された強度で数えます · 平均 {average}×",
-                "ratio": "比率"
+                "ratio": "比率",
+                "average": "評価済み1枚あたりの得点",
+                "averageWeighted": "評価済み1枚あたりの重み付き得点"
             },
             "noRatio": "なし",
             "rowHint": "この項目の画像を表示",

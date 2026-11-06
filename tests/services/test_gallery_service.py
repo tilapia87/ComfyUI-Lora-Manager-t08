@@ -1364,3 +1364,198 @@ async def test_artist_statistics_carry_a_neutral_prompt_weight(tmp_path):
     rows = {row["key"]: row for row in (await service.stats(by="artist"))["items"]}
     assert rows["nnn yryr"]["score"] == 3
     assert rows["nnn yryr"]["weighted_score"] == 3
+
+
+def _seed_pair_images(tmp_path, entries) -> GalleryCache:
+    """Index one image per (rating, [(lora, weight), ...]) entry.
+
+    A tiny helper for the average-score and pair-ranking tests: the statistics
+    only read the normalized child tables, so no filesystem scan is needed.
+    """
+    cache = GalleryCache(str(tmp_path / "gallery.sqlite"))
+    paths = [str(tmp_path / "output" / f"{index}.png") for index in range(len(entries))]
+    cache.upsert_images(
+        [
+            {
+                "image_path": path,
+                "file_name": os.path.basename(path),
+                "mtime": float(index),
+                "size": 10,
+                "width": 8,
+                "height": 8,
+                "has_metadata": False,
+                "artists": [],
+                "loras": [
+                    {"name": name, "weight": weight, "exists_locally": False}
+                    for name, weight in loras
+                ],
+            }
+            for index, (path, (_rating, loras)) in enumerate(zip(paths, entries))
+        ]
+    )
+    for path, (rating, _loras) in zip(paths, entries):
+        assert cache.set_rating(path, rating) is True
+    return cache
+
+
+async def test_average_score_divides_by_rated_pictures_only(tmp_path):
+    # One +3 and one unrated image: the headline score is still 3, but the
+    # "score per rated picture" must stay 3 instead of being halved by a
+    # picture the user never judged.
+    cache = _seed_pair_images(
+        tmp_path,
+        [
+            (3, [("style_x.safetensors", 1.0)]),
+            (0, [("style_x.safetensors", 1.0)]),
+        ],
+    )
+    service = GalleryService(cache=cache)
+    row = (await service.stats(by="lora"))["items"][0]
+    assert row["total"] == 2
+    assert row["unrated"] == 1
+    assert row["score"] == 3
+    assert row["average_score"] == 3.0
+    assert row["average_weighted_score"] == 3.0
+
+    # Two +3 votes: the cumulative score doubles, the per-picture one does not.
+    many = _seed_pair_images(
+        tmp_path / "many",
+        [(3, [("style_x.safetensors", 1.0)]) for _ in range(2)],
+    )
+    many_row = (await GalleryService(cache=many).stats(by="lora"))["items"][0]
+    assert many_row["score"] == 6
+    assert many_row["average_score"] == 3.0
+
+
+async def test_average_weighted_score_keeps_the_prompt_weight(tmp_path):
+    # The weighted average is the *weighted* score divided by the same rated
+    # count, not the plain score with a different denominator.
+    cache = _seed_pair_images(
+        tmp_path,
+        [
+            (3, [("style_x.safetensors", 0.5)]),
+            (3, [("style_x.safetensors", 0.5)]),
+        ],
+    )
+    row = (await GalleryService(cache=cache).stats(by="lora"))["items"][0]
+    assert row["score"] == 6
+    assert row["average_score"] == 3.0
+    assert row["weighted_score"] == pytest.approx(3.0)
+    assert row["average_weighted_score"] == pytest.approx(1.5)
+
+
+async def test_stats_sort_by_average_and_weighted_average(tmp_path):
+    # style_y appears on four mildly-liked pictures (+1 each), style_x on one
+    # loved picture (+3). Volume wins the cumulative ranking; the average
+    # ranking answers "how good is a typical picture" and flips the order.
+    entries = [(3, [("style_x.safetensors", 1.0)])] + [
+        (1, [("style_y.safetensors", 1.0)]) for _ in range(4)
+    ]
+    service = GalleryService(cache=_seed_pair_images(tmp_path, entries))
+
+    by_score = await service.stats(by="lora", sort="score")
+    assert [row["key"] for row in by_score["items"]][0] == "style_y.safetensors"
+
+    by_average = await service.stats(by="lora", sort="average")
+    assert [row["key"] for row in by_average["items"]][0] == "style_x.safetensors"
+    assert {row["key"]: row["average_score"] for row in by_average["items"]} == {
+        "style_x.safetensors": 3.0,
+        "style_y.safetensors": 1.0,
+    }
+
+    # The weighted average sort uses the same denominator but the prompt-weighted
+    # numerator; here both LoRAs run at 1.0 so the order is unchanged.
+    by_weighted_average = await service.stats(by="lora", sort="weighted_average")
+    assert [row["key"] for row in by_weighted_average["items"]][0] == "style_x.safetensors"
+
+
+async def test_stats_by_combo_requires_three_rated_cooccurrences(tmp_path):
+    # a+b co-occur on three rated pictures; a+c only on two. A single unrated
+    # a+b picture must not count towards the sample floor either.
+    entries = [
+        (3, [("a.safetensors", 1.0), ("b.safetensors", 0.5)]),
+        (1, [("a.safetensors", 1.0), ("b.safetensors", 0.5)]),
+        (-1, [("a.safetensors", 1.0), ("b.safetensors", 0.5)]),
+        (0, [("a.safetensors", 1.0), ("b.safetensors", 0.5)]),
+        (3, [("a.safetensors", 1.0), ("c.safetensors", 1.0)]),
+        (3, [("a.safetensors", 1.0), ("c.safetensors", 1.0)]),
+    ]
+    service = GalleryService(cache=_seed_pair_images(tmp_path, entries))
+
+    page = await service.stats(by="combo")
+    assert page["by"] == "combo"
+    assert [row["key"] for row in page["items"]] == ["a.safetensors + b.safetensors"]
+    row = page["items"][0]
+    assert row["first_lora"] == "a.safetensors"
+    assert row["second_lora"] == "b.safetensors"
+    assert row["total"] == 3
+    assert row["unrated"] == 0
+    assert row["score"] == 3  # +3 +1 -1
+    assert row["average_score"] == 1.0
+    # The weaker LoRA of the pair decides the multiplier on every picture.
+    assert row["weighted_score"] == pytest.approx(1.5)
+    assert row["average_weighted_score"] == pytest.approx(0.5)
+    assert row["average_strength"] == pytest.approx(0.5)
+    assert row["known"] is False
+    assert len(row["images"]) == 3
+
+    # A higher min_total raises the pair's sample floor too.
+    assert (await service.stats(by="combo", min_total=4))["items"] == []
+
+
+async def test_stats_by_combo_sorts_by_average_and_ignores_animadex(tmp_path):
+    # Two pairs with the same cumulative score but different sample sizes:
+    # the average ranking must put the smaller, stronger pair first (the
+    # cumulative ranking is won by the high-volume pair on the total tie-break).
+    entries = [
+        (3, [("a.safetensors", 1.0), ("b.safetensors", 1.0)]),
+        (3, [("a.safetensors", 1.0), ("b.safetensors", 1.0)]),
+        (3, [("a.safetensors", 1.0), ("b.safetensors", 1.0)]),
+    ] + [
+        (1, [("c.safetensors", 1.0), ("d.safetensors", 1.0)]) for _ in range(9)
+    ]
+    service = GalleryService(cache=_seed_pair_images(tmp_path, entries))
+
+    by_score = await service.stats(by="combo", sort="score")
+    # Both pairs sum to 9, so the total-count tie-break puts the pair seen on
+    # nine pictures first: that is exactly the volume bias the average fixes.
+    assert [row["key"] for row in by_score["items"]] == [
+        "c.safetensors + d.safetensors",
+        "a.safetensors + b.safetensors",
+    ]
+    by_average = await service.stats(by="combo", sort="average")
+    assert [row["key"] for row in by_average["items"]][0] == "a.safetensors + b.safetensors"
+    assert by_average["items"][0]["average_score"] == 3.0
+
+    # animadex is an artist-only filter: it must not touch the pair ranking.
+    animadex = await service.stats(by="combo", animadex_only=True)
+    assert [row["key"] for row in animadex["items"]] == [
+        row["key"] for row in by_score["items"]
+    ]
+
+
+async def test_list_images_filters_on_a_lora_pair(tmp_path):
+    # Clicking a pair row must show only pictures that used BOTH LoRAs, not
+    # pictures that happen to use either one of them.
+    entries = [
+        (3, [("a.safetensors", 1.0), ("b.safetensors", 1.0)]),
+        (1, [("a.safetensors", 1.0), ("b.safetensors", 1.0)]),
+        (-1, [("a.safetensors", 1.0), ("b.safetensors", 1.0)]),
+        (3, [("a.safetensors", 1.0)]),
+        (3, [("b.safetensors", 1.0)]),
+        (0, [("c.safetensors", 1.0)]),
+    ]
+    service = GalleryService(cache=_seed_pair_images(tmp_path, entries))
+
+    page = await service.list_images(
+        page=1, page_size=40, sort="newest", rating="all", metadata="all",
+        artist=None, lora=None, query=None, order="desc",
+        lora_pair=("a.safetensors", "b.safetensors"),
+    )
+    assert page["total"] == 3
+    # A one-sided pair is ignored rather than silently filtering on one LoRA.
+    unfiltered = await service.list_images(
+        page=1, page_size=40, sort="newest", rating="all", metadata="all",
+        artist=None, lora=None, query=None, order="desc", lora_pair=("a.safetensors",),
+    )
+    assert unfiltered["total"] == len(entries)

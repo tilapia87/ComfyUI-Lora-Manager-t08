@@ -90,6 +90,21 @@ LoRA 分组另有一个**提示词权重得分** `weighted_score = Σ rating × 
 平均值 `1.00` 就意味每一票都按满强度投的，此时 `weighted_score` 只能等于 `score`；
 没有已评分的图则为 `null`，界面退回不带平均值的说明。
 
+**平均分（除以已评分图片数）**：每行还有 `average_score = score / rated` 与
+`average_weighted_score = weighted_score / rated`，分母 `rated` 是 `likes + dislikes`，
+即只数 `rating != 0` 的图 —— 未评分的图不会稀释一个 LoRA。这样「只出现 1 次且被特别中意」
+的 LoRA 不会被「被看过 200 次、褒贬各半」的行靠数量压过去。两个累计总分仍然并排保留，
+平均分只是额外的排序键（`sort=average` / `sort=weighted_average`），不改默认榜单。
+
+**LoRA 组合排行**：`by=combo` 时后端对同一张图的 LoRA 子表做两两自连接
+（`a.lora_name < b.lora_name`），枚举所有共同出现过的配对 `A + B`，忽略三件及以上的组合。
+只收 `rating != 0` 的已评分图，并用 `HAVING COUNT(*) >= min_rated` 卡门槛
+（默认 `max(3, min_total)`，即至少 3 张已评分图，样本太少的组合不进榜）。
+配对的权重取两个 LoRA 里较弱的那个 `MIN(|a.weight|, |b.weight|)`，与单 LoRA 口径一致；
+每行带 `first_lora` / `second_lora`，没有 `hash`（组合是派生行，不跳 LoRA 页）。
+组合行同样提供 `score` / `weighted_score` / `average_score` / `average_weighted_score` /
+`average_strength` / `levels` / `images`，默认按平均分排序。
+
 `lora_hash` 是后加的列（老库靠 `ALTER TABLE ... ADD COLUMN` 就地迁移，不需要重建），
 存的是这个 LoRA 名在**本机 LoRA 库**里解析出的 sha256 —— 画廊 → LoRA 页的跳转就靠它。
 冷缓存时为空，只是暂时没有跳转入口，不影响评分与统计。
@@ -108,10 +123,10 @@ LoRA 分组另有一个**提示词权重得分** `weighted_score = Σ rating × 
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/lm/gallery/images` | 分页列表。参数 `page`、`page_size`、`sort`(`newest/oldest/rating_desc/rating_asc/name`)、`rating`(`all/loved/like/dislike/hate/unrated`，精确到四档；`positive/negative`、`liked/disliked`、`hated` 为兼容别名)、`metadata`(`all/with/without`)、`artist`、`lora`、`q` |
+| GET | `/api/lm/gallery/images` | 分页列表。参数 `page`、`page_size`、`sort`(`newest/oldest/rating_desc/rating_asc/name`)、`rating`(`all/loved/like/dislike/hate/unrated`，精确到四档；`positive/negative`、`liked/disliked`、`hated` 为兼容别名)、`metadata`(`all/with/without`)、`artist`、`lora`、`lora_a` + `lora_b`（同时给了才按「一张图里同时用了这两个 LoRA」过滤，供组合卡片点击跳网格）、`q` |
 | POST/GET | `/api/lm/gallery/rating` | `{"image_path","rating"}`，rating 取 `3/1/-1/-3/0` |
 | GET | `/api/lm/gallery/summary` | 全库评分分布：`images/rated/unrated/liked/disliked/loved/hated/score/net/levels{love,like,dislike,hate}/like_ratio`，供侧栏分档计数与分布条使用 |
-| GET | `/api/lm/gallery/stats` | `by`(`artist/lora`)、`sort`(`score/strength/loved/liked/disliked/hated/likes/dislikes/net/total/ratio`，默认 `score` 加权得分；`strength` 只在 `by=lora` 时有意义)、`limit`、`min_total`；每行带 `score`、`weighted_score`、`average_strength`、`net`、`levels{love,like,dislike,hate}` 与 `images` 样本缩略图 |
+| GET | `/api/lm/gallery/stats` | `by`(`artist/lora/combo`)、`sort`(`score/strength/average/weighted_average/loved/liked/disliked/hated/likes/dislikes/net/total/ratio`，默认 `score` 加权得分；`strength` 只在 `by=lora` 时有意义，`average`/`weighted_average` 是除以已评分图片数后的排序，仅在 `lora`/`combo` 可选)、`limit`、`offset`、`min_total`（`combo` 时也是样本门槛，下限 3）、`order`；每行带 `score`、`weighted_score`、`average_score`、`average_weighted_score`、`average_strength`、`net`、`levels{love,like,dislike,hate}` 与 `images` 样本缩略图；`by=combo` 的行另带 `first_lora`/`second_lora` 且 `known=false`（无跳转） |
 | POST/GET | `/api/lm/gallery/index` | 启动后台扫描，`force=1` 强制重新解析 |
 | GET | `/api/lm/gallery/index/status` | 扫描进度：`running/stage/progress/total/added/updated/removed/failed/root/root_source/error` |
 | GET | `/api/lm/gallery/image?path=` | 图片字节流（含包含性校验） |
@@ -177,10 +192,20 @@ LoRA 分组另有一个**提示词权重得分** `weighted_score = Σ rating × 
   画师分组只有一个 `得分` 块。
   权重块的 tooltip 会带上 `average_strength`（如「平均 0.20×」），直接解释两个数为什么不同；
   没有已评分的图时用不带平均值的说明。
-- 排序 pill：`加权得分 / +3 / −3 / 总数 / 点赞率`，LoRA 分组再多一个 `提示词权重`。
+- **平均分**：LoRA 与 LoRA 组合分组的卡片在四档计数那一行多两个紧凑数值 ——
+  `每张已评分图的得分`（`average_score`）与 `每张已评分图的加权得分`（`average_weighted_score`），
+  各自带正负色、标签与排序按钮（`sort=average` / `sort=weighted_average`）。
+  累计总分仍留在右上角的大号色块里，平均分只是同一批票的第二种读法。
+- 排序 pill：`加权得分 / +3 / −3 / 总数 / 点赞率`，LoRA 分组再多一个 `提示词权重`，
+  LoRA 与组合分组再多一个 `平均分`（`sort=average`）。
   `likes/dislikes/net` 作为兼容键仍由后端接受。
-- **提示词权重**（`sort=strength`）只出现在 LoRA 分组：画师没有提示词权重，所以那个 pill
-  在画师榜里隐藏，切回画师时如果正按 `strength` 排会自动退回 `score`——控制项永远与可见的行一致。
+- **提示词权重**（`sort=strength`）只出现在 LoRA 分组：画师没有提示词权重，组合是派生行
+  也没有单件强度，所以那个 pill 在画师榜与组合榜里都隐藏；切到非 LoRA 分组时若正按
+  `strength`（或 `average`/`weighted_average` 在画师榜）排会自动退回 `score`——控制项永远与可见的行一致。
+- **第三个分组按钮 `LoRA 组合`**（`by=combo`）：把统计视图切成两两配对榜。卡片标题是
+  `A + B` 而不是单个名字，没有 ↗ 跳 LoRA 页按钮；点击整张卡会带着 `lora_a` + `lora_b`
+  跳回图片网格，只显示「同时用了这两个 LoRA」的图，筛选横幅也写明这一对。
+  组合默认也是按平均分读，样本门槛见上文（至少 3 张已评分图）。
 
 - LoRA 弹窗的 Gallery 标签摘要同样按四档显示（`for-lora` 的 `summary.levels`）。
 
@@ -244,6 +269,13 @@ ComfyUI 图与 A1111 文本两种来源、`LoraLoaderModelOnly` 的 LoRA 抓取�
 **LoRA 按提示词权重加权**：同一档位在 `weight=0.3` 的图上分数只有 0.3 倍、
 `sort=strength` 的次序与 `sort=score` 可以不同、画师分组的 `weighted_score` 恒等于 `score`、
 **`average_strength` 只对已评分的图求平均且全未评分时为 `null`**）、
+**平均分**（`average_score`/`average_weighted_score` 的分母只数已评分图、未评分图不稀释，
+`sort=average`/`sort=weighted_average` 与 `sort=score` 的次序不同、累计总分不变）、
+**LoRA 组合排行**（两两自连接、忽略三件以上、只收已评分图、`min_rated` 默认下限 3 且
+`min_total=4` 会整榜清空、配对权重取两者较小者、组合行 `known=false` 无跳转、
+`by=combo` 不走 animadex 过滤、平均分排序时同分由样本数作次级键）、
+**组合卡片跳网格的双 LoRA 过滤**（`lora_a`/`lora_b` 两条 EXISTS，只给齐两个名字才生效，
+单给一个不过滤）、
 **四档评分**（每档独立计数、加权得分、`like_ratio` 在无评分时为 null）、
 列表各过滤器（精确四档 + 两侧兼容别名 / **元数据有无** / 画师 / LoRA / 关键词）及其组合、
 分页总计、包含性校验与扩展名白名单、路由注册完整性（含 summary 端点）、评分接口的参数校验、
@@ -257,7 +289,11 @@ ComfyUI 图与 A1111 文本两种来源、`LoraLoaderModelOnly` 的 LoRA 抓取�
 评分后不匹配当前筛选项的卡片就地移出、统计页四档指标与排序 pill、
 **提示词权重 pill 只在 LoRA 分组出现**（切回画师分组时自动退回 `score` 排序）、
 **LoRA 排行卡把 `得分` 与 `提示词权重` 并排成两个带标签的大号块**（权重块不再藏在四档计数行里、
-带 `average_strength` 的 tooltip、点击按 `strength` 排序）。
+带 `average_strength` 的 tooltip、点击按 `strength` 排序）、
+**平均分 pill 只在 LoRA / 组合分组出现**（画师榜隐藏、切回画师自动退回 `score`）、
+**LoRA 与组合行的两个平均分数**（累计总分仍并排保留、点击按 `average` 排序）、
+**组合卡片点击后按两个 LoRA 同时过滤网格**（`lora_a`/`lora_b` 都进请求、横幅写明这一对、
+组合行没有 ↗ 跳转按钮、strength pill 在组合榜隐藏）。
 
 ## 8. 已知限制 / 后续可做
 
@@ -271,6 +307,8 @@ ComfyUI 图与 A1111 文本两种来源、`LoraLoaderModelOnly` 的 LoRA 抓取�
 - **LoRA 跳转入口同样依赖扫描器缓存。** 冷缓存（还没扫过 LoRA 库）时解析不出 hash，
   芯片上的 ↗ 暂时不出现；扫描完成后重扫一次画廊即可补上。
   一个 LoRA 名在本机匹配到**多个**文件时不猜，按"无法确定"处理，不给跳转入口。
+- **组合排行只算两两配对。** 一张图里同时用了 3 个及以上 LoRA 时，会拆成所有可能的
+  `A+B` 对分别计分，不会产出「三件套」或更高阶组合行；这是刻意的范围，不是漏算。
 - **侧栏分数刷新是去抖的**：评分后 400ms 才重新拉 `/summary`，极端情况下快速连评的计数会比
   卡片晚一拍；这是刻意的取舍（避免键盘连评打出一串请求）。
 

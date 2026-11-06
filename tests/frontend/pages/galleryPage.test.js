@@ -1256,6 +1256,160 @@ describe('GalleryPage', () => {
     await vi.waitFor(() => expect(statsCalls(fetchStub.calls).at(-1).url).toContain('sort=strength'));
   });
 
+  it('offers the average-score ranking for LoRAs and pairs only', async () => {
+    await boot();
+
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    // Artists have no per-picture score, so the pill starts hidden.
+    const pill = document.getElementById('galleryStatsAveragePill');
+    expect(pill.classList.contains('hidden')).toBe(true);
+
+    document.querySelector('#galleryStatsBySwitch [data-by="lora"]').click();
+    await vi.waitFor(() => expect(pill.classList.contains('hidden')).toBe(false));
+
+    pill.click();
+    await vi.waitFor(() => {
+      const last = statsCalls(fetchStub.calls).at(-1);
+      expect(last.url).toContain('by=lora');
+      expect(last.url).toContain('sort=average');
+    });
+    expect(pill.classList.contains('active')).toBe(true);
+
+    // Pairs keep the average pill but lose the single-LoRA prompt-weight one.
+    document.querySelector('#galleryStatsBySwitch [data-by="combo"]').click();
+    await vi.waitFor(() => {
+      const last = statsCalls(fetchStub.calls).at(-1);
+      expect(last.url).toContain('by=combo');
+      expect(last.url).toContain('sort=average');
+    });
+    expect(pill.classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('galleryStatsStrengthPill').classList.contains('hidden')).toBe(true);
+
+    // Back to artists: the average sort is dropped rather than left hidden.
+    document.querySelector('#galleryStatsBySwitch [data-by="artist"]').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).at(-1).url).toContain('sort=score'));
+    expect(pill.classList.contains('hidden')).toBe(true);
+  });
+
+  it('shows the score per rated picture on LoRA and pair rows', async () => {
+    fetchStub.setRoute('/api/lm/gallery/stats', (url) => {
+      const by = new URL(url, 'http://localhost').searchParams.get('by');
+      const isCombo = by === 'combo';
+      return jsonResponse({
+        success: true,
+        data: {
+          by: isCombo ? 'combo' : 'lora',
+          totals: { images: 3, rated: 3, score: 9, levels: { love: 3, like: 0, dislike: 0, hate: 0 } },
+          total: 1,
+          offset: 0,
+          items: [
+            {
+              key: isCombo ? 'a.safetensors + b.safetensors' : 'style_a.safetensors',
+              label: isCombo ? 'a.safetensors + b.safetensors' : 'style_a.safetensors',
+              first_lora: 'a.safetensors',
+              second_lora: 'b.safetensors',
+              known: false,
+              likes: 3,
+              dislikes: 0,
+              unrated: 0,
+              total: 3,
+              net: 3,
+              score: 9,
+              weighted_score: 4.5,
+              average_score: 3.0,
+              average_weighted_score: 1.5,
+              average_strength: 0.5,
+              levels: { love: 3, like: 0, dislike: 0, hate: 0 },
+              like_ratio: 1,
+            },
+          ],
+        },
+      });
+    });
+
+    await boot();
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    for (const by of ['lora', 'combo']) {
+      document.querySelector(`#galleryStatsBySwitch [data-by="${by}"]`).click();
+      await vi.waitFor(() =>
+        expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(1)
+      );
+      const card = document.querySelector('#galleryStatsBody .gallery-rank-card');
+
+      const plain = card.querySelector('[data-sort-metric="average"]');
+      const weighted = card.querySelector('[data-sort-metric="weighted_average"]');
+      expect(plain.textContent.trim()).toContain('+3');
+      expect(plain.title).toBe('gallery.stats.columns.average');
+      expect(weighted.textContent.trim()).toContain('+1.5');
+      expect(weighted.title).toBe('gallery.stats.columns.averageWeighted');
+
+      // The cumulative scores are still shown side by side, unchanged.
+      expect(card.querySelector('[data-sort-metric="score"]').textContent.trim()).toBe('+9');
+
+      // Clicking an average metric actually re-sorts by it.
+      plain.click();
+      await vi.waitFor(() => expect(statsCalls(fetchStub.calls).at(-1).url).toContain('sort=average'));
+    }
+  });
+
+  it('filters the grid by both LoRAs when a pair row is clicked', async () => {
+    fetchStub.setRoute('/api/lm/gallery/stats', {
+      success: true,
+      data: {
+        by: 'combo',
+        totals: { images: 3, rated: 3, score: 9, levels: { love: 3, like: 0, dislike: 0, hate: 0 } },
+        total: 1,
+        offset: 0,
+        items: [
+          {
+            key: 'a.safetensors + b.safetensors',
+            label: 'a.safetensors + b.safetensors',
+            first_lora: 'a.safetensors',
+            second_lora: 'b.safetensors',
+            known: false,
+            likes: 3,
+            dislikes: 0,
+            unrated: 0,
+            total: 3,
+            net: 3,
+            score: 9,
+            levels: { love: 3, like: 0, dislike: 0, hate: 0 },
+            like_ratio: 1,
+          },
+        ],
+      },
+    });
+
+    await boot();
+    document.getElementById('galleryStatsTab').click();
+    await vi.waitFor(() => expect(statsCalls(fetchStub.calls).length).toBe(1));
+
+    document.querySelector('#galleryStatsBySwitch [data-by="combo"]').click();
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll('#galleryStatsBody .gallery-rank-card').length).toBe(1)
+    );
+
+    // A pair is a derived row: no jump-to-LoRA-page button.
+    expect(document.querySelector('#galleryStatsBody .gallery-open-lora')).toBeNull();
+
+    document.querySelector('#galleryStatsBody .gallery-rank-card').click();
+    await vi.waitFor(() => expect(imageCalls(fetchStub.calls).length).toBe(2));
+    const gridCall = imageCalls(fetchStub.calls).at(-1).url;
+    expect(gridCall).toContain('lora_a=a.safetensors');
+    expect(gridCall).toContain('lora_b=b.safetensors');
+    // The filter banner names the pair rather than a single LoRA. It is
+    // rendered with the grid response, not with the request, so wait for it.
+    await vi.waitFor(() =>
+      expect(document.getElementById('galleryFilterBannerText').textContent).toContain(
+        'gallery.filter.loraPair'
+      )
+    );
+  });
+
   it('ranks by an exact level when its metric is clicked', async () => {
     await boot();
 

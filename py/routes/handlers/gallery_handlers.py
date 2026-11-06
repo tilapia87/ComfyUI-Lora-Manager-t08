@@ -76,6 +76,11 @@ class GalleryHandlerSet:
             if metadata not in ("all", "with", "without"):
                 metadata = "all"
             order = "asc" if (query.get("order") or "").lower() == "asc" else "desc"
+            # A combo ranking row names two LoRAs: both query params must be
+            # present (and non-empty) before the grid filters on the pair.
+            lora_a = (query.get("lora_a") or "").strip() or None
+            lora_b = (query.get("lora_b") or "").strip() or None
+            lora_pair = (lora_a, lora_b) if lora_a and lora_b else None
             service = await self._service()
             data = await service.list_images(
                 page=page,
@@ -87,6 +92,7 @@ class GalleryHandlerSet:
                 query=(query.get("q") or "").strip() or None,
                 metadata=metadata,
                 order=order,
+                lora_pair=lora_pair,
             )
             return web.json_response({"success": True, "data": data})
         except Exception as exc:
@@ -150,7 +156,8 @@ class GalleryHandlerSet:
     async def get_stats(self, request: web.Request) -> web.Response:
         try:
             query = request.query
-            by = "lora" if (query.get("by") or "").lower() == "lora" else "artist"
+            raw_by = (query.get("by") or "").lower()
+            by = raw_by if raw_by in ("artist", "lora", "combo") else "artist"
             service = await self._service()
             data = await service.stats(
                 by=by,

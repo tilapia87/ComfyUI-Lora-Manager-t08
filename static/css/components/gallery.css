@@ -1479,6 +1479,29 @@
     color: var(--color-error, #e74c3c);
 }
 
+/* Average-per-rated-picture metrics live in the metric row, not the headline:
+   they are a second reading of the same votes, so they stay compact but keep
+   the signed colour of their own score. */
+.gallery-col-average {
+    font-weight: var(--weight-semibold, 600);
+    font-variant-numeric: tabular-nums;
+}
+
+.gallery-col-average.is-positive {
+    color: var(--color-success, #2ecc71);
+}
+
+.gallery-col-average.is-negative {
+    color: var(--color-error, #e74c3c);
+}
+
+.gallery-metric-label {
+    font-size: 10px;
+    opacity: 0.72;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 .gallery-level-tag {
     font-size: 10px;
     font-weight: var(--weight-bold, 700);

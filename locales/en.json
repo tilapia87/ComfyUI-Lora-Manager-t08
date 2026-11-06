@@ -3161,7 +3161,8 @@
     },
     "filter": {
       "artist": "Artist: {name}",
-      "lora": "LoRA: {name}"
+      "lora": "LoRA: {name}",
+      "loraPair": "LoRA pair: {first} + {second}"
     },
     "card": {
       "unknownSize": "Unknown size",
@@ -3236,7 +3237,8 @@
       "by": {
         "label": "Group by",
         "artist": "Artist",
-        "lora": "LoRA"
+        "lora": "LoRA",
+        "combo": "LoRA pair"
       },
       "sort": {
         "label": "Sort",
@@ -3244,7 +3246,9 @@
         "strength": "Prompt weight",
         "strengthHint": "Count each vote at the strength the prompt gave the LoRA, so a LoRA a picture barely used cannot outrank one it leaned on.",
         "total": "Total",
-        "ratio": "Like ratio"
+        "ratio": "Like ratio",
+        "average": "Average",
+        "averageHint": "Divide the score by the number of rated pictures, so a row seen many times does not win on volume alone."
       },
       "animadex": {
         "group": "Catalogue",
@@ -3270,7 +3274,9 @@
         "score": "Weighted score",
         "strength": "Prompt-weighted score",
         "strengthWithAverage": "Each vote counts at the strength the prompt gave it · average {average}×",
-        "ratio": "Ratio"
+        "ratio": "Ratio",
+        "average": "Score per rated picture",
+        "averageWeighted": "Weighted score per rated picture"
       },
       "noRatio": "n/a",
       "rowHint": "Show the images for this entry",

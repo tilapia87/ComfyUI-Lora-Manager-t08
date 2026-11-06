@@ -3161,7 +3161,8 @@
         },
         "filter": {
             "artist": "작가: {name}",
-            "lora": "LoRA: {name}"
+            "lora": "LoRA: {name}",
+            "loraPair": "[TODO: Translate] LoRA pair: {first} + {second}"
         },
         "card": {
             "unknownSize": "크기 알 수 없음",
@@ -3236,7 +3237,8 @@
             "by": {
                 "label": "그룹 기준",
                 "artist": "작가",
-                "lora": "LoRA"
+                "lora": "LoRA",
+                "combo": "[TODO: Translate] LoRA pair"
             },
             "sort": {
                 "label": "정렬",
@@ -3244,7 +3246,9 @@
                 "strength": "[TODO: Translate] Prompt weight",
                 "strengthHint": "[TODO: Translate] Count each vote at the strength the prompt gave the LoRA, so a LoRA a picture barely used cannot outrank one it leaned on.",
                 "total": "전체",
-                "ratio": "좋아요 비율"
+                "ratio": "좋아요 비율",
+                "average": "[TODO: Translate] Average",
+                "averageHint": "[TODO: Translate] Divide the score by the number of rated pictures, so a row seen many times does not win on volume alone."
             },
             "animadex": {
                 "group": "[TODO: Translate] Catalogue",
@@ -3270,7 +3274,9 @@
                 "score": "[TODO: Translate] Weighted score",
                 "strength": "[TODO: Translate] Prompt-weighted score",
                 "strengthWithAverage": "[TODO: Translate] Each vote counts at the strength the prompt gave it · average {average}×",
-                "ratio": "비율"
+                "ratio": "비율",
+                "average": "[TODO: Translate] Score per rated picture",
+                "averageWeighted": "[TODO: Translate] Weighted score per rated picture"
             },
             "noRatio": "없음",
             "rowHint": "이 항목의 이미지 보기",

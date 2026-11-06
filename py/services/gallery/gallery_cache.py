@@ -394,6 +394,7 @@ class GalleryCache:
         lora: Optional[str],
         query: Optional[str],
         metadata: str = "all",
+        lora_pair: Optional[Sequence[str]] = None,
     ) -> Tuple[List[str], List[Any]]:
         clauses: List[str] = []
         params: List[Any] = []
@@ -416,6 +417,16 @@ class GalleryCache:
                 "WHERE l.image_path = i.image_path AND l.lora_name = ?)"
             )
             params.append(lora)
+        # A combo row is a pair of LoRAs: both must be present on the same image.
+        # Two independent EXISTS clauses (rather than one IN (...) check) are
+        # what makes this an AND, not an OR.
+        if lora_pair and len(lora_pair) == 2 and all(lora_pair):
+            for name in (lora_pair[0], lora_pair[1]):
+                clauses.append(
+                    "EXISTS (SELECT 1 FROM gallery_image_loras p "
+                    "WHERE p.image_path = i.image_path AND p.lora_name = ?)"
+                )
+                params.append(name)
         if query:
             like = f"%{query}%"
             clauses.append(
@@ -440,9 +451,12 @@ class GalleryCache:
         query: Optional[str] = None,
         metadata: str = "all",
         ascending: bool = False,
+        lora_pair: Optional[Sequence[str]] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         self._ensure_schema()
-        clauses, params = self._build_filters(rating, artist, lora, query, metadata)
+        clauses, params = self._build_filters(
+            rating, artist, lora, query, metadata, lora_pair
+        )
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         order = _SORT_SQL.get(sort, _SORT_SQL["newest"])
         if ascending:
@@ -556,6 +570,7 @@ class GalleryCache:
         group_extra: Optional[str] = None,
         preview_limit: int = 3,
         strength_expression: str = "1.0",
+        where_clause: str = "",
     ) -> List[Dict[str, Any]]:
         """Ranking rows for one grouping column.
 
@@ -564,9 +579,13 @@ class GalleryCache:
         its face value); the multiplier only feeds ``weighted_score``, so the LoRA
         ranking can scale a vote by the strength the LoRA was actually run with
         while the artist ranking leaves it at ``1.0``.
+
+        ``where_clause`` is an optional extra predicate on the joined images,
+        used by the LoRA-pair ranking to count only rated pictures.
         """
         self._ensure_schema()
         label_sql = f", {extra_label}" if extra_label else ""
+        where_sql = f"WHERE {where_clause}" if where_clause else ""
         if group_extra is None:
             group_extra = ", known" if extra_label else ""
         with self._db_lock:
@@ -589,6 +608,7 @@ class GalleryCache:
                            {label_sql}
                     FROM {table} c
                     JOIN gallery_images i ON i.image_path = c.image_path
+                    {where_sql}
                     GROUP BY c.{name_column}{group_extra}
                     """
                 ).fetchall()
@@ -620,6 +640,16 @@ class GalleryCache:
                 # equals ``score``; for LoRAs it answers "did the picture that
                 # ran this LoRA at 0.4 love it as much as the one at 1.0".
                 "weighted_score": round(float(row["weighted_score"] or 0.0), 3),
+                # Same two scores divided by the number of *rated* pictures.
+                # A LoRA seen on 30 images (20 of them loved) must not beat one
+                # seen on 3 images (all loved) purely by volume; the average
+                # answers "how good is a typical picture using this thing".
+                # Unrated pictures are excluded from the denominator so merely
+                # having more unlabelled images cannot dilute a good average.
+                "average_score": (round(int(row["score"] or 0) / rated, 3) if rated else 0.0),
+                "average_weighted_score": (
+                    round(float(row["weighted_score"] or 0.0) / rated, 3) if rated else 0.0
+                ),
                 # Mean multiplier over the *rated* pictures only. It is how the
                 # UI explains the gap between the two scores: an average of 1.0
                 # means every rating was cast at full strength, so the weighted
@@ -825,6 +855,126 @@ class GalleryCache:
             # it at full value like the old behaviour instead of dropping it.
             strength_expression="ABS(COALESCE(c.weight, 1.0))",
         )
+
+    def stats_by_lora_combo(self, min_rated: int = 3) -> List[Dict[str, Any]]:
+        """Rank every two-LoRA pair that co-occurred on rated pictures.
+
+        A "combo" is an unordered pair of LoRAs that were used together on the
+        *same* image: ``(a, b)`` with ``a.lora_name < b.lora_name``. Only rated
+        pictures (``rating <> 0``) count, and a pair needs at least
+        ``min_rated`` of them to make the board, so a single lucky image cannot
+        claim the top spot. Each pair's score is the sum of the ratings of the
+        images where both LoRAs appeared, and the two average fields divide that
+        by the number of rated co-occurrences. Larger groups are deliberately
+        ignored -- the request is for pairwise combinations.
+
+        ``min_rated`` is clamped to 1 so an old/zero client argument cannot
+        accidentally let one-off pairs through.
+        """
+        self._ensure_schema()
+        floor = max(1, int(min_rated or 1))
+        with self._db_lock:
+            conn = self._connect(readonly=True)
+            try:
+                rows = conn.execute(
+                    f"""
+                    SELECT a.lora_name || ' + ' || b.lora_name AS key,
+                           a.lora_name AS first_lora,
+                           b.lora_name AS second_lora,
+                           SUM(CASE WHEN i.rating > 0 THEN 1 ELSE 0 END) AS likes,
+                           SUM(CASE WHEN i.rating < 0 THEN 1 ELSE 0 END) AS dislikes,
+                           SUM(CASE WHEN i.rating = 0 THEN 1 ELSE 0 END) AS unrated,
+                           SUM(CASE WHEN i.rating = {RATING_LOVED} THEN 1 ELSE 0 END) AS loved,
+                           SUM(CASE WHEN i.rating = {RATING_LIKED} THEN 1 ELSE 0 END) AS liked_mild,
+                           SUM(CASE WHEN i.rating = {RATING_DISLIKED} THEN 1 ELSE 0 END) AS disliked_mild,
+                           SUM(CASE WHEN i.rating = {RATING_HATED} THEN 1 ELSE 0 END) AS hated,
+                           SUM(i.rating) AS score,
+                           COALESCE(SUM(i.rating * MIN(
+                               ABS(COALESCE(a.weight, 1.0)), ABS(COALESCE(b.weight, 1.0))
+                           )), 0) AS weighted_score,
+                           AVG(MIN(
+                               ABS(COALESCE(a.weight, 1.0)), ABS(COALESCE(b.weight, 1.0))
+                           )) AS average_strength,
+                           COUNT(*) AS total
+                    FROM gallery_image_loras a
+                    JOIN gallery_image_loras b
+                      ON b.image_path = a.image_path AND a.lora_name < b.lora_name
+                    JOIN gallery_images i ON i.image_path = a.image_path
+                    WHERE i.rating <> 0
+                    GROUP BY a.lora_name, b.lora_name
+                    HAVING COUNT(*) >= ?
+                    """,
+                    (floor,),
+                ).fetchall()
+
+                # Previews are keyed by the pair string, which is not a column
+                # in the lora table. Build them here instead of reusing
+                # _previews_by_key: look up the images carrying both LoRAs and
+                # keep the best-rated ones, like the per-key helper would.
+                previews: Dict[str, List[Dict[str, Any]]] = {}
+                for row in rows:
+                    image_rows = conn.execute(
+                        """
+                        SELECT i.image_path, i.rating
+                        FROM gallery_images i
+                        WHERE i.rating <> 0
+                          AND EXISTS (SELECT 1 FROM gallery_image_loras x
+                                      WHERE x.image_path = i.image_path AND x.lora_name = ?)
+                          AND EXISTS (SELECT 1 FROM gallery_image_loras y
+                                      WHERE y.image_path = i.image_path AND y.lora_name = ?)
+                        ORDER BY i.rating DESC, i.mtime DESC
+                        LIMIT ?
+                        """,
+                        (row["first_lora"], row["second_lora"], 3),
+                    ).fetchall()
+                    previews[row["key"]] = [
+                        {"image_path": image["image_path"], "rating": image["rating"]}
+                        for image in image_rows
+                    ]
+            finally:
+                conn.close()
+
+        items: List[Dict[str, Any]] = []
+        for row in rows:
+            likes = int(row["likes"] or 0)
+            dislikes = int(row["dislikes"] or 0)
+            rated = likes + dislikes
+            items.append(
+                {
+                    "key": row["key"],
+                    "label": row["key"],
+                    "first_lora": row["first_lora"],
+                    "second_lora": row["second_lora"],
+                    "likes": likes,
+                    "dislikes": dislikes,
+                    "unrated": int(row["unrated"] or 0),
+                    "total": int(row["total"] or 0),
+                    "net": likes - dislikes,
+                    "score": int(row["score"] or 0),
+                    "weighted_score": round(float(row["weighted_score"] or 0.0), 3),
+                    "average_score": round(int(row["score"] or 0) / rated, 3) if rated else 0.0,
+                    "average_weighted_score": (
+                        round(float(row["weighted_score"] or 0.0) / rated, 3) if rated else 0.0
+                    ),
+                    "average_strength": (
+                        round(float(row["average_strength"]), 3)
+                        if row["average_strength"] is not None
+                        else None
+                    ),
+                    "levels": {
+                        "love": int(row["loved"] or 0),
+                        "like": int(row["liked_mild"] or 0),
+                        "dislike": int(row["disliked_mild"] or 0),
+                        "hate": int(row["hated"] or 0),
+                    },
+                    "like_ratio": (likes / rated) if rated else None,
+                    "images": previews.get(row["key"], []),
+                    # A combo is a derived row: there is no single model to open
+                    # on the LoRA page and no artist preview to fetch.
+                    "known": False,
+                }
+            )
+        return items
 
     def rating_totals(self) -> Dict[str, Any]:
         """Whole-gallery vote counts, weighted score, and level distribution.

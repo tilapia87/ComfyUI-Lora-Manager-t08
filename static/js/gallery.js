@@ -246,6 +246,9 @@ export class GalleryPage {
         this.search = DEFAULT_GALLERY_SEARCH;
         this.artist = '';
         this.lora = '';
+        // A combo ranking row is a pair of LoRA names; clicking it filters the
+        // grid by both at once instead of just the first one.
+        this.loraPair = null;
 
         this.statsBy = 'artist';
         this.statsSort = 'score';
@@ -365,6 +368,7 @@ export class GalleryPage {
             statsBySwitch: byId('galleryStatsBySwitch'),
             statsSortPills: byId('galleryStatsSortPills'),
             statsStrengthPill: byId('galleryStatsStrengthPill'),
+            statsAveragePill: byId('galleryStatsAveragePill'),
             statsSummary: byId('galleryStatsSummary'),
             statsTableWrap: byId('galleryStatsTableWrap'),
             statsBody: byId('galleryStatsBody'),
@@ -463,10 +467,18 @@ export class GalleryPage {
             // The animadex catalogue only knows artists: leaving the artist
             // grouping drops the filter instead of keeping a hidden state.
             if (this.statsBy !== 'artist') this.statsAnimadexOnly = false;
-            // The strength ranking only exists for LoRAs (it scales the votes
-            // by the weight the prompt gave the LoRA), so fall back to the
-            // plain score instead of leaving a hidden sort active.
-            if (this.statsBy !== 'lora' && this.statsSort === 'strength') this.statsSort = 'score';
+            // LoRA-only rankings (prompt weight, score per rated picture) do
+            // not exist for artists, so fall back to the plain score rather
+            // than leaving a hidden sort active on the visible rows.
+            const averageAvailable = this.statsBy === 'lora' || this.statsBy === 'combo';
+            if (!averageAvailable && ['average', 'weighted_average'].includes(this.statsSort)) {
+                this.statsSort = 'score';
+            }
+            // Prompt weight is a single-LoRA concept; pairs have no per-row
+            // strength pill either, so a hidden `strength` sort must not linger.
+            if (this.statsBy !== 'lora' && this.statsSort === 'strength') {
+                this.statsSort = 'score';
+            }
             this._syncStatsBySwitch();
             this._syncStatsSortPills();
             this.loadStats();
@@ -562,6 +574,7 @@ export class GalleryPage {
                 metadata: this.metadataFilter,
                 artist: this.artist,
                 lora: this.lora,
+                loraPair: this.loraPair,
                 q: this.search,
                 order: this.order,
             });
@@ -1177,6 +1190,7 @@ export class GalleryPage {
      */
     applyChipFilter(kind, value) {
         if (!value) return;
+        this.loraPair = null;
         if (kind === 'artist') {
             this.artist = value;
             this.lora = '';
@@ -1193,9 +1207,10 @@ export class GalleryPage {
      * Drop the artist/LoRA chip filter.
      */
     clearChipFilter() {
-        if (!this.artist && !this.lora) return;
+        if (!this.artist && !this.lora && !this.loraPair) return;
         this.artist = '';
         this.lora = '';
+        this.loraPair = null;
         this.page = 1;
         this.loadImages();
     }
@@ -1348,6 +1363,11 @@ export class GalleryPage {
         const parts = [];
         if (this.artist) parts.push(translate('gallery.filter.artist', { name: this.artist }));
         if (this.lora) parts.push(translate('gallery.filter.lora', { name: this.lora }));
+        if (this.loraPair && this.loraPair.length === 2) {
+            parts.push(translate('gallery.filter.loraPair', {
+                first: this.loraPair[0], second: this.loraPair[1],
+            }));
+        }
 
         if (!parts.length) {
             this._hide(this.el.filterBanner);
@@ -1401,7 +1421,7 @@ export class GalleryPage {
         // as a filter the user applied: otherwise an untouched gallery would
         // claim "no matches" instead of explaining that it is still empty.
         const searchFiltered = Boolean(this.search) && this.search !== DEFAULT_GALLERY_SEARCH;
-        const filtersActive = Boolean(this.artist || this.lora || searchFiltered) ||
+        const filtersActive = Boolean(this.artist || this.lora || this.loraPair || searchFiltered) ||
             this.ratingFilter !== 'all' ||
             this.metadataFilter !== 'all';
         const outputUnset = !this.config || this.config.output_path_source === 'unset' || !this.config.output_path;
@@ -1496,6 +1516,9 @@ export class GalleryPage {
     renderStats(data) {
         const totals = data?.totals || {};
         const items = data?.items || [];
+        // Keep the rows around: clicking a combo card needs its two LoRA names,
+        // which the label alone does not carry.
+        this._statRows = items;
 
         // The headline is the weighted score, not the raw vote count: that is
         // where the strong levels actually change the ranking. The four exact
@@ -1617,6 +1640,28 @@ export class GalleryPage {
                                 </span>`
                         : '';
 
+                // Score per *rated* picture: the headline blocks are cumulative
+                // sums, so a row seen on many images would otherwise win purely
+                // by volume. LoRA and combo rows expose both the plain and the
+                // prompt-weighted average as their own sortable metrics.
+                const averageAvailable = this.statsBy === 'lora' || this.statsBy === 'combo';
+                const plainAverage = Number(row.average_score ?? 0) || 0;
+                const weightedAverage = Number(row.average_weighted_score ?? plainAverage) || 0;
+                const averageMetrics =
+                    averageAvailable
+                        ? `
+                                <span class="gallery-metric gallery-col-average${this._scoreTone(plainAverage)}"
+                                    data-sort-metric="average" title="${escapeHtml(translate('gallery.stats.columns.average'))}">
+                                    <i class="fas fa-divide" aria-hidden="true"></i>${formatScore(plainAverage)}
+                                    <span class="gallery-metric-label">${escapeHtml(translate('gallery.stats.columns.average'))}</span>
+                                </span>
+                                <span class="gallery-metric gallery-col-average${this._scoreTone(weightedAverage)}"
+                                    data-sort-metric="weighted_average" title="${escapeHtml(translate('gallery.stats.columns.averageWeighted'))}">
+                                    <i class="fas fa-balance-scale" aria-hidden="true"></i>${formatScore(weightedAverage)}
+                                    <span class="gallery-metric-label">${escapeHtml(translate('gallery.stats.columns.averageWeighted'))}</span>
+                                </span>`
+                        : '';
+
                 return `
                     <article class="gallery-rank-card${unknownClass}" data-key="${escapeHtml(row.key || label)}"${artistAttr}
                         tabindex="0" title="${escapeHtml(translate('gallery.stats.rowHint'))}">
@@ -1657,6 +1702,7 @@ export class GalleryPage {
                                 <span class="gallery-metric gallery-col-unrated" title="${tooltip('unrated')}">
                                     <i class="fas fa-minus" aria-hidden="true"></i>${Number(row.unrated) || 0}
                                 </span>
+                                ${averageMetrics}
                             </div>
                             <div class="gallery-col-levels">
                                 ${levelBar}
@@ -1882,6 +1928,8 @@ export class GalleryPage {
         const allowed = [
             'score',
             'strength',
+            'average',
+            'weighted_average',
             'loved',
             'liked',
             'disliked',
@@ -1932,6 +1980,10 @@ export class GalleryPage {
         // visible rows.
         const strengthAvailable = this.statsBy === 'lora';
         this.el.statsStrengthPill?.classList.toggle('hidden', !strengthAvailable);
+        // The average is meaningful wherever a row has a per-picture score:
+        // both the single-LoRA and the pair ranking, but not artists.
+        const averageAvailable = this.statsBy === 'lora' || this.statsBy === 'combo';
+        this.el.statsAveragePill?.classList.toggle('hidden', !averageAvailable);
         for (const button of pills.querySelectorAll('[data-sort]')) {
             const active = button.dataset.sort === this.statsSort;
             button.classList.toggle('active', active);
@@ -2133,7 +2185,19 @@ export class GalleryPage {
 
     _filterByStatRow(key) {
         if (!key) return;
-        if (this.statsBy === 'lora') {
+        // Combo rows are derived pairs: the grid must show only the pictures
+        // that used *both* LoRAs, so hand the pair to the API rather than
+        // filtering by a single name from the label.
+        const comboRow = this.statsBy === 'combo'
+            ? (this._statRows || []).find((row) => row.key === key)
+            : null;
+        this.loraPair = comboRow && comboRow.first_lora && comboRow.second_lora
+            ? [comboRow.first_lora, comboRow.second_lora]
+            : null;
+        if (this.loraPair) {
+            this.lora = '';
+            this.artist = '';
+        } else if (this.statsBy === 'lora') {
             this.lora = key;
             this.artist = '';
         } else {

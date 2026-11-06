@@ -326,6 +326,9 @@
                                 <button type="button" class="gallery-segmented-btn" data-by="lora">
                                     {{ t('gallery.stats.by.lora') }}
                                 </button>
+                                <button type="button" class="gallery-segmented-btn" data-by="combo">
+                                    {{ t('gallery.stats.by.combo') }}
+                                </button>
                             </div>
                         </div>
 
@@ -353,6 +356,13 @@
                                 <button type="button" class="gallery-segmented-btn hidden" data-sort="strength"
                                     id="galleryStatsStrengthPill" title="{{ t('gallery.stats.sort.strengthHint') }}">
                                     {{ t('gallery.stats.sort.strength') }}
+                                </button>
+                                <!-- Score divided by the number of rated pictures:
+                                     a row seen on many images should not win on
+                                     volume alone. Available for LoRAs and pairs. -->
+                                <button type="button" class="gallery-segmented-btn hidden" data-sort="average"
+                                    id="galleryStatsAveragePill" title="{{ t('gallery.stats.sort.averageHint') }}">
+                                    {{ t('gallery.stats.sort.average') }}
                                 </button>
                             </div>
                         </div>

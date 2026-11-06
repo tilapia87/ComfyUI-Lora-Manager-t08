@@ -3161,7 +3161,8 @@
         },
         "filter": {
             "artist": "画师：{name}",
-            "lora": "LoRA：{name}"
+            "lora": "LoRA：{name}",
+            "loraPair": "LoRA 组合：{first} + {second}"
         },
         "card": {
             "unknownSize": "尺寸未知",
@@ -3236,7 +3237,8 @@
             "by": {
                 "label": "分组方式",
                 "artist": "画师",
-                "lora": "LoRA"
+                "lora": "LoRA",
+                "combo": "LoRA 组合"
             },
             "sort": {
                 "label": "排序",
@@ -3244,7 +3246,9 @@
                 "strength": "提示词权重",
                 "strengthHint": "按提示词中给该 LoRA 的强度给每票加权，几乎没用到的 LoRA 无法压过真正主打的 LoRA。",
                 "total": "总数",
-                "ratio": "点赞率"
+                "ratio": "点赞率",
+                "average": "平均分",
+                "averageHint": "用得分除以已评分图片数，避免只因出现次数多就排到前面。"
             },
             "animadex": {
                 "group": "目录",
@@ -3270,7 +3274,9 @@
                 "score": "加权得分",
                 "strength": "强度加权得分",
                 "strengthWithAverage": "每票按提示词里给的强度折算 · 平均 {average}×",
-                "ratio": "点赞率"
+                "ratio": "点赞率",
+                "average": "每张已评分图的得分",
+                "averageWeighted": "每张已评分图的加权得分"
             },
             "noRatio": "无",
             "rowHint": "显示这一项的图片",

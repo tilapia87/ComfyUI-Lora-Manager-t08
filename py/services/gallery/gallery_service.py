@@ -58,6 +58,12 @@ _STATS_SORT_KEYS = {
     # Same votes, each scaled by the strength the ranked LoRA ran at. For
     # artists the multiplier is 1.0, so this sort matches "score" there.
     "strength": lambda item: item.get("weighted_score", item["score"]),
+    # Score per rated picture. Without this, a LoRA seen on 30 images can beat
+    # one seen on 3 purely by volume; dividing by the number of rated pictures
+    # answers "how good is a typical image using this thing". Two keys so both
+    # the plain and the prompt-weighted reading can be ranked this way.
+    "average": lambda item: item.get("average_score", 0.0),
+    "weighted_average": lambda item: item.get("average_weighted_score", 0.0),
     "net": lambda item: item["net"],
     "likes": lambda item: item["likes"],
     "dislikes": lambda item: item["dislikes"],
@@ -334,6 +340,7 @@ class GalleryService:
         query: Optional[str] = None,
         metadata: str = "all",
         order: str = "desc",
+        lora_pair: Optional[Sequence[str]] = None,
     ) -> Dict[str, Any]:
         ascending = str(order).lower() == "asc"
         items, total = self.cache.list_images(
@@ -346,6 +353,7 @@ class GalleryService:
             query=query,
             metadata=metadata,
             ascending=ascending,
+            lora_pair=lora_pair,
         )
         for item in items:
             item["image_url"] = self.image_url(item["image_path"])
@@ -381,7 +389,17 @@ class GalleryService:
         order: str = "desc",
         animadex_only: bool = False,
     ) -> Dict[str, Any]:
-        rows = self.cache.stats_by_lora() if by == "lora" else self.cache.stats_by_artist()
+        # Three groupings: one artist name, one LoRA name, or a two-LoRA pair.
+        # The pair ranking only counts rated co-occurrences, so its own sample
+        # floor is at least 3 images (and honours a larger min_total from the
+        # client) before the generic total filter below runs.
+        grouping = by if by in ("artist", "lora", "combo") else "artist"
+        if grouping == "combo":
+            rows = self.cache.stats_by_lora_combo(min_rated=max(3, min_total))
+        elif grouping == "lora":
+            rows = self.cache.stats_by_lora()
+        else:
+            rows = self.cache.stats_by_artist()
 
         # The animadex artist catalogue is an optional filter on the artist
         # ranking: the index mirrors the public artist list once and answers
@@ -389,7 +407,7 @@ class GalleryService:
         # UI can show a loading note instead of an empty table.
         animadex_index: Optional[AnimadexArtistIndex] = None
         animadex_status: Dict[str, Any] = {}
-        if by != "lora":
+        if grouping == "artist":
             animadex_index = AnimadexArtistIndex.get_instance()
             if animadex_only:
                 await animadex_index.ensure_loaded(wait_seconds=_ANIMADEX_INDEX_WAIT_SECONDS)
@@ -431,7 +449,7 @@ class GalleryService:
                 for image in row.get("images", [])
             ]
 
-        if by == "lora":
+        if grouping == "lora":
             # The ranking row is the same model the LoRA page shows, so reuse
             # that page's preview instead of making the client look it up. The
             # name is re-resolved first: the database hash can be stale when the
@@ -447,7 +465,7 @@ class GalleryService:
                 row["preview_url"] = previews.get(str(row.get("hash") or ""), "")
 
         return {
-            "by": "lora" if by == "lora" else "artist",
+            "by": grouping,
             "totals": self.cache.rating_totals(),
             "total": total,
             "offset": offset,

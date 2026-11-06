@@ -3161,7 +3161,8 @@
         },
         "filter": {
             "artist": "Artiste : {name}",
-            "lora": "LoRA : {name}"
+            "lora": "LoRA : {name}",
+            "loraPair": "[TODO: Translate] LoRA pair: {first} + {second}"
         },
         "card": {
             "unknownSize": "Taille inconnue",
@@ -3236,7 +3237,8 @@
             "by": {
                 "label": "Grouper par",
                 "artist": "Artiste",
-                "lora": "LoRA"
+                "lora": "LoRA",
+                "combo": "[TODO: Translate] LoRA pair"
             },
             "sort": {
                 "label": "Trier par",
@@ -3244,7 +3246,9 @@
                 "strength": "[TODO: Translate] Prompt weight",
                 "strengthHint": "[TODO: Translate] Count each vote at the strength the prompt gave the LoRA, so a LoRA a picture barely used cannot outrank one it leaned on.",
                 "total": "Total",
-                "ratio": "Ratio de J'aime"
+                "ratio": "Ratio de J'aime",
+                "average": "[TODO: Translate] Average",
+                "averageHint": "[TODO: Translate] Divide the score by the number of rated pictures, so a row seen many times does not win on volume alone."
             },
             "animadex": {
                 "group": "[TODO: Translate] Catalogue",
@@ -3270,7 +3274,9 @@
                 "score": "[TODO: Translate] Weighted score",
                 "strength": "[TODO: Translate] Prompt-weighted score",
                 "strengthWithAverage": "[TODO: Translate] Each vote counts at the strength the prompt gave it · average {average}×",
-                "ratio": "Ratio"
+                "ratio": "Ratio",
+                "average": "[TODO: Translate] Score per rated picture",
+                "averageWeighted": "[TODO: Translate] Weighted score per rated picture"
             },
             "noRatio": "N/D",
             "rowHint": "Afficher les images de cette entrée",

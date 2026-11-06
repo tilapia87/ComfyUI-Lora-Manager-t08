@@ -93,6 +93,7 @@ export async function fetchGalleryImages(params = {}) {
         metadata = 'all',
         artist = '',
         lora = '',
+        loraPair = null,
         q = '',
         order = 'desc',
     } = params;
@@ -108,6 +109,12 @@ export async function fetchGalleryImages(params = {}) {
 
     if (artist) query.append('artist', artist);
     if (lora) query.append('lora', lora);
+    // Combo rows carry two LoRA names; the backend turns lora_a/lora_b into
+    // two independent EXISTS checks so only images using both are returned.
+    if (Array.isArray(loraPair) && loraPair.length === 2 && loraPair[0] && loraPair[1]) {
+        query.append('lora_a', loraPair[0]);
+        query.append('lora_b', loraPair[1]);
+    }
     if (q) query.append('q', q);
 
     try {

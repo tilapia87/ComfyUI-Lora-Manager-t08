@@ -547,6 +547,50 @@ async def test_stats_endpoint_forwards_the_prompt_strength_sort(service, monkeyp
     assert captured["sort"] == "strength"
 
 
+async def test_stats_endpoint_accepts_the_combo_grouping_and_average_sorts(service, monkeypatch):
+    captured = {}
+
+    async def _stats(**kwargs):
+        captured.update(kwargs)
+        return {"by": kwargs["by"], "totals": {}, "total": 0, "offset": 0, "limit": 200, "items": []}
+
+    monkeypatch.setattr(service, "stats", _stats)
+    handler = GalleryHandlerSet()
+
+    for sort in ("average", "weighted_average"):
+        await handler.get_stats(FakeRequest(query={"by": "combo", "sort": sort}))
+        assert captured["by"] == "combo"
+        assert captured["sort"] == sort
+
+    # An unknown grouping still falls back to artists rather than erroring.
+    await handler.get_stats(FakeRequest(query={"by": "nonsense"}))
+    assert captured["by"] == "artist"
+
+
+async def test_list_images_forwards_a_lora_pair_filter(service, monkeypatch):
+    captured = {}
+
+    async def _list(**kwargs):
+        captured.update(kwargs)
+        return {"items": [], "total": 0, "page": 1, "page_size": 40, "total_pages": 0}
+
+    monkeypatch.setattr(service, "list_images", _list)
+    handler = GalleryHandlerSet()
+
+    await handler.list_images(
+        FakeRequest(query={"lora_a": "a.safetensors", "lora_b": "b.safetensors"})
+    )
+    assert captured["lora_pair"] == ("a.safetensors", "b.safetensors")
+
+    # One side alone is not a pair: the grid must not silently filter on one
+    # LoRA when the other half is missing.
+    await handler.list_images(FakeRequest(query={"lora_a": "a.safetensors"}))
+    assert captured["lora_pair"] is None
+
+    await handler.list_images(FakeRequest(query={}))
+    assert captured["lora_pair"] is None
+
+
 async def test_stats_endpoint_forwards_the_animadex_filter(service, monkeypatch):
     captured = {}
 
